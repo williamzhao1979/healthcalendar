@@ -12,7 +12,10 @@ export default function UserDropdown() {
   // 调试当前用户状态
   useEffect(() => {
     console.log("UserDropdown - 当前用户:", currentUser?.name || "无")
-    console.log("UserDropdown - 用户列表:", users.map(u => u.name))
+    console.log(
+      "UserDropdown - 用户列表:",
+      users.map((u) => u.name),
+    )
   }, [currentUser, users])
 
   // 点击外部关闭下拉菜单

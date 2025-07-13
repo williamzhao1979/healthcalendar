@@ -333,8 +333,8 @@ class DatabaseService {
       const existingUsers = await this.getUsers()
 
       // 检查是否已经有"我"这个用户
-      const meUser = existingUsers.find(user => user.name === "我" && user.relationship === "本人")
-      
+      const meUser = existingUsers.find((user) => user.name === "我" && user.relationship === "本人")
+
       if (meUser) {
         console.log("默认用户'我'已存在，跳过创建")
         return
@@ -373,10 +373,10 @@ class DatabaseService {
   async ensureDefaultUserExists(): Promise<User> {
     try {
       const existingUsers = await this.getUsers()
-      
+
       // 查找"我"这个用户
-      let meUser = existingUsers.find(user => user.name === "我" && user.relationship === "本人")
-      
+      let meUser = existingUsers.find((user) => user.name === "我" && user.relationship === "本人")
+
       if (!meUser) {
         console.log("默认用户'我'不存在，正在创建...")
         meUser = await this.addUser({ name: "我", relationship: "本人" })
@@ -384,7 +384,7 @@ class DatabaseService {
       } else {
         console.log("默认用户'我'已存在:", meUser.name)
       }
-      
+
       return meUser
     } catch (error) {
       console.error("确保默认用户存在时出错:", error)

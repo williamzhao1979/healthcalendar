@@ -50,9 +50,12 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const updateCurrentUser = async () => {
       if (users.length > 0 && settings) {
-        console.log("开始更新当前用户，用户列表:", users.map(u => u.name))
+        console.log(
+          "开始更新当前用户，用户列表:",
+          users.map((u) => u.name),
+        )
         console.log("当前设置:", settings)
-        
+
         if (settings.lastUserId) {
           // 查找当前选定的用户
           const user = users.find((u) => u.id === settings.lastUserId)
@@ -72,9 +75,9 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
           await setCurrentUser(defaultUser.id)
         }
       } else {
-        console.log("用户数据或设置未准备好:", { 
-          usersLength: users.length, 
-          hasSettings: !!settings 
+        console.log("用户数据或设置未准备好:", {
+          usersLength: users.length,
+          hasSettings: !!settings,
         })
       }
     }
@@ -126,7 +129,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         dbInitialized,
         usersLoading,
         usersCount: users.length,
-        createUserAttempts
+        createUserAttempts,
       })
 
       if (dbInitialized && !usersLoading && users.length === 0 && createUserAttempts < MAX_CREATE_USER_ATTEMPTS) {
