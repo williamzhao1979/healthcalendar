@@ -1,4 +1,6 @@
 "use client"
+
+import { useState } from "react"
 import { ChevronDown, User, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,61 +15,93 @@ import { useDatabase } from "@/context/DatabaseContext"
 import { useRouter } from "next/navigation"
 
 export default function UserDropdown() {
-  const { currentUser, users, switchUser } = useDatabase()
+  const { currentUser, users, setCurrentUser } = useDatabase()
   const router = useRouter()
+  const [isOpen, setIsOpen] = useState(false)
+
+  // 获取用户显示名称
+  const getUserDisplayName = (user: any) => {
+    if (user.relationship && user.relationship !== "本人") {
+      return `${user.name} (${user.relationship})`
+    }
+    return user.name
+  }
+
+  // 获取用户头像
+  const getUserAvatar = (user: any) => {
+    return user.avatar || "/placeholder-user.jpg"
+  }
+
+  // 获取用户姓名首字母
+  const getUserInitials = (user: any) => {
+    return user.name ? user.name.charAt(0).toUpperCase() : "U"
+  }
+
+  // 切换用户
+  const handleUserSwitch = (user: any) => {
+    setCurrentUser(user)
+    setIsOpen(false)
+  }
+
+  // 前往用户管理页面
+  const handleUserManagement = () => {
+    router.push("/user-management")
+    setIsOpen(false)
+  }
 
   if (!currentUser) {
     return (
-      <div className="flex items-center space-x-2 p-2 border rounded-lg">
-        <User className="h-8 w-8 text-gray-400" />
-        <span className="text-sm text-gray-500">加载中...</span>
-      </div>
+      <Button variant="outline" onClick={handleUserManagement} className="flex items-center gap-2 bg-transparent">
+        <User className="h-4 w-4" />
+        添加用户
+      </Button>
     )
   }
 
-  const handleUserSwitch = async (userId: string) => {
-    if (userId !== currentUser.id) {
-      await switchUser(userId)
-    }
-  }
-
-  const handleManageUsers = () => {
-    router.push("/user-management")
-  }
-
   return (
-    <DropdownMenu>
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="flex items-center space-x-2 h-auto p-2 bg-transparent">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
-            <AvatarFallback>{currentUser.name.charAt(0)}</AvatarFallback>
+        <Button variant="outline" className="flex items-center gap-2 h-10 px-3 bg-transparent">
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={getUserAvatar(currentUser) || "/placeholder.svg"} alt={currentUser.name} />
+            <AvatarFallback className="text-xs">{getUserInitials(currentUser)}</AvatarFallback>
           </Avatar>
-          <span className="text-sm font-medium">{currentUser.name}</span>
-          <ChevronDown className="h-4 w-4" />
+          <span className="text-sm font-medium">{getUserDisplayName(currentUser)}</span>
+          <ChevronDown className="h-4 w-4 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent align="end" className="w-56">
-        <div className="px-2 py-1.5 text-sm font-semibold">切换用户</div>
+        {/* 当前用户信息 */}
+        <div className="px-2 py-1.5">
+          <p className="text-sm font-medium">当前用户</p>
+          <p className="text-xs text-muted-foreground">{getUserDisplayName(currentUser)}</p>
+        </div>
+
         <DropdownMenuSeparator />
+
+        {/* 用户切换列表 */}
         {users.map((user) => (
           <DropdownMenuItem
             key={user.id}
-            onClick={() => handleUserSwitch(user.id)}
-            className={`flex items-center space-x-2 ${user.id === currentUser.id ? "bg-accent" : ""}`}
+            onClick={() => handleUserSwitch(user)}
+            className={`flex items-center gap-2 ${currentUser.id === user.id ? "bg-accent" : ""}`}
           >
             <Avatar className="h-6 w-6">
-              <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-              <AvatarFallback className="text-xs">{user.name.charAt(0)}</AvatarFallback>
+              <AvatarImage src={getUserAvatar(user) || "/placeholder.svg"} alt={user.name} />
+              <AvatarFallback className="text-xs">{getUserInitials(user)}</AvatarFallback>
             </Avatar>
-            <span>{user.name}</span>
-            {user.id === currentUser.id && <span className="ml-auto text-xs text-muted-foreground">当前</span>}
+            <span className="text-sm">{getUserDisplayName(user)}</span>
+            {currentUser.id === user.id && <div className="ml-auto h-2 w-2 bg-green-500 rounded-full" />}
           </DropdownMenuItem>
         ))}
+
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleManageUsers}>
-          <Settings className="h-4 w-4 mr-2" />
-          管理用户
+
+        {/* 用户管理 */}
+        <DropdownMenuItem onClick={handleUserManagement}>
+          <Settings className="mr-2 h-4 w-4" />
+          <span>用户管理</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

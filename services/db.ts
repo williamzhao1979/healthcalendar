@@ -1,178 +1,278 @@
 import Dexie, { type EntityTable } from "dexie"
 
+// 用户接口
 export interface User {
   id: string
   name: string
   avatar?: string
-  createdAt: Date
+  relationship?: string
+  birthDate?: string
+  gender?: "male" | "female" | "other"
+  phone?: string
+  email?: string
+  address?: string
+  emergencyContact?: string
+  medicalHistory?: string[]
+  allergies?: string[]
+  medications?: string[]
+  createdAt: number
+  updatedAt?: number
 }
 
+// 健康记录接口
 export interface HealthRecord {
   id: string
   userId: string
-  date: string
-  type: "stool" | "medication" | "symptom" | "other"
-  data: Record<string, any>
-  createdAt: Date
-  updatedAt: Date
+  type: string
+  category: string
+  timestamp: number
+  note?: string
+  details?: Record<string, any>
+  attachments?: Array<{
+    name: string
+    size: number
+    type: string
+    compressed?: boolean
+  }>
+  createdAt: number
+  updatedAt?: number
 }
 
-export interface Settings {
-  id: string
-  userId: string
+// 设置接口
+export interface Setting {
   key: string
   value: any
-  updatedAt: Date
+  updatedAt: number
 }
 
-class HealthDatabase extends Dexie {
+// 数据库类
+class HealthCalendarDB extends Dexie {
   users!: EntityTable<User, "id">
   healthRecords!: EntityTable<HealthRecord, "id">
-  settings!: EntityTable<Settings, "id">
+  settings!: EntityTable<Setting, "key">
 
   constructor() {
-    super("HealthDatabase")
+    super("HealthCalendarDB")
+
     this.version(1).stores({
-      users: "id, name, createdAt",
-      healthRecords: "id, userId, date, type, createdAt, updatedAt",
-      settings: "id, userId, key, updatedAt",
+      users: "id, name, relationship, createdAt",
+      healthRecords: "id, userId, type, category, timestamp, createdAt",
+      settings: "key, updatedAt",
     })
   }
 }
 
-const db = new HealthDatabase()
+// 数据库实例
+const db = new HealthCalendarDB()
 
+// 数据库服务类
 class DatabaseService {
-  private db = db
+  private initialized = false
 
+  // 初始化数据库
   async initialize() {
+    if (this.initialized) return
+
     try {
-      await this.db.open()
+      await db.open()
 
       // 检查是否有默认用户，如果没有则创建
-      const userCount = await this.db.users.count()
+      const userCount = await db.users.count()
       if (userCount === 0) {
         await this.createDefaultUsers()
       }
+
+      this.initialized = true
+      console.log("数据库初始化成功")
     } catch (error) {
-      console.error("Database initialization failed:", error)
+      console.error("数据库初始化失败:", error)
       throw error
     }
   }
 
+  // 创建默认用户
   private async createDefaultUsers() {
-    const defaultUsers: Omit<User, "id">[] = [
+    const defaultUsers: Omit<User, "id" | "createdAt">[] = [
       {
         name: "张三",
+        relationship: "本人",
         avatar: "/placeholder-user.jpg",
-        createdAt: new Date(),
+        gender: "male",
+        birthDate: "1990-01-01",
       },
       {
         name: "李四",
+        relationship: "配偶",
         avatar: "/placeholder-user.jpg",
-        createdAt: new Date(),
+        gender: "female",
+        birthDate: "1992-05-15",
       },
       {
-        name: "王五",
+        name: "小明",
+        relationship: "子女",
         avatar: "/placeholder-user.jpg",
-        createdAt: new Date(),
+        gender: "male",
+        birthDate: "2015-08-20",
       },
     ]
 
-    for (const user of defaultUsers) {
-      await this.addUser(user)
+    for (const userData of defaultUsers) {
+      await this.addUser(userData)
     }
   }
 
-  // User methods
-  async getAllUsers(): Promise<User[]> {
-    return await this.db.users.orderBy("createdAt").toArray()
+  // 生成唯一ID
+  private generateId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2)
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return await this.db.users.get(id)
+  // 用户相关方法
+  async getUsers(): Promise<User[]> {
+    try {
+      return await db.users.orderBy("createdAt").toArray()
+    } catch (error) {
+      console.error("获取用户列表失败:", error)
+      return []
+    }
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    try {
+      return await db.users.get(id)
+    } catch (error) {
+      console.error("获取用户失败:", error)
+      return undefined
+    }
   }
 
   async addUser(userData: Omit<User, "id" | "createdAt">): Promise<User> {
-    const user: User = {
-      id: crypto.randomUUID(),
-      ...userData,
-      createdAt: new Date(),
+    try {
+      const user: User = {
+        ...userData,
+        id: this.generateId(),
+        createdAt: Date.now(),
+      }
+
+      await db.users.add(user)
+      return user
+    } catch (error) {
+      console.error("添加用户失败:", error)
+      throw error
     }
-    await this.db.users.add(user)
-    return user
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<void> {
-    await this.db.users.update(id, updates)
+    try {
+      await db.users.update(id, {
+        ...updates,
+        updatedAt: Date.now(),
+      })
+    } catch (error) {
+      console.error("更新用户失败:", error)
+      throw error
+    }
   }
 
   async deleteUser(id: string): Promise<void> {
-    await this.db.users.delete(id)
-    // Also delete related records
-    await this.db.healthRecords.where("userId").equals(id).delete()
-    await this.db.settings.where("userId").equals(id).delete()
+    try {
+      // 删除用户相关的健康记录
+      await db.healthRecords.where("userId").equals(id).delete()
+      // 删除用户
+      await db.users.delete(id)
+    } catch (error) {
+      console.error("删除用户失败:", error)
+      throw error
+    }
   }
 
-  // Health Record methods
-  async getHealthRecords(userId: string, type?: string): Promise<HealthRecord[]> {
-    let query = this.db.healthRecords.where("userId").equals(userId)
-    if (type) {
-      query = query.and((record) => record.type === type)
+  // 健康记录相关方法
+  async getHealthRecords(userId?: string): Promise<HealthRecord[]> {
+    try {
+      if (userId) {
+        return await db.healthRecords.where("userId").equals(userId).orderBy("timestamp").reverse().toArray()
+      } else {
+        return await db.healthRecords.orderBy("timestamp").reverse().toArray()
+      }
+    } catch (error) {
+      console.error("获取健康记录失败:", error)
+      return []
     }
-    return await query.orderBy("date").reverse().toArray()
   }
 
-  async addHealthRecord(recordData: Omit<HealthRecord, "id" | "createdAt" | "updatedAt">): Promise<HealthRecord> {
-    const record: HealthRecord = {
-      id: crypto.randomUUID(),
-      ...recordData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+  async addHealthRecord(recordData: Omit<HealthRecord, "id" | "createdAt">): Promise<HealthRecord> {
+    try {
+      const record: HealthRecord = {
+        ...recordData,
+        id: this.generateId(),
+        createdAt: Date.now(),
+      }
+
+      await db.healthRecords.add(record)
+      return record
+    } catch (error) {
+      console.error("添加健康记录失败:", error)
+      throw error
     }
-    await this.db.healthRecords.add(record)
-    return record
   }
 
   async updateHealthRecord(id: string, updates: Partial<HealthRecord>): Promise<void> {
-    await this.db.healthRecords.update(id, {
-      ...updates,
-      updatedAt: new Date(),
-    })
-  }
-
-  async deleteHealthRecord(id: string): Promise<void> {
-    await this.db.healthRecords.delete(id)
-  }
-
-  // Settings methods
-  async getSetting(userId: string, key: string): Promise<any> {
-    const setting = await this.db.settings.where({ userId, key }).first()
-    return setting?.value
-  }
-
-  async setSetting(userId: string, key: string, value: any): Promise<void> {
-    const existing = await this.db.settings.where({ userId, key }).first()
-    if (existing) {
-      await this.db.settings.update(existing.id, {
-        value,
-        updatedAt: new Date(),
+    try {
+      await db.healthRecords.update(id, {
+        ...updates,
+        updatedAt: Date.now(),
       })
-    } else {
-      await this.db.settings.add({
-        id: crypto.randomUUID(),
-        userId,
-        key,
-        value,
-        updatedAt: new Date(),
-      })
+    } catch (error) {
+      console.error("更新健康记录失败:", error)
+      throw error
     }
   }
 
-  async deleteSetting(userId: string, key: string): Promise<void> {
-    await this.db.settings.where({ userId, key }).delete()
+  async deleteHealthRecord(id: string): Promise<void> {
+    try {
+      await db.healthRecords.delete(id)
+    } catch (error) {
+      console.error("删除健康记录失败:", error)
+      throw error
+    }
+  }
+
+  // 设置相关方法
+  async getSetting(key: string): Promise<any> {
+    try {
+      const setting = await db.settings.get(key)
+      return setting?.value
+    } catch (error) {
+      console.error("获取设置失败:", error)
+      return null
+    }
+  }
+
+  async setSetting(key: string, value: any): Promise<void> {
+    try {
+      await db.settings.put({
+        key,
+        value,
+        updatedAt: Date.now(),
+      })
+    } catch (error) {
+      console.error("设置保存失败:", error)
+      throw error
+    }
+  }
+
+  // 清空所有数据
+  async clearAllData(): Promise<void> {
+    try {
+      await db.users.clear()
+      await db.healthRecords.clear()
+      await db.settings.clear()
+    } catch (error) {
+      console.error("清空数据失败:", error)
+      throw error
+    }
   }
 }
 
+// 导出数据库服务实例
 const dbService = new DatabaseService()
 export default dbService
