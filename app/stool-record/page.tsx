@@ -2,467 +2,244 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
-import { useRouter } from "next/navigation"
-import { ArrowLeft, Calendar, Upload, Check } from "lucide-react"
+import { useState } from "react"
+import { ArrowLeft, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useDatabase } from "@/context/DatabaseContext"
 import { useHealthRecords } from "@/hooks/useHealthRecords"
+import { getDateString } from "@/lib/utils"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
-// 布里斯托大便分类法
-const stoolTypes = [
-  {
-    id: "type1",
-    name: "类型1",
-    description: "分离的硬块，像坚果",
-    detail: "严重便秘",
-    color: "text-red-600",
-  },
-  {
-    id: "type2",
-    name: "类型2",
-    description: "香肠状但有块状",
-    detail: "轻度便秘",
-    color: "text-orange-600",
-  },
-  {
-    id: "type3",
-    name: "类型3",
-    description: "香肠状但表面有裂纹",
-    detail: "正常",
-    color: "text-green-600",
-  },
-  {
-    id: "type4",
-    name: "类型4",
-    description: "香肠状或蛇状，光滑柔软",
-    detail: "正常",
-    color: "text-green-600",
-  },
-  {
-    id: "type5",
-    name: "类型5",
-    description: "柔软的块状，边缘清晰",
-    detail: "缺乏纤维",
-    color: "text-yellow-600",
-  },
-  {
-    id: "type6",
-    name: "类型6",
-    description: "蓬松的块状，边缘不规则",
-    detail: "轻度腹泻",
-    color: "text-orange-600",
-  },
-  {
-    id: "type7",
-    name: "类型7",
-    description: "水样，无固体块状",
-    detail: "腹泻",
-    color: "text-red-600",
-  },
+const BRISTOL_TYPES = [
+  { type: 1, name: "硬球状", description: "分离的硬块，像坚果" },
+  { type: 2, name: "块状", description: "香肠状但有块状" },
+  { type: 3, name: "裂纹状", description: "香肠状但表面有裂纹" },
+  { type: 4, name: "光滑状", description: "香肠状，光滑柔软" },
+  { type: 5, name: "软块状", description: "柔软的块状，边缘清晰" },
+  { type: 6, name: "糊状", description: "蓬松的块状，边缘不规则" },
+  { type: 7, name: "水状", description: "完全液体状" },
 ]
 
-// 大便颜色选项
-const stoolColors = [
-  {
-    id: "brown",
-    name: "棕色",
-    description: "正常颜色，胆汁代谢正常",
-    color: "bg-amber-700",
-  },
-  {
-    id: "yellow",
-    name: "黄色",
-    description: "可能脂肪消化不良",
-    color: "bg-yellow-500",
-  },
-  {
-    id: "green",
-    name: "绿色",
-    description: "胆汁过多或食物通过过快",
-    color: "bg-green-600",
-  },
-  {
-    id: "black",
-    name: "黑色",
-    description: "可能上消化道出血，需就医",
-    color: "bg-gray-900",
-  },
-  {
-    id: "red",
-    name: "红色",
-    description: "可能下消化道出血，需就医",
-    color: "bg-red-600",
-  },
-  {
-    id: "white",
-    name: "白色/灰色",
-    description: "胆汁分泌异常，需就医",
-    color: "bg-gray-300",
-  },
+const STOOL_COLORS = [
+  { color: "brown", name: "棕色", hex: "#8B4513" },
+  { color: "yellow", name: "黄色", hex: "#FFD700" },
+  { color: "green", name: "绿色", hex: "#228B22" },
+  { color: "black", name: "黑色", hex: "#000000" },
+  { color: "red", name: "红色", hex: "#DC143C" },
+  { color: "white", name: "白色", hex: "#F5F5F5" },
 ]
 
 export default function StoolRecordPage() {
+  const { currentUser } = useDatabase()
+  const { addRecord } = useHealthRecords()
   const router = useRouter()
-  const { currentUser, users, isLoading } = useDatabase()
-  const { addRecord } = useHealthRecords(currentUser?.id || null)
 
-  // 表单状态
-  const [selectedUser, setSelectedUser] = useState("")
-  const [dateTime, setDateTime] = useState(() => {
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = String(now.getMonth() + 1).padStart(2, "0")
-    const day = String(now.getDate()).padStart(2, "0")
-    const hours = String(now.getHours()).padStart(2, "0")
-    const minutes = String(now.getMinutes()).padStart(2, "0")
-    return `${year}-${month}-${day}T${hours}:${minutes}`
+  const [formData, setFormData] = useState({
+    date: getDateString(new Date()),
+    time: new Date().toTimeString().slice(0, 5),
+    bristolType: "",
+    color: "",
+    notes: "",
   })
-  const [stoolType, setStoolType] = useState("type4") // 默认类型4
-  const [stoolColor, setStoolColor] = useState("brown")
-  const [note, setNote] = useState("")
-  const [attachments, setAttachments] = useState<File[]>([])
-  const [compressImages, setCompressImages] = useState(true)
+
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
 
-  // 当 currentUser 加载完成后，设置默认选中用户
-  useState(() => {
-    if (currentUser && !selectedUser) {
-      setSelectedUser(currentUser.id)
+    if (!currentUser) {
+      toast.error("请先选择用户")
+      return
     }
-  }, [currentUser, selectedUser])
 
-  // 如果正在加载，显示加载状态
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">加载中...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // 如果没有用户，显示提示
-  if (!users || users.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">请先添加用户</p>
-          <Button onClick={() => router.push("/user-management")}>前往用户管理</Button>
-        </div>
-      </div>
-    )
-  }
-
-  // 获取选中的大便类型信息
-  const selectedStoolType = stoolTypes.find((type) => type.id === stoolType)
-
-  // 获取选中的大便颜色信息
-  const selectedStoolColor = stoolColors.find((color) => color.id === stoolColor)
-
-  // 获取用户显示名称
-  const getUserDisplayName = (user: any) => {
-    if (user.relationship && user.relationship !== "本人") {
-      return `${user.name} (${user.relationship})`
-    }
-    return user.name
-  }
-
-  // 处理文件上传
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files) {
-      setAttachments((prev) => [...prev, ...Array.from(files)])
-    }
-  }
-
-  // 移除附件
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  // 格式化文件大小
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
-  }
-
-  // 保存记录
-  const handleSave = async () => {
-    if (!selectedUser) {
-      alert("请选择用户")
+    if (!formData.bristolType || !formData.color) {
+      toast.error("请选择布里斯托尔分型和颜色")
       return
     }
 
     setIsSubmitting(true)
+
     try {
-      const timestamp = new Date(dateTime).getTime()
-
-      // 准备附件信息
-      const attachmentInfo = attachments.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        compressed: compressImages && file.type.startsWith("image/"),
-      }))
-
-      // 创建健康记录
-      const recordData = {
-        userId: selectedUser,
+      await addRecord({
+        date: formData.date,
         type: "stool",
-        category: "大便记录",
-        timestamp,
-        note,
-        details: {
-          stoolType,
-          stoolTypeName: selectedStoolType?.name,
-          stoolTypeDescription: selectedStoolType?.description,
-          stoolColor,
-          stoolColorName: selectedStoolColor?.name,
-          stoolColorDescription: selectedStoolColor?.description,
-          attachments: attachmentInfo,
+        data: {
+          time: formData.time,
+          bristolType: Number.parseInt(formData.bristolType),
+          color: formData.color,
+          notes: formData.notes,
         },
-      }
+      })
 
-      await addRecord(recordData)
-
-      // 保存成功，返回健康日历页面
+      toast.success("记录已保存")
       router.push("/health-calendar")
     } catch (error) {
-      console.error("保存大便记录失败:", error)
-      alert("保存失败，请重试")
+      console.error("Failed to save record:", error)
+      toast.error("保存失败，请重试")
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      {/* 头部 */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-            <div className="w-5 h-5 bg-green-600 rounded"></div>
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">大便记录</h1>
-            <p className="text-sm text-gray-600">记录今天的大便状况</p>
-          </div>
+  const handleBack = () => {
+    router.push("/health-calendar")
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">请先选择用户</p>
+          <Button onClick={handleBack}>返回</Button>
         </div>
       </div>
+    )
+  }
 
-      {/* 当前用户选择 */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
-              <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-            </div>
-            <Label className="text-sm font-medium text-gray-700">当前用户:</Label>
-            <Select value={selectedUser} onValueChange={setSelectedUser}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="选择用户" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {getUserDisplayName(user)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="max-w-2xl mx-auto p-4">
+        {/* 头部 */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="sm" onClick={handleBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-2xl font-bold">大便记录</h1>
           </div>
-        </CardContent>
-      </Card>
+          <div className="text-sm text-muted-foreground">用户: {currentUser.name}</div>
+        </div>
 
-      {/* 主要记录信息 */}
-      <Card>
-        <CardContent className="p-6 space-y-6">
-          {/* 日期时间 */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">日期时间</h3>
-            <div className="relative">
-              <Input
-                type="datetime-local"
-                value={dateTime}
-                onChange={(e) => setDateTime(e.target.value)}
-                className="pl-10"
-              />
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            </div>
-          </div>
-
-          {/* 大便类型 */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-              大便类型 <span className="text-sm font-normal text-gray-600">(布里斯托分类法)</span>
-            </h3>
-            <Select value={stoolType} onValueChange={setStoolType}>
-              <SelectTrigger>
-                <SelectValue placeholder="选择大便类型" />
-              </SelectTrigger>
-              <SelectContent>
-                {stoolTypes.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{type.name}</span>
-                      <span className="text-sm text-gray-600">{type.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {selectedStoolType && (
-              <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-green-800">当前选择：</span>
-                  <span className="text-sm font-medium text-green-800">{selectedStoolType.name}</span>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* 基本信息 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>基本信息</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date">日期</Label>
+                  <input
+                    id="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    required
+                  />
                 </div>
-                <div className="text-sm text-green-700 mt-1">
-                  {selectedStoolType.description}，{selectedStoolType.detail}
+                <div className="space-y-2">
+                  <Label htmlFor="time">时间</Label>
+                  <input
+                    id="time"
+                    type="time"
+                    value={formData.time}
+                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    required
+                  />
                 </div>
               </div>
-            )}
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* 大便颜色 */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">大便颜色</h3>
-            <Select value={stoolColor} onValueChange={setStoolColor}>
-              <SelectTrigger>
-                <SelectValue placeholder="选择大便颜色" />
-              </SelectTrigger>
-              <SelectContent>
-                {stoolColors.map((color) => (
-                  <SelectItem key={color.id} value={color.id}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full ${color.color}`}></div>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{color.name}</span>
-                        <span className="text-sm text-gray-600">{color.description}</span>
+          {/* 布里斯托尔分型 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>布里斯托尔大便分型</CardTitle>
+              <CardDescription>请选择最符合的分型</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={formData.bristolType}
+                onValueChange={(value) => setFormData({ ...formData, bristolType: value })}
+                className="space-y-3"
+              >
+                {BRISTOL_TYPES.map((type) => (
+                  <div key={type.type} className="flex items-center space-x-3 p-3 border rounded-lg">
+                    <RadioGroupItem value={type.type.toString()} id={`bristol-${type.type}`} />
+                    <Label htmlFor={`bristol-${type.type}`} className="flex-1 cursor-pointer">
+                      <div className="font-medium">
+                        类型 {type.type}: {type.name}
                       </div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* 备注 */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">备注</h3>
-            <Textarea
-              placeholder="记录其他感受或注意事项..."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="min-h-[100px]"
-            />
-          </div>
-
-          {/* 附件上传 */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-gray-900">附件上传</h3>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="compress"
-                  checked={compressImages}
-                  onCheckedChange={(checked) => setCompressImages(checked as boolean)}
-                />
-                <Label htmlFor="compress" className="text-sm text-gray-600">
-                  图片压缩
-                </Label>
-              </div>
-            </div>
-
-            <div
-              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-600 mb-1">点击上传图片或文档</p>
-              <p className="text-sm text-gray-500">图片格式动态压缩适合上传的大小</p>
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,.pdf,.doc,.docx"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-
-            {/* 已上传文件列表 */}
-            {attachments.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {attachments.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                        <Upload className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{file.name}</p>
-                        <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeAttachment(index)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      删除
-                    </Button>
+                      <div className="text-sm text-muted-foreground">{type.description}</div>
+                    </Label>
                   </div>
                 ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              </RadioGroup>
+            </CardContent>
+          </Card>
 
-      {/* 操作按钮 */}
-      <div className="flex gap-4 mt-6">
-        <Button
-          variant="outline"
-          className="flex-1 bg-transparent"
-          onClick={() => router.back()}
-          disabled={isSubmitting}
-        >
-          取消
-        </Button>
-        <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleSave} disabled={isSubmitting}>
-          {isSubmitting ? (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              保存中...
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Check className="h-4 w-4" />
-              保存记录
-            </div>
-          )}
-        </Button>
+          {/* 颜色选择 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>颜色</CardTitle>
+              <CardDescription>请选择大便的颜色</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={formData.color}
+                onValueChange={(value) => setFormData({ ...formData, color: value })}
+                className="grid grid-cols-2 gap-3"
+              >
+                {STOOL_COLORS.map((colorOption) => (
+                  <div key={colorOption.color} className="flex items-center space-x-3 p-3 border rounded-lg">
+                    <RadioGroupItem value={colorOption.color} id={`color-${colorOption.color}`} />
+                    <Label
+                      htmlFor={`color-${colorOption.color}`}
+                      className="flex items-center space-x-2 cursor-pointer"
+                    >
+                      <div className="w-6 h-6 rounded-full border-2" style={{ backgroundColor: colorOption.hex }} />
+                      <span>{colorOption.name}</span>
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </CardContent>
+          </Card>
+
+          {/* 备注 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>备注</CardTitle>
+              <CardDescription>记录其他相关信息（可选）</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="输入备注信息..."
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={4}
+              />
+            </CardContent>
+          </Card>
+
+          {/* 提交按钮 */}
+          <div className="flex justify-end space-x-4">
+            <Button type="button" variant="outline" onClick={handleBack}>
+              取消
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  保存中...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  保存记录
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   )

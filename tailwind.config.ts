@@ -66,11 +66,6 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
-      fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "monospace"],
-        chinese: ["var(--font-chinese)", "system-ui", "sans-serif"],
-      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

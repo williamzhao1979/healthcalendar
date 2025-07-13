@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from "react"
 import dbService, { type HealthRecord } from "@/services/db"
+import { useDatabase } from "@/context/DatabaseContext"
 
-export function useHealthRecords(userId: string | null) {
+export function useHealthRecords(type?: string) {
+  const { currentUser } = useDatabase()
   const [records, setRecords] = useState<HealthRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 获取健康记录
   const fetchRecords = async () => {
-    if (!userId) {
+    if (!currentUser) {
       setRecords([])
       setIsLoading(false)
       return
@@ -19,54 +20,57 @@ export function useHealthRecords(userId: string | null) {
     try {
       setIsLoading(true)
       setError(null)
-      const userRecords = await dbService.getHealthRecords(userId)
-      setRecords(userRecords)
+      const data = await dbService.getHealthRecords(currentUser.id, type)
+      setRecords(data)
     } catch (err) {
-      console.error("获取健康记录失败:", err)
-      setError("获取健康记录失败")
+      setError(err instanceof Error ? err.message : "Failed to fetch records")
+      console.error("Error fetching health records:", err)
     } finally {
       setIsLoading(false)
     }
   }
 
-  // 添加健康记录
-  const addRecord = async (recordData: Omit<HealthRecord, "id" | "createdAt">) => {
+  const addRecord = async (recordData: Omit<HealthRecord, "id" | "userId" | "createdAt" | "updatedAt">) => {
+    if (!currentUser) {
+      throw new Error("No current user")
+    }
+
     try {
-      const newRecord = await dbService.addHealthRecord(recordData)
-      setRecords((prev) => [newRecord, ...prev])
+      const newRecord = await dbService.addHealthRecord({
+        ...recordData,
+        userId: currentUser.id,
+      })
+      await fetchRecords() // Refresh the list
       return newRecord
     } catch (err) {
-      console.error("添加健康记录失败:", err)
+      setError(err instanceof Error ? err.message : "Failed to add record")
       throw err
     }
   }
 
-  // 更新健康记录
   const updateRecord = async (id: string, updates: Partial<HealthRecord>) => {
     try {
       await dbService.updateHealthRecord(id, updates)
-      setRecords((prev) => prev.map((record) => (record.id === id ? { ...record, ...updates } : record)))
+      await fetchRecords() // Refresh the list
     } catch (err) {
-      console.error("更新健康记录失败:", err)
+      setError(err instanceof Error ? err.message : "Failed to update record")
       throw err
     }
   }
 
-  // 删除健康记录
   const deleteRecord = async (id: string) => {
     try {
       await dbService.deleteHealthRecord(id)
-      setRecords((prev) => prev.filter((record) => record.id !== id))
+      await fetchRecords() // Refresh the list
     } catch (err) {
-      console.error("删除健康记录失败:", err)
+      setError(err instanceof Error ? err.message : "Failed to delete record")
       throw err
     }
   }
 
-  // 当用户ID变化时重新获取记录
   useEffect(() => {
     fetchRecords()
-  }, [userId])
+  }, [currentUser, type])
 
   return {
     records,

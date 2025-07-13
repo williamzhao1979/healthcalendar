@@ -2,7 +2,7 @@ import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   experimental: {
-    allowedDevOrigins: process.env.NEXT_PUBLIC_ALLOWED_DEV_ORIGINS?.split(",") || [],
+    allowedDevOrigins: ["localhost:3000", "127.0.0.1:3000"],
   },
   eslint: {
     ignoreDuringBuilds: true,

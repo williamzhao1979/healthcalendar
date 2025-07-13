@@ -1,473 +1,293 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, RefreshCw, UserPlus, Edit, Trash2, MoreHorizontal, Users, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Plus, Edit, Trash2, User } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useDatabase } from "@/context/DatabaseContext"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function UserManagementPage() {
+  const { users, currentUser, addUser, updateUser, deleteUser, switchUser } = useDatabase()
   const router = useRouter()
-  const { users, currentUser, addUser, updateUser, deleteUser, setCurrentUser, isLoading } = useDatabase()
-  const [showAddForm, setShowAddForm] = useState(false)
+
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
-  const [newUserName, setNewUserName] = useState("")
-  const [newUserRelationship, setNewUserRelationship] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [userToDelete, setUserToDelete] = useState<any>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [formData, setFormData] = useState({
+    name: "",
+    avatar: "",
+  })
 
-  // 格式化日期
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp)
-    return `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")}`
+  const handleBack = () => {
+    router.push("/health-calendar")
   }
 
-  // 显示成功消息
-  const showSuccess = (message: string) => {
-    setSuccessMessage(message)
-    setTimeout(() => setSuccessMessage(null), 3000)
-  }
-
-  // 获取用户头像文字
-  const getUserAvatar = (name: string) => {
-    return name.charAt(0)
-  }
-
-  // 获取关系显示文本
-  const getRelationshipText = (relationship?: string) => {
-    if (!relationship || relationship === "本人") return "家庭成员"
-    return relationship
-  }
-
-  // 处理添加用户
   const handleAddUser = async () => {
-    if (!newUserName.trim()) {
-      setError("请输入用户姓名")
+    if (!formData.name.trim()) {
+      toast.error("请输入用户名")
       return
     }
-
-    // 检查用户名是否已存在
-    if (users.some(user => user.name === newUserName.trim())) {
-      setError("该用户名已存在")
-      return
-    }
-
-    setIsSubmitting(true)
-    setError(null)
 
     try {
       await addUser({
-        name: newUserName.trim(),
-        relationship: newUserRelationship.trim() || "家庭成员",
+        name: formData.name.trim(),
+        avatar: formData.avatar || "/placeholder-user.jpg",
       })
-
-      setNewUserName("")
-      setNewUserRelationship("")
-      setShowAddForm(false)
-      setError(null)
-      showSuccess("用户添加成功！")
+      toast.success("用户添加成功")
+      setIsAddDialogOpen(false)
+      setFormData({ name: "", avatar: "" })
     } catch (error) {
-      console.error("添加用户失败:", error)
-      setError("添加用户失败，请重试")
-    } finally {
-      setIsSubmitting(false)
+      console.error("Failed to add user:", error)
+      toast.error("添加用户失败")
     }
   }
 
-  // 处理编辑用户
   const handleEditUser = async () => {
-    if (!editingUser || !newUserName.trim()) {
-      setError("请输入用户姓名")
+    if (!editingUser || !formData.name.trim()) {
+      toast.error("请输入用户名")
       return
     }
-
-    // 检查用户名是否已存在（除了当前编辑的用户）
-    if (users.some(user => user.name === newUserName.trim() && user.id !== editingUser.id)) {
-      setError("该用户名已存在")
-      return
-    }
-
-    setIsSubmitting(true)
-    setError(null)
 
     try {
       await updateUser(editingUser.id, {
-        name: newUserName.trim(),
-        relationship: newUserRelationship.trim() || "家庭成员",
+        name: formData.name.trim(),
+        avatar: formData.avatar || editingUser.avatar,
       })
-
+      toast.success("用户更新成功")
+      setIsEditDialogOpen(false)
       setEditingUser(null)
-      setNewUserName("")
-      setNewUserRelationship("")
-      setShowAddForm(false)
-      setError(null)
-      showSuccess("用户信息更新成功！")
+      setFormData({ name: "", avatar: "" })
     } catch (error) {
-      console.error("更新用户失败:", error)
-      setError("更新用户失败，请重试")
-    } finally {
-      setIsSubmitting(false)
+      console.error("Failed to update user:", error)
+      toast.error("更新用户失败")
     }
   }
 
-  // 开始编辑用户
-  const startEditUser = (user: any) => {
-    setEditingUser(user)
-    setNewUserName(user.name)
-    setNewUserRelationship(user.relationship || "")
-    setShowAddForm(true)
-    setError(null)
-  }
-
-  // 处理删除用户确认
-  const handleDeleteUser = async () => {
-    if (!userToDelete) return
-
-    setIsSubmitting(true)
-    setError(null)
-
+  const handleDeleteUser = async (userId: string) => {
     try {
-      await deleteUser(userToDelete.id)
-
-      // 如果删除的是当前用户，切换到第一个可用用户
-      if (currentUser?.id === userToDelete.id && users.length > 1) {
-        const remainingUser = users.find((u) => u.id !== userToDelete.id)
-        if (remainingUser) {
-          await setCurrentUser(remainingUser.id)
-        }
-      }
-
-      setShowDeleteConfirm(false)
-      setUserToDelete(null)
-      showSuccess("用户删除成功！")
+      await deleteUser(userId)
+      toast.success("用户删除成功")
     } catch (error) {
-      console.error("删除用户失败:", error)
-      setError("删除用户失败，请重试")
-    } finally {
-      setIsSubmitting(false)
+      console.error("Failed to delete user:", error)
+      toast.error("删除用户失败")
     }
   }
 
-  // 显示删除确认弹窗
-  const showDeleteConfirmation = (userId: string) => {
-    if (users.length <= 1) {
-      setError("至少需要保留一个用户")
-      return
-    }
-
-    const user = users.find(u => u.id === userId)
-    if (!user) {
-      setError("用户不存在")
-      return
-    }
-    setUserToDelete(user)
-    setShowDeleteConfirm(true)
-  }
-
-  // 取消编辑
-  const cancelEdit = () => {
-    setShowAddForm(false)
-    setEditingUser(null)
-    setNewUserName("")
-    setNewUserRelationship("")
-    setError(null)
-  }
-
-  // 切换当前用户
   const handleSwitchUser = async (userId: string) => {
-    if (userId === currentUser?.id) return
-
-    setIsSubmitting(true)
-    setError(null)
-
     try {
-      await setCurrentUser(userId)
-      showSuccess("用户切换成功！")
+      await switchUser(userId)
+      toast.success("用户切换成功")
     } catch (error) {
-      console.error("切换用户失败:", error)
-      setError("切换用户失败，请重试")
-    } finally {
-      setIsSubmitting(false)
+      console.error("Failed to switch user:", error)
+      toast.error("切换用户失败")
     }
+  }
+
+  const openEditDialog = (user: any) => {
+    setEditingUser(user)
+    setFormData({
+      name: user.name,
+      avatar: user.avatar || "",
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const openAddDialog = () => {
+    setFormData({ name: "", avatar: "" })
+    setIsAddDialogOpen(true)
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* 头部 */}
-      <div className="bg-white px-4 py-4 flex items-center justify-between border-b">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-lg">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold">用户管理</h1>
-              <p className="text-sm text-gray-500">管理家庭成员</p>
-            </div>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto p-4">
+        {/* 头部 */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="sm" onClick={handleBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-2xl font-bold">用户管理</h1>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button className="p-2 hover:bg-gray-100 rounded-lg">
-            <RefreshCw className="w-5 h-5 text-gray-600" />
-          </button>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm"
-          >
-            <UserPlus className="w-4 h-4" />
+          <Button onClick={openAddDialog}>
+            <Plus className="h-4 w-4 mr-2" />
             添加用户
-          </button>
+          </Button>
         </div>
-      </div>
 
-      {/* 调试信息 */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-        <h3 className="font-semibold mb-2">调试信息</h3>
-        <div className="space-y-1 text-sm text-gray-600">
-          <div>用户总数: {users.length}</div>
-          <div>当前用户: {currentUser ? `${currentUser.name} (${currentUser.id})` : "无"}</div>
-          <div>加载状态: {isLoading ? "加载中..." : "已加载"}</div>
-          <div>用户列表: {users.map(u => u.name).join(", ")}</div>
-        </div>
-      </div>
-
-      {/* 用户列表 */}
-      <div className="p-4 space-y-3">
-        {/* 错误提示 */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-red-500 rounded-full flex-shrink-0"></div>
-              <span className="text-red-700 text-sm">{error}</span>
-              <button 
-                onClick={() => setError(null)} 
-                className="ml-auto text-red-500 hover:text-red-700"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 成功提示 */}
-        {successMessage && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-500 rounded-full flex-shrink-0"></div>
-              <span className="text-green-700 text-sm">{successMessage}</span>
-              <button 
-                onClick={() => setSuccessMessage(null)} 
-                className="ml-auto text-green-500 hover:text-green-700"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 加载状态 */}
-        {isLoading ? (
-          <div className="bg-white rounded-xl p-8 shadow-sm text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
-            <p className="text-gray-500">加载用户数据中...</p>
-          </div>
-        ) : users.length === 0 ? (
-          <div className="bg-white rounded-xl p-8 shadow-sm text-center">
-            <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500 mb-4">暂无用户数据</p>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-            >
-              添加第一个用户
-            </button>
-          </div>
-        ) : (
-          users.map((user) => (
-            <div key={user.id} className="bg-white rounded-xl p-4 shadow-sm">
-              <div className="flex items-center gap-4">
-                {/* 头像 */}
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-semibold text-lg ${
-                  currentUser?.id === user.id ? 'bg-green-500' : 'bg-blue-500'
-                }`}>
-                  {getUserAvatar(user.name)}
+        {/* 用户列表 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {users.map((user) => (
+            <Card key={user.id} className={`relative ${currentUser?.id === user.id ? "ring-2 ring-primary" : ""}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                    <AvatarFallback>
+                      <User className="h-6 w-6" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{user.name}</CardTitle>
+                    <CardDescription>
+                      {currentUser?.id === user.id && <span className="text-primary font-medium">当前用户</span>}
+                    </CardDescription>
+                  </div>
                 </div>
-
-                {/* 用户信息 */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-lg">{user.name}</h3>
-                    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs">
-                      {getRelationshipText(user.relationship)}
-                    </span>
-                    {currentUser?.id === user.id && (
-                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">当前用户</span>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="flex justify-between items-center">
+                  <div className="flex space-x-2">
+                    {currentUser?.id !== user.id && (
+                      <Button variant="outline" size="sm" onClick={() => handleSwitchUser(user.id)}>
+                        切换
+                      </Button>
                     )}
+                    <Button variant="outline" size="sm" onClick={() => openEditDialog(user)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    <span>ID: {user.id.slice(0, 8)}...</span>
-                    <span className="ml-4">更新: {formatDate(user.updatedAt)}</span>
-                  </div>
-                </div>
-
-                {/* 操作按钮 */}
-                <div className="flex items-center gap-2">
-                  {currentUser?.id !== user.id && (
-                    <button 
-                      onClick={() => handleSwitchUser(user.id)}
-                      disabled={isSubmitting}
-                      className="px-3 py-1 bg-green-100 text-green-700 rounded-lg text-xs hover:bg-green-200 disabled:opacity-50"
-                    >
-                      切换
-                    </button>
+                  {users.length > 1 && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>确认删除</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            确定要删除用户 "{user.name}" 吗？此操作将同时删除该用户的所有健康记录，且无法恢复。
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>取消</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            删除
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
-                  <button 
-                    onClick={() => startEditUser(user)} 
-                    disabled={isSubmitting}
-                    className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50"
-                  >
-                    <Edit className="w-4 h-4 text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => showDeleteConfirmation(user.id)}
-                    disabled={users.length <= 1 || isSubmitting}
-                    className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50"
-                  >
-                    <Trash2 className={`w-4 h-4 ${users.length <= 1 ? "text-gray-300" : "text-red-500"}`} />
-                  </button>
                 </div>
-              </div>
-            </div>
-          ))
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {users.length === 0 && (
+          <Card>
+            <CardContent className="text-center py-12">
+              <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">暂无用户</h3>
+              <p className="text-muted-foreground mb-4">请添加第一个用户开始使用</p>
+              <Button onClick={openAddDialog}>
+                <Plus className="h-4 w-4 mr-2" />
+                添加用户
+              </Button>
+            </CardContent>
+          </Card>
         )}
-      </div>
 
-      {/* 添加/编辑用户弹窗 */}
-      {showAddForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md p-6">
-            <h2 className="text-lg font-semibold mb-4">{editingUser ? "编辑用户" : "添加用户"}</h2>
-
-            {/* 错误提示 */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-                <span className="text-red-700 text-sm">{error}</span>
-              </div>
-            )}
-
+        {/* 添加用户对话框 */}
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>添加用户</DialogTitle>
+              <DialogDescription>创建一个新的用户账户</DialogDescription>
+            </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  姓名 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="请输入姓名"
-                  disabled={isSubmitting}
-                  maxLength={20}
+              <div className="space-y-2">
+                <Label htmlFor="add-name">用户名</Label>
+                <Input
+                  id="add-name"
+                  placeholder="输入用户名"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
-                <div className="text-xs text-gray-500 mt-1">{newUserName.length}/20</div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">关系</label>
-                <select
-                  value={newUserRelationship}
-                  onChange={(e) => setNewUserRelationship(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={isSubmitting}
-                >
-                  <option value="">选择关系</option>
-                  <option value="本人">本人</option>
-                  <option value="父亲">父亲</option>
-                  <option value="母亲">母亲</option>
-                  <option value="配偶">配偶</option>
-                  <option value="儿子">儿子</option>
-                  <option value="女儿">女儿</option>
-                  <option value="爷爷">爷爷</option>
-                  <option value="奶奶">奶奶</option>
-                  <option value="外公">外公</option>
-                  <option value="外婆">外婆</option>
-                  <option value="其他">其他</option>
-                </select>
+              <div className="space-y-2">
+                <Label htmlFor="add-avatar">头像URL（可选）</Label>
+                <Input
+                  id="add-avatar"
+                  placeholder="输入头像URL"
+                  value={formData.avatar}
+                  onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
+                />
               </div>
             </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={cancelEdit}
-                disabled={isSubmitting}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                 取消
-              </button>
-              <button
-                onClick={editingUser ? handleEditUser : handleAddUser}
-                disabled={!newUserName.trim() || isSubmitting}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isSubmitting && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                {editingUser ? "保存" : "添加"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </Button>
+              <Button onClick={handleAddUser}>添加</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* 删除确认弹窗 */}
-      {showDeleteConfirm && userToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
+        {/* 编辑用户对话框 */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>编辑用户</DialogTitle>
+              <DialogDescription>修改用户信息</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">用户名</Label>
+                <Input
+                  id="edit-name"
+                  placeholder="输入用户名"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
               </div>
-              <h2 className="text-lg font-semibold text-gray-900">确认删除</h2>
-            </div>
-
-            <div className="mb-6">
-              <p className="text-gray-700 mb-2">
-                确定要删除用户 <span className="font-semibold">"{userToDelete.name}"</span> 吗？
-              </p>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-sm text-red-700">
-                  <strong>警告：</strong>删除用户将同时删除该用户的所有健康记录，此操作无法撤销！
-                </p>
+              <div className="space-y-2">
+                <Label htmlFor="edit-avatar">头像URL（可选）</Label>
+                <Input
+                  id="edit-avatar"
+                  placeholder="输入头像URL"
+                  value={formData.avatar}
+                  onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
+                />
               </div>
             </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false)
-                  setUserToDelete(null)
-                }}
-                disabled={isSubmitting}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 取消
-              </button>
-              <button
-                onClick={handleDeleteUser}
-                disabled={isSubmitting}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isSubmitting && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                确认删除
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </Button>
+              <Button onClick={handleEditUser}>保存</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   )
 }
