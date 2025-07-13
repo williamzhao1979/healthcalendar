@@ -15,33 +15,33 @@
 ### 方法 1: 使用启动脚本（推荐）
 
 **Windows 用户：**
-```powershell
+\`\`\`powershell
 .\start.ps1
-```
+\`\`\`
 
 **Linux/Mac 用户：**
-```bash
+\`\`\`bash
 chmod +x start.sh
 ./start.sh
-```
+\`\`\`
 
 ### 方法 2: 手动设置
 
 1. **安装依赖**
-   ```bash
+   \`\`\`bash
    npm install
-   ```
+   \`\`\`
 
 2. **配置环境变量**
-   ```bash
+   \`\`\`bash
    cp .env.local.example .env.local
-   ```
+   \`\`\`
    然后编辑 `.env.local` 文件，设置您的 Microsoft 客户端 ID。
 
 3. **启动开发服务器**
-   ```bash
+   \`\`\`bash
    npm run dev
-   ```
+   \`\`\`
 
 4. **访问应用**
    打开 [http://localhost:3000](http://localhost:3000) 查看应用。
@@ -74,7 +74,7 @@ chmod +x start.sh
 
 ## 📁 项目结构
 
-```
+\`\`\`
 healthcalendar/
 ├── src/
 │   └── app/
@@ -87,7 +87,7 @@ healthcalendar/
 ├── TROUBLESHOOTING.md         # 故障排除指南
 ├── start.ps1                  # Windows 启动脚本
 └── start.sh                   # Linux/Mac 启动脚本
-```
+\`\`\`
 
 ## 🛠️ 技术栈
 
