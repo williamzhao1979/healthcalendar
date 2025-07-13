@@ -7,10 +7,12 @@ import { useHealthRecords } from "@/hooks/useHealthRecords"
 // import { useMigration } from '@/hooks/useMigration';
 import dbService from "@/services/db"
 import UserDropdown from "@/components/UserDropdown"
+import { useRouter } from "next/navigation"
 
 export default function HealthCalendarPage() {
   // State to control the modal visibility
   const [showModal, setShowModal] = useState(false)
+  const [systemManagementExpanded, setSystemManagementExpanded] = useState(false)
 
   // 获取当前日期信息
   const today = new Date()
@@ -183,6 +185,13 @@ export default function HealthCalendarPage() {
         return
       }
 
+      // 如果是排便记录，跳转到专门的大便记录页面
+      if (typeId === "stool") {
+        onClose()
+        router.push("/stool-record")
+        return
+      }
+
       try {
         // 创建基本记录对象
         const newRecord = {
@@ -277,6 +286,8 @@ export default function HealthCalendarPage() {
       </div>
     )
   }
+
+  const router = useRouter()
 
   return (
     <div className="health-calendar-container">
@@ -441,6 +452,57 @@ export default function HealthCalendarPage() {
         </div>
 
         <button className="view-more-btn">查看更多记录</button>
+      </div>
+
+      {/* 系统管理卡片 - 可折叠 */}
+      <div className="bg-white rounded-lg p-4 mb-4">
+        <button
+          onClick={() => setSystemManagementExpanded(!systemManagementExpanded)}
+          className="w-full flex items-center justify-between hover:bg-gray-50 transition-colors rounded-lg p-2"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
+              <div className="w-3 h-3 bg-blue-500 rounded"></div>
+            </div>
+            <span className="font-medium">系统管理</span>
+          </div>
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${systemManagementExpanded ? "rotate-180" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {systemManagementExpanded && (
+          <div className="mt-3 pt-3 border-t">
+            <button
+              onClick={() => router.push("/user-management")}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <div className="font-medium text-left">用户管理</div>
+                  <div className="text-sm text-gray-500 text-left">管理家庭成员和权限设置</div>
+                </div>
+              </div>
+              <span className="text-blue-500 text-sm">进入</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Logout Button */}
