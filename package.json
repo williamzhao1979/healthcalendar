@@ -31,10 +31,27 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.3.5",
-    "postcss": "^8.5",
-    "tailwindcss": "^4",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.11",
     "typescript": "^5"
-  }
+  },
+  "description": "这是一个基于 Next.js 构建的健康日历应用，支持 Microsoft 账户登录和日历同步功能。",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/williamzhao1979/healthcalendar.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/williamzhao1979/healthcalendar/issues"
+  },
+  "homepage": "https://github.com/williamzhao1979/healthcalendar#readme"
 }

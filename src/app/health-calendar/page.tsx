@@ -454,6 +454,9 @@ export default function HealthCalendarPage() {
         <button className="view-more-btn">查看更多记录</button>
       </div>
 
+     {/* Logout Button */}
+      <button className="logout-btn">退出</button>
+
       {/* 系统管理卡片 - 可折叠 */}
       <div className="bg-white rounded-lg p-4 mb-4">
         <button
@@ -504,9 +507,6 @@ export default function HealthCalendarPage() {
           </div>
         )}
       </div>
-
-      {/* Logout Button */}
-      <button className="logout-btn">退出</button>
 
       {/* Record Type Modal */}
       {showModal && <RecordTypeModal onClose={() => setShowModal(false)} />}
