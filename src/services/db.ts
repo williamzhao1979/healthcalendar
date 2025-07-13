@@ -110,6 +110,7 @@ class DatabaseService {
         request.onupgradeneeded = (event) => {
           console.log("数据库需要升级，创建对象存储...")
           const db = request.result
+          const transaction = (event.target as IDBOpenDBRequest).transaction
 
           try {
             // 创建用户存储区
@@ -137,9 +138,19 @@ class DatabaseService {
             }
 
             console.log("数据库对象存储创建完成")
+
+            // 监听事务完成
+            if (transaction) {
+              transaction.oncomplete = () => {
+                console.log("数据库升级事务完成")
+              }
+              transaction.onerror = () => {
+                console.error("数据库升级事务失败:", transaction.error)
+              }
+            }
           } catch (upgradeError) {
             console.error("升级数据库结构时出错:", upgradeError)
-            // 不要在这里拒绝Promise，让升级过程继续
+            reject(upgradeError)
           }
         }
       } catch (error) {

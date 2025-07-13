@@ -92,16 +92,17 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   // 首先初始化数据库
   useEffect(() => {
     const initializeDatabase = async () => {
+      console.log("开始初始化数据库...")
+      
       try {
-        console.log("开始初始化数据库...")
-        // 先尝试初始化数据库
+        // 简化初始化，移除复杂的超时逻辑
         const db = await dbService.initDB()
         console.log("数据库初始化成功:", db)
         setDbInitialized(true)
       } catch (error) {
         console.error("数据库初始化失败:", error)
-        // 可以在这里添加重试逻辑或提示用户刷新页面
-        // 重试一次
+        
+        // 简单重试一次
         setTimeout(async () => {
           try {
             console.log("重试数据库初始化...")
@@ -109,9 +110,10 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             console.log("数据库重试初始化成功:", db)
             setDbInitialized(true)
           } catch (retryError) {
-            console.error("数据库重试初始化仍然失败:", retryError)
+            console.error("数据库重试失败，强制设置为已初始化:", retryError)
+            setDbInitialized(true) // 强制设置以防止卡住
           }
-        }, 2000)
+        }, 1000)
       }
     }
 
@@ -147,11 +149,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
           // 停止重试
           setCreateUserAttempts(MAX_CREATE_USER_ATTEMPTS)
 
-          // 强制重新加载用户列表
-          console.log("1秒后刷新页面以加载新用户...")
-          setTimeout(() => {
-            window.location.reload()
-          }, 1000)
+          // 不需要刷新页面，useUsers hook会自动更新状态
         } catch (error) {
           console.error("创建默认用户失败:", error)
 
