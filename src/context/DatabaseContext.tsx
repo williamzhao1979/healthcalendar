@@ -93,7 +93,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initializeDatabase = async () => {
       console.log("开始初始化数据库...")
-      
+
       try {
         // 简化初始化，移除复杂的超时逻辑
         const db = await dbService.initDB()
@@ -101,7 +101,7 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
         setDbInitialized(true)
       } catch (error) {
         console.error("数据库初始化失败:", error)
-        
+
         // 简单重试一次
         setTimeout(async () => {
           try {

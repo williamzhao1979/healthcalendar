@@ -45,7 +45,7 @@ export function useSettings() {
     }
   }
 
-  // 组件挂载时加载设置
+  // 初始加载
   useEffect(() => {
     loadSettings()
   }, [])

@@ -3,22 +3,27 @@
 import { useState, useEffect } from "react"
 import dbService, { type HealthRecord } from "@/services/db"
 
-export function useHealthRecords(userId: string | null) {
+export function useHealthRecords(userId?: string) {
   const [records, setRecords] = useState<HealthRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  // 加载健康记录（所有用户共享）
+  // 加载健康记录
   const loadRecords = async (options?: {
     type?: string
     startDate?: number
     endDate?: number
     limit?: number
   }) => {
+    if (!userId) {
+      setRecords([])
+      setIsLoading(false)
+      return
+    }
+
     try {
       setIsLoading(true)
-      // 移除userId参数，获取所有记录
-      const loadedRecords = await dbService.getHealthRecords("", options)
+      const loadedRecords = await dbService.getHealthRecords(userId, options)
       setRecords(loadedRecords)
       setError(null)
     } catch (err) {
@@ -66,10 +71,10 @@ export function useHealthRecords(userId: string | null) {
     }
   }
 
-  // 当组件挂载时加载记录，不依赖userId
+  // 当用户ID变化时重新加载记录
   useEffect(() => {
     loadRecords()
-  }, []) // 移除userId依赖
+  }, [userId])
 
   return {
     records,

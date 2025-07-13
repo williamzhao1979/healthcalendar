@@ -57,7 +57,7 @@ export function useUsers() {
     }
   }
 
-  // 组件挂载时加载用户
+  // 初始加载
   useEffect(() => {
     loadUsers()
   }, [])

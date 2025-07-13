@@ -41,6 +41,11 @@ class DatabaseService {
   private initializationRetries = 0
   private maxRetries = 3
 
+  // 生成唯一ID
+  private generateUniqueId(): string {
+    return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  }
+
   // 数据库初始化
   async initDB(): Promise<IDBDatabase> {
     // 如果数据库已初始化，直接返回
@@ -249,6 +254,17 @@ class DatabaseService {
     }
   }
 
+  // 检查用户是否已存在
+  private async userExists(name: string, relationship?: string): Promise<boolean> {
+    try {
+      const users = await this.getUsers()
+      return users.some((user) => user.name === name && (user.relationship || "") === (relationship || ""))
+    } catch (error) {
+      console.error("检查用户是否存在时出错:", error)
+      return false
+    }
+  }
+
   // 用户操作
   async getUsers(): Promise<User[]> {
     try {
@@ -276,8 +292,22 @@ class DatabaseService {
 
   async addUser(user: Omit<User, "id" | "createdAt" | "updatedAt">): Promise<User> {
     const timestamp = Date.now()
+
+    // 检查用户是否已存在
+    const exists = await this.userExists(user.name, user.relationship)
+    if (exists) {
+      console.log(`用户 ${user.name} (${user.relationship || "无关系"}) 已存在，跳过创建`)
+      const existingUsers = await this.getUsers()
+      const existingUser = existingUsers.find(
+        (u) => u.name === user.name && (u.relationship || "") === (user.relationship || ""),
+      )
+      if (existingUser) {
+        return existingUser
+      }
+    }
+
     const newUser: User = {
-      id: `user_${timestamp}`,
+      id: this.generateUniqueId(),
       ...user,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -289,25 +319,15 @@ class DatabaseService {
       // 先确保数据库和用户对象存储已初始化
       await this.ensureObjectStoreExists("users")
 
-      // 执行添加操作
+      // 使用 put 而不是 add，这样可以避免重复键错误
       await this.performOperation("users", (store) => {
-        return store.add(newUser)
+        return store.put(newUser)
       })
 
       console.log(`用户添加成功: ${newUser.id}`)
       return newUser
     } catch (error) {
       console.error("添加用户失败:", error)
-
-      // 如果错误是由于密钥已存在，尝试用put替代add
-      if (error instanceof DOMException && error.name === "ConstraintError") {
-        console.log("尝试使用put替代add...")
-        await this.performOperation("users", (store) => {
-          return store.put(newUser)
-        })
-        return newUser
-      }
-
       throw error
     }
   }
@@ -338,48 +358,6 @@ class DatabaseService {
     })
   }
 
-  // 初始化默认用户
-  async initializeDefaultUsers(): Promise<void> {
-    try {
-      const existingUsers = await this.getUsers()
-
-      // 检查是否已经有"我"这个用户
-      const meUser = existingUsers.find((user) => user.name === "我" && user.relationship === "本人")
-
-      if (meUser) {
-        console.log("默认用户'我'已存在，跳过创建")
-        return
-      }
-
-      // 如果没有"我"这个用户，创建它（即使有其他用户）
-      if (!meUser) {
-        console.log("创建默认用户'我'...")
-        const defaultUser = { name: "我", relationship: "本人" }
-        await this.addUser(defaultUser)
-        console.log(`已创建默认用户: ${defaultUser.name}`)
-      }
-
-      // 如果完全没有用户，创建所有默认用户
-      if (existingUsers.length === 0) {
-        console.log("创建其他默认用户...")
-        const otherDefaultUsers = [
-          { name: "爸爸", relationship: "父亲" },
-          { name: "妈妈", relationship: "母亲" },
-        ]
-
-        for (const userData of otherDefaultUsers) {
-          await this.addUser(userData)
-          console.log(`已创建默认用户: ${userData.name}`)
-        }
-      }
-
-      console.log("默认用户初始化完成")
-    } catch (error) {
-      console.error("创建默认用户失败:", error)
-      throw error
-    }
-  }
-
   // 确保默认用户"我"存在
   async ensureDefaultUserExists(): Promise<User> {
     try {
@@ -399,6 +377,40 @@ class DatabaseService {
       return meUser
     } catch (error) {
       console.error("确保默认用户存在时出错:", error)
+      throw error
+    }
+  }
+
+  // 初始化默认用户
+  async initializeDefaultUsers(): Promise<void> {
+    try {
+      const existingUsers = await this.getUsers()
+
+      // 确保"我"用户存在
+      await this.ensureDefaultUserExists()
+
+      // 如果用户数量少于3个，添加其他默认用户
+      if (existingUsers.length < 3) {
+        console.log("创建其他默认用户...")
+        const otherDefaultUsers = [
+          { name: "爸爸", relationship: "父亲" },
+          { name: "妈妈", relationship: "母亲" },
+        ]
+
+        for (const userData of otherDefaultUsers) {
+          const exists = await this.userExists(userData.name, userData.relationship)
+          if (!exists) {
+            await this.addUser(userData)
+            console.log(`已创建默认用户: ${userData.name}`)
+          } else {
+            console.log(`默认用户 ${userData.name} 已存在，跳过创建`)
+          }
+        }
+      }
+
+      console.log("默认用户初始化完成")
+    } catch (error) {
+      console.error("创建默认用户失败:", error)
       throw error
     }
   }
@@ -462,14 +474,14 @@ class DatabaseService {
   async addHealthRecord(record: Omit<HealthRecord, "id" | "createdAt" | "updatedAt">): Promise<HealthRecord> {
     const timestamp = Date.now()
     const newRecord: HealthRecord = {
-      id: `record_${timestamp}`,
+      id: this.generateUniqueId(),
       ...record,
       createdAt: timestamp,
       updatedAt: timestamp,
     }
 
     await this.performOperation("healthRecords", (store) => {
-      return store.add(newRecord)
+      return store.put(newRecord)
     })
 
     return newRecord
