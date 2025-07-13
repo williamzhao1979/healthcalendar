@@ -1,367 +1,105 @@
-"use client"
-
 export interface User {
   id: string
   name: string
+  relationship: string
   avatar?: string
-  relationship?: string
-  createdAt: number
-  updatedAt: number
+  createdAt: Date
 }
 
 export interface HealthRecord {
   id: string
   userId: string
-  type: string
-  category?: string
-  timestamp: number
-  meal?: string
-  note?: string
-  color?: string
-  details?: Record<string, any>
-  createdAt: number
-  updatedAt: number
+  type: "stool" | "urine" | "weight" | "blood_pressure" | "temperature" | "other"
+  date: Date
+  data: any
+  notes?: string
+  createdAt: Date
 }
 
 export interface Settings {
   id: string
-  lastUserId: string
-  theme?: string
-  language?: string
-  notifications?: boolean
-  updatedAt: number
+  userId: string
+  key: string
+  value: any
+  updatedAt: Date
 }
 
 class DatabaseService {
-  private dbName = "HealthCalendarDB"
-  private dbVersion = 1
   private db: IDBDatabase | null = null
+  private readonly dbName = "HealthCalendarDB"
+  private readonly dbVersion = 1
 
-  private databaseInitializationPromise: Promise<IDBDatabase> | null = null
-  private initializationRetries = 0
-  private maxRetries = 3
+  async initDB(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.dbVersion)
 
-  // 生成唯一ID
+      request.onerror = () => {
+        reject(new Error("Failed to open database"))
+      }
+
+      request.onsuccess = () => {
+        this.db = request.result
+        this.initializeDefaultUsers().then(resolve).catch(reject)
+      }
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+
+        // Users store
+        if (!db.objectStoreNames.contains("users")) {
+          const userStore = db.createObjectStore("users", { keyPath: "id" })
+          userStore.createIndex("name", "name", { unique: false })
+          userStore.createIndex("relationship", "relationship", { unique: false })
+        }
+
+        // Health records store
+        if (!db.objectStoreNames.contains("healthRecords")) {
+          const recordStore = db.createObjectStore("healthRecords", { keyPath: "id" })
+          recordStore.createIndex("userId", "userId", { unique: false })
+          recordStore.createIndex("type", "type", { unique: false })
+          recordStore.createIndex("date", "date", { unique: false })
+        }
+
+        // Settings store
+        if (!db.objectStoreNames.contains("settings")) {
+          const settingsStore = db.createObjectStore("settings", { keyPath: "id" })
+          settingsStore.createIndex("userId", "userId", { unique: false })
+          settingsStore.createIndex("key", "key", { unique: false })
+        }
+      }
+    })
+  }
+
+  async initializeDatabase(): Promise<void> {
+    return this.initDB()
+  }
+
   private generateUniqueId(): string {
     return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   }
 
-  // 数据库初始化
-  async initDB(): Promise<IDBDatabase> {
-    // 如果数据库已初始化，直接返回
-    if (this.db) {
-      return this.db
-    }
+  private async initializeDefaultUsers(): Promise<void> {
+    try {
+      const existingUsers = await this.getAllUsers()
+      if (existingUsers.length === 0) {
+        const defaultUsers = [
+          { name: "爸爸", relationship: "父亲", avatar: "/placeholder-user.jpg" },
+          { name: "妈妈", relationship: "母亲", avatar: "/placeholder-user.jpg" },
+          { name: "宝宝", relationship: "孩子", avatar: "/placeholder-user.jpg" },
+        ]
 
-    // 如果有初始化进行中的Promise，返回它，避免多次初始化
-    if (this.databaseInitializationPromise) {
-      return this.databaseInitializationPromise
-    }
-
-    // 创建数据库初始化Promise并保存引用
-    this.databaseInitializationPromise = new Promise<IDBDatabase>((resolve, reject) => {
-      try {
-        console.log(`正在初始化IndexedDB数据库 "${this.dbName}" (版本 ${this.dbVersion})...`)
-
-        // 如果在Safari私密浏览模式下，索引数据库可能不可用
-        if (!window.indexedDB) {
-          throw new Error("您的浏览器不支持IndexedDB或处于私密浏览模式")
+        for (const userData of defaultUsers) {
+          await this.addUser(userData)
         }
-
-        const request = indexedDB.open(this.dbName, this.dbVersion)
-
-        request.onerror = (event) => {
-          console.error("IndexedDB初始化错误:", request.error)
-          this.databaseInitializationPromise = null // 清除Promise引用以便重试
-
-          // 如果是权限被拒绝错误，不进行重试
-          if (request.error?.name === "SecurityError" || request.error?.name === "InvalidStateError") {
-            reject(new Error(`IndexedDB访问被拒绝: ${request.error.message}`))
-          } else if (this.initializationRetries < this.maxRetries) {
-            // 有限次数重试
-            this.initializationRetries++
-            console.warn(`数据库初始化失败，正在重试 (${this.initializationRetries}/${this.maxRetries})...`)
-            setTimeout(() => {
-              this.initDB().then(resolve).catch(reject)
-            }, 500) // 短暂延迟后重试
-          } else {
-            reject(request.error)
-          }
-        }
-
-        request.onsuccess = (event) => {
-          console.log("IndexedDB数据库初始化成功")
-          this.db = request.result
-          this.initializationRetries = 0 // 重置重试计数器
-
-          // 添加关闭事件处理，以便在数据库被关闭时重新初始化
-          this.db.onclose = () => {
-            console.log("IndexedDB连接被关闭，将在下次访问时重新初始化")
-            this.db = null
-            this.databaseInitializationPromise = null
-          }
-
-          // 添加版本变更事件处理
-          this.db.onversionchange = () => {
-            console.log("IndexedDB版本已变更，关闭旧连接")
-            this.db?.close()
-            this.db = null
-            this.databaseInitializationPromise = null
-          }
-
-          resolve(this.db)
-        }
-
-        request.onupgradeneeded = (event) => {
-          console.log("数据库需要升级，创建对象存储...")
-          const db = request.result
-          const transaction = (event.target as IDBOpenDBRequest).transaction
-
-          try {
-            // 创建用户存储区
-            if (!db.objectStoreNames.contains("users")) {
-              console.log("创建users对象存储")
-              const usersStore = db.createObjectStore("users", { keyPath: "id" })
-              usersStore.createIndex("name", "name", { unique: false })
-              usersStore.createIndex("updatedAt", "updatedAt", { unique: false })
-            }
-
-            // 创建健康记录存储区
-            if (!db.objectStoreNames.contains("healthRecords")) {
-              console.log("创建healthRecords对象存储")
-              const recordsStore = db.createObjectStore("healthRecords", { keyPath: "id" })
-              recordsStore.createIndex("userId", "userId", { unique: false })
-              recordsStore.createIndex("type", "type", { unique: false })
-              recordsStore.createIndex("timestamp", "timestamp", { unique: false })
-              recordsStore.createIndex("updatedAt", "updatedAt", { unique: false })
-            }
-
-            // 创建设置存储区
-            if (!db.objectStoreNames.contains("settings")) {
-              console.log("创建settings对象存储")
-              const settingsStore = db.createObjectStore("settings", { keyPath: "id" })
-            }
-
-            console.log("数据库对象存储创建完成")
-
-            // 监听事务完成
-            if (transaction) {
-              transaction.oncomplete = () => {
-                console.log("数据库升级事务完成")
-              }
-              transaction.onerror = () => {
-                console.error("数据库升级事务失败:", transaction.error)
-              }
-            }
-          } catch (upgradeError) {
-            console.error("升级数据库结构时出错:", upgradeError)
-            reject(upgradeError)
-          }
-        }
-      } catch (error) {
-        console.error("初始化IndexedDB时出错:", error)
-        this.databaseInitializationPromise = null
-        reject(error)
       }
-    })
-
-    return this.databaseInitializationPromise
-  }
-
-  // 确保对象存储存在
-  private async ensureObjectStoreExists(storeName: string): Promise<IDBDatabase> {
-    try {
-      const db = await this.initDB()
-
-      // 检查对象存储是否存在
-      if (!db.objectStoreNames.contains(storeName)) {
-        console.warn(`对象存储 "${storeName}" 不存在，尝试重新初始化数据库...`)
-
-        // 数据库版本升级以创建缺失的对象存储
-        this.db = null
-        this.databaseInitializationPromise = null
-        this.dbVersion++ // 增加版本号，强制触发onupgradeneeded
-
-        console.log(`正在使用新版本 (${this.dbVersion}) 重新打开数据库以创建缺失的对象存储...`)
-        return this.initDB() // 重新初始化数据库
-      }
-
-      return db
     } catch (error) {
-      console.error(`检查对象存储 "${storeName}" 时出错:`, error)
-      throw error
+      console.error("Failed to initialize default users:", error)
     }
   }
 
-  // 通用方法执行数据库操作
-  private async performOperation<T>(
-    storeName: string,
-    operation: (store: IDBObjectStore) => IDBRequest<T>,
-    retryCount = 0,
-  ): Promise<T> {
-    try {
-      // 确保对象存储存在
-      const db = await this.ensureObjectStoreExists(storeName)
-
-      return new Promise<T>((resolve, reject) => {
-        try {
-          console.log(`开始数据库事务: ${storeName}`)
-          const transaction = db.transaction(storeName, "readwrite")
-
-          transaction.oncomplete = () => {
-            console.log(`事务完成: ${storeName}`)
-          }
-
-          transaction.onerror = (event) => {
-            console.error(`事务错误 (${storeName}):`, transaction.error)
-            reject(transaction.error)
-          }
-
-          transaction.onabort = (event) => {
-            console.error(`事务中止 (${storeName}):`, transaction.error)
-            reject(transaction.error || new Error("事务被中止"))
-          }
-
-          const store = transaction.objectStore(storeName)
-          const request = operation(store)
-
-          request.onsuccess = () => {
-            console.log(`操作成功完成: ${storeName}`)
-            resolve(request.result)
-          }
-
-          request.onerror = () => {
-            console.error(`请求错误 (${storeName}):`, request.error)
-            reject(request.error)
-          }
-        } catch (error) {
-          console.error(`执行操作错误 (${storeName}):`, error)
-          reject(error)
-        }
-      })
-    } catch (error) {
-      console.error(`数据库操作错误 (${storeName}):`, error)
-
-      // 重试逻辑
-      if (retryCount < 3) {
-        console.log(`重试操作 (${retryCount + 1}/3): ${storeName}`)
-        // 短暂延迟后重试
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        return this.performOperation(storeName, operation, retryCount + 1)
-      }
-
-      throw error
-    }
-  }
-
-  // 检查用户是否已存在
-  private async userExists(name: string, relationship?: string): Promise<boolean> {
-    try {
-      const users = await this.getUsers()
-      return users.some((user) => user.name === name && (user.relationship || "") === (relationship || ""))
-    } catch (error) {
-      console.error("检查用户是否存在时出错:", error)
-      return false
-    }
-  }
-
-  // 用户操作
-  async getUsers(): Promise<User[]> {
-    try {
-      // 先确保数据库和用户对象存储已初始化
-      await this.ensureObjectStoreExists("users")
-
-      const users = await this.performOperation<User[]>("users", (store) => {
-        return store.getAll()
-      })
-
-      console.log(`获取到 ${users.length} 个用户`)
-      return users
-    } catch (error) {
-      console.error("获取用户列表失败:", error)
-      // 如果出错，返回空数组而不是抛出错误，使应用可以继续运行
-      return []
-    }
-  }
-
-  async getUserById(id: string): Promise<User | undefined> {
-    return this.performOperation<User | undefined>("users", (store) => {
-      return store.get(id)
-    })
-  }
-
-  async addUser(user: Omit<User, "id" | "createdAt" | "updatedAt">): Promise<User> {
-    const timestamp = Date.now()
-
-    // 检查用户是否已存在
-    const exists = await this.userExists(user.name, user.relationship)
-    if (exists) {
-      console.log(`用户 ${user.name} (${user.relationship || "无关系"}) 已存在，跳过创建`)
-      const existingUsers = await this.getUsers()
-      const existingUser = existingUsers.find(
-        (u) => u.name === user.name && (u.relationship || "") === (user.relationship || ""),
-      )
-      if (existingUser) {
-        return existingUser
-      }
-    }
-
-    const newUser: User = {
-      id: this.generateUniqueId(),
-      ...user,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    }
-
-    try {
-      console.log(`正在添加新用户: ${user.name || "未命名"}`, newUser)
-
-      // 先确保数据库和用户对象存储已初始化
-      await this.ensureObjectStoreExists("users")
-
-      // 使用 put 而不是 add，这样可以避免重复键错误
-      await this.performOperation("users", (store) => {
-        return store.put(newUser)
-      })
-
-      console.log(`用户添加成功: ${newUser.id}`)
-      return newUser
-    } catch (error) {
-      console.error("添加用户失败:", error)
-      throw error
-    }
-  }
-
-  async updateUser(id: string, userData: Partial<Omit<User, "id" | "createdAt" | "updatedAt">>): Promise<User> {
-    const user = await this.getUserById(id)
-
-    if (!user) {
-      throw new Error(`找不到ID为${id}的用户`)
-    }
-
-    const updatedUser: User = {
-      ...user,
-      ...userData,
-      updatedAt: Date.now(),
-    }
-
-    await this.performOperation("users", (store) => {
-      return store.put(updatedUser)
-    })
-
-    return updatedUser
-  }
-
-  async deleteUser(id: string): Promise<void> {
-    await this.performOperation("users", (store) => {
-      return store.delete(id)
-    })
-  }
-
-  // 确保默认用户"我"存在
   async ensureDefaultUserExists(): Promise<User> {
     try {
-      const existingUsers = await this.getUsers()
+      const existingUsers = await this.getAllUsers()
 
       // 查找"我"这个用户
       let meUser = existingUsers.find((user) => user.name === "我" && user.relationship === "本人")
@@ -381,188 +119,240 @@ class DatabaseService {
     }
   }
 
-  // 初始化默认用户
-  async initializeDefaultUsers(): Promise<void> {
+  private async userExists(name: string, relationship: string): Promise<boolean> {
     try {
-      const existingUsers = await this.getUsers()
-
-      // 确保"我"用户存在
-      await this.ensureDefaultUserExists()
-
-      // 如果用户数量少于3个，添加其他默认用户
-      if (existingUsers.length < 3) {
-        console.log("创建其他默认用户...")
-        const otherDefaultUsers = [
-          { name: "爸爸", relationship: "父亲" },
-          { name: "妈妈", relationship: "母亲" },
-        ]
-
-        for (const userData of otherDefaultUsers) {
-          const exists = await this.userExists(userData.name, userData.relationship)
-          if (!exists) {
-            await this.addUser(userData)
-            console.log(`已创建默认用户: ${userData.name}`)
-          } else {
-            console.log(`默认用户 ${userData.name} 已存在，跳过创建`)
-          }
-        }
-      }
-
-      console.log("默认用户初始化完成")
+      const users = await this.getAllUsers()
+      return users.some((user) => user.name === name && user.relationship === relationship)
     } catch (error) {
-      console.error("创建默认用户失败:", error)
-      throw error
+      console.error("Error checking user existence:", error)
+      return false
     }
   }
 
-  // 健康记录操作
-  async getHealthRecords(
-    userId: string,
-    options?: {
-      type?: string
-      startDate?: number
-      endDate?: number
-      limit?: number
-    },
-  ): Promise<HealthRecord[]> {
-    const db = await this.initDB()
+  async addUser(userData: Omit<User, "id" | "createdAt">): Promise<User> {
+    if (!this.db) throw new Error("Database not initialized")
+
+    // 检查用户是否已存在
+    const exists = await this.userExists(userData.name, userData.relationship)
+    if (exists) {
+      // 如果用户已存在，返回现有用户
+      const users = await this.getAllUsers()
+      const existingUser = users.find((u) => u.name === userData.name && u.relationship === userData.relationship)
+      if (existingUser) {
+        return existingUser
+      }
+    }
+
+    const user: User = {
+      id: `user_${this.generateUniqueId()}`,
+      ...userData,
+      createdAt: new Date(),
+    }
 
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction("healthRecords", "readonly")
-      const store = transaction.objectStore("healthRecords")
+      const transaction = this.db!.transaction(["users"], "readwrite")
+      const store = transaction.objectStore("users")
+      const request = store.put(user) // 使用 put 而不是 add
 
-      // 如果userId为空，获取所有记录；否则按用户过滤
-      const request = userId ? store.index("userId").getAll(userId) : store.getAll()
+      request.onsuccess = () => resolve(user)
+      request.onerror = () => reject(new Error("Failed to add user"))
+    })
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    if (!this.db) throw new Error("Database not initialized")
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["users"], "readonly")
+      const store = transaction.objectStore("users")
+      const request = store.getAll()
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(new Error("Failed to get users"))
+    })
+  }
+
+  async getUser(id: string): Promise<User | null> {
+    if (!this.db) throw new Error("Database not initialized")
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["users"], "readonly")
+      const store = transaction.objectStore("users")
+      const request = store.get(id)
+
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(new Error("Failed to get user"))
+    })
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized")
+
+    const user = await this.getUser(id)
+    if (!user) throw new Error("User not found")
+
+    const updatedUser = { ...user, ...updates }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["users"], "readwrite")
+      const store = transaction.objectStore("users")
+      const request = store.put(updatedUser)
+
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(new Error("Failed to update user"))
+    })
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized")
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["users"], "readwrite")
+      const store = transaction.objectStore("users")
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(new Error("Failed to delete user"))
+    })
+  }
+
+  // Health Records methods
+  async addHealthRecord(record: Omit<HealthRecord, "id" | "createdAt">): Promise<HealthRecord> {
+    if (!this.db) throw new Error("Database not initialized")
+
+    const healthRecord: HealthRecord = {
+      id: `record_${this.generateUniqueId()}`,
+      ...record,
+      createdAt: new Date(),
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["healthRecords"], "readwrite")
+      const store = transaction.objectStore("healthRecords")
+      const request = store.add(healthRecord)
+
+      request.onsuccess = () => resolve(healthRecord)
+      request.onerror = () => reject(new Error("Failed to add health record"))
+    })
+  }
+
+  async getHealthRecords(userId: string, type?: string): Promise<HealthRecord[]> {
+    if (!this.db) throw new Error("Database not initialized")
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["healthRecords"], "readonly")
+      const store = transaction.objectStore("healthRecords")
+      const index = store.index("userId")
+      const request = index.getAll(userId)
 
       request.onsuccess = () => {
         let records = request.result
+        if (type) {
+          records = records.filter((record) => record.type === type)
+        }
+        resolve(records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+      }
+      request.onerror = () => reject(new Error("Failed to get health records"))
+    })
+  }
 
-        // 应用过滤器
-        if (options) {
-          if (options.type) {
-            records = records.filter((record) => record.type === options.type)
-          }
+  async updateHealthRecord(id: string, updates: Partial<HealthRecord>): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized")
 
-          if (options.startDate) {
-            records = records.filter((record) => record.timestamp >= options.startDate!)
-          }
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["healthRecords"], "readwrite")
+      const store = transaction.objectStore("healthRecords")
+      const getRequest = store.get(id)
 
-          if (options.endDate) {
-            records = records.filter((record) => record.timestamp <= options.endDate!)
-          }
-
-          records.sort((a, b) => b.timestamp - a.timestamp)
-
-          if (options.limit) {
-            records = records.slice(0, options.limit)
-          }
+      getRequest.onsuccess = () => {
+        const record = getRequest.result
+        if (!record) {
+          reject(new Error("Health record not found"))
+          return
         }
 
-        resolve(records)
+        const updatedRecord = { ...record, ...updates }
+        const putRequest = store.put(updatedRecord)
+
+        putRequest.onsuccess = () => resolve()
+        putRequest.onerror = () => reject(new Error("Failed to update health record"))
       }
 
-      request.onerror = () => reject(request.error)
+      getRequest.onerror = () => reject(new Error("Failed to get health record"))
     })
-  }
-
-  async getHealthRecordById(id: string): Promise<HealthRecord | undefined> {
-    return this.performOperation<HealthRecord | undefined>("healthRecords", (store) => {
-      return store.get(id)
-    })
-  }
-
-  async addHealthRecord(record: Omit<HealthRecord, "id" | "createdAt" | "updatedAt">): Promise<HealthRecord> {
-    const timestamp = Date.now()
-    const newRecord: HealthRecord = {
-      id: this.generateUniqueId(),
-      ...record,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    }
-
-    await this.performOperation("healthRecords", (store) => {
-      return store.put(newRecord)
-    })
-
-    return newRecord
-  }
-
-  async updateHealthRecord(
-    id: string,
-    recordData: Partial<Omit<HealthRecord, "id" | "userId" | "createdAt" | "updatedAt">>,
-  ): Promise<HealthRecord> {
-    const record = await this.getHealthRecordById(id)
-
-    if (!record) {
-      throw new Error(`找不到ID为${id}的健康记录`)
-    }
-
-    const updatedRecord: HealthRecord = {
-      ...record,
-      ...recordData,
-      updatedAt: Date.now(),
-    }
-
-    await this.performOperation("healthRecords", (store) => {
-      return store.put(updatedRecord)
-    })
-
-    return updatedRecord
   }
 
   async deleteHealthRecord(id: string): Promise<void> {
-    await this.performOperation("healthRecords", (store) => {
-      return store.delete(id)
+    if (!this.db) throw new Error("Database not initialized")
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["healthRecords"], "readwrite")
+      const store = transaction.objectStore("healthRecords")
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(new Error("Failed to delete health record"))
     })
   }
 
-  // 设置操作
-  async getSettings(): Promise<Settings | null> {
-    try {
-      const settings = await this.performOperation<Settings | undefined>("settings", (store) => {
-        return store.get("settings")
-      })
+  // Settings methods
+  async setSetting(userId: string, key: string, value: any): Promise<void> {
+    if (!this.db) throw new Error("Database not initialized")
 
-      return settings || null
-    } catch (error) {
-      return null
+    const setting: Settings = {
+      id: `${userId}_${key}`,
+      userId,
+      key,
+      value,
+      updatedAt: new Date(),
     }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["settings"], "readwrite")
+      const store = transaction.objectStore("settings")
+      const request = store.put(setting)
+
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(new Error("Failed to set setting"))
+    })
   }
 
-  async updateSettings(settingsData: Partial<Omit<Settings, "id" | "updatedAt">>): Promise<Settings> {
-    let settings: Settings
+  async getSetting(userId: string, key: string): Promise<any> {
+    if (!this.db) throw new Error("Database not initialized")
 
-    try {
-      const existingSettings = await this.getSettings()
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["settings"], "readonly")
+      const store = transaction.objectStore("settings")
+      const request = store.get(`${userId}_${key}`)
 
-      if (existingSettings) {
-        settings = {
-          ...existingSettings,
-          ...settingsData,
-          updatedAt: Date.now(),
-        }
-      } else {
-        settings = {
-          id: "settings",
-          lastUserId: settingsData.lastUserId || "",
-          ...settingsData,
-          updatedAt: Date.now(),
-        }
+      request.onsuccess = () => {
+        const result = request.result
+        resolve(result ? result.value : null)
       }
+      request.onerror = () => reject(new Error("Failed to get setting"))
+    })
+  }
 
-      await this.performOperation("settings", (store) => {
-        return store.put(settings)
-      })
+  async getUserSettings(userId: string): Promise<Record<string, any>> {
+    if (!this.db) throw new Error("Database not initialized")
 
-      return settings
-    } catch (error) {
-      console.error("更新设置时出错:", error)
-      throw error
-    }
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(["settings"], "readonly")
+      const store = transaction.objectStore("settings")
+      const index = store.index("userId")
+      const request = index.getAll(userId)
+
+      request.onsuccess = () => {
+        const settings: Record<string, any> = {}
+        request.result.forEach((setting) => {
+          settings[setting.key] = setting.value
+        })
+        resolve(settings)
+      }
+      request.onerror = () => reject(new Error("Failed to get user settings"))
+    })
   }
 }
 
-// 创建单例实例
 const dbService = new DatabaseService()
-
 export default dbService

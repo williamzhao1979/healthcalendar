@@ -27,6 +27,7 @@ const notoSansSC = Noto_Sans_SC({
 export const metadata: Metadata = {
   title: "全家健康日历",
   description: "全家健康日历",
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({

@@ -1,54 +1,550 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-chinese: var(--font-chinese);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer components {
+  /* 中文排版优化 */
+  body {
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.6;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-chinese), var(--font-geist-sans), Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-}
+  /* 健康日历样式 */
+  .health-calendar-container {
+    max-width: 414px;
+    margin: 0 auto;
+    background: #f8f9fa;
+    min-height: 100vh;
+    padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
 
-/* 增强中文排版 */
-h1, h2, h3, h4, h5, h6, .title-content h1, .modal-title {
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
 
-p, .record-type-description, .record-details {
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 1.6;
-}
+  .title-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
 
-.record-title, .card-title, legend-title, .record-type-title {
-  font-weight: 500;
-  letter-spacing: 0;
-}
+  .heart-icon {
+    font-size: 24px;
+  }
 
-/* 确保中文字体正确显示深浅 */
-strong, b, .card-value, .badge {
-  font-weight: 700;
-}
+  .title-content h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    color: #333;
+  }
 
-/* 增加字间距，提高中文可读性 */
-.calendar-header h2, .records-header h3, .modal-title {
-  letter-spacing: 0.05em;
+  .title-content p {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+  }
+
+  .add-record-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+
+  .add-record-btn:hover {
+    background: #0056b3;
+  }
+
+  .add-record-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+
+  .plus-icon {
+    font-size: 16px;
+    font-weight: bold;
+  }
+
+  .summary-cards {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .summary-card {
+    flex: 1;
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-icon {
+    font-size: 24px;
+  }
+
+  .card-content {
+    flex: 1;
+  }
+
+  .card-title {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 4px;
+  }
+
+  .card-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .calendar-section {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .calendar-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    color: #333;
+  }
+
+  .calendar-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .calendar-nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .nav-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #007bff;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .current-month {
+    font-size: 16px;
+    font-weight: 500;
+    color: #333;
+  }
+
+  .calendar-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .refresh-btn,
+  .today-btn {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: #666;
+    cursor: pointer;
+  }
+
+  .calendar {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .calendar th {
+    text-align: center;
+    padding: 8px 4px;
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+  }
+
+  .calendar td {
+    text-align: center;
+    padding: 8px 4px;
+    font-size: 14px;
+    position: relative;
+    height: 40px;
+    vertical-align: middle;
+  }
+
+  .day-cell {
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  .day-cell:hover {
+    background-color: #f8f9fa;
+  }
+
+  .current-day {
+    background-color: #007bff;
+    color: white;
+    font-weight: 600;
+  }
+
+  .event-dot {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    background-color: #ff6b35;
+    border-radius: 50%;
+  }
+
+  .badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background-color: #dc3545;
+    color: white;
+    font-size: 10px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+  }
+
+  .legend {
+    margin-bottom: 20px;
+  }
+
+  .legend-title {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 8px;
+  }
+
+  .legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .dot.life {
+    background-color: #e91e63;
+  }
+  .dot.sleep {
+    background-color: #9c27b0;
+  }
+  .dot.medicine {
+    background-color: #2196f3;
+  }
+  .dot.note {
+    background-color: #4caf50;
+  }
+  .dot.food {
+    background-color: #ff9800;
+  }
+  .dot.health {
+    background-color: #f44336;
+  }
+  .dot.mental {
+    background-color: #ffeb3b;
+  }
+  .dot.pharmacy {
+    background-color: #00bcd4;
+  }
+  .dot.love {
+    background-color: #ff5722;
+  }
+  .dot.body {
+    background-color: #795548;
+  }
+  .dot.toilet {
+    background-color: #607d8b;
+  }
+  .dot.sport {
+    background-color: #8bc34a;
+  }
+
+  .recent-records {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .records-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .records-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    color: #333;
+  }
+
+  .records-count {
+    font-size: 12px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .refresh-icon {
+    font-size: 12px;
+  }
+
+  .records-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .record-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+  }
+
+  .record-icon {
+    font-size: 20px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border-radius: 6px;
+  }
+
+  .record-content {
+    flex: 1;
+  }
+
+  .record-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 4px;
+  }
+
+  .record-details {
+    font-size: 12px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .record-user,
+  .record-time,
+  .record-meal,
+  .record-category,
+  .record-color,
+  .record-note {
+    white-space: nowrap;
+  }
+
+  .record-action {
+    font-size: 12px;
+    color: #007bff;
+    cursor: pointer;
+  }
+
+  .view-more-btn {
+    width: 100%;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    color: #666;
+    cursor: pointer;
+    margin-top: 12px;
+  }
+
+  .logout-btn {
+    width: 100%;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+
+  .logout-btn:hover {
+    background: #c82333;
+  }
+
+  /* Modal styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+  }
+
+  .modal-container {
+    background: white;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 400px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .add-icon {
+    color: #007bff;
+    font-size: 20px;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .record-types-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .record-type-card {
+    border: 2px solid;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .record-type-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .record-type-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .food-icon {
+    color: #28a745;
+  }
+  .stool-icon {
+    color: #ffc107;
+  }
+  .health-icon {
+    color: #dc3545;
+  }
+  .note-icon {
+    color: #6c757d;
+  }
+
+  .record-type-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+  }
+
+  .record-type-description {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.4;
+  }
 }

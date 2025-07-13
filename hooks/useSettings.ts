@@ -1,61 +1,50 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import dbService, { type Settings } from "@/services/db"
+import { useState } from "react"
+import dbService from "../services/db"
 
 export function useSettings() {
-  const [settings, setSettings] = useState<Settings | null>(null)
+  const [settings, setSettings] = useState<Record<string, any>>({})
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
 
-  // 加载设置
-  const loadSettings = async () => {
+  const loadSettings = async (userId: string) => {
     try {
       setIsLoading(true)
-      const loadedSettings = await dbService.getSettings()
-      setSettings(loadedSettings)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)))
+      const userSettings = await dbService.getUserSettings(userId)
+      setSettings(userSettings)
+    } catch (error) {
+      console.error("Failed to load settings:", error)
+      setSettings({})
     } finally {
       setIsLoading(false)
     }
   }
 
-  // 设置当前用户
-  const setCurrentUser = async (userId: string) => {
+  const setSetting = async (userId: string, key: string, value: any) => {
     try {
-      const updatedSettings = await dbService.updateSettings({ lastUserId: userId })
-      setSettings(updatedSettings)
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)))
-      throw err
+      await dbService.setSetting(userId, key, value)
+      setSettings((prev) => ({ ...prev, [key]: value }))
+    } catch (error) {
+      console.error("Failed to set setting:", error)
+      throw error
     }
   }
 
-  // 更新设置
-  const updateSettings = async (settingsData: Partial<Omit<Settings, "id" | "updatedAt">>) => {
+  const getSetting = async (userId: string, key: string) => {
     try {
-      const updatedSettings = await dbService.updateSettings(settingsData)
-      setSettings(updatedSettings)
-      return updatedSettings
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)))
-      throw err
+      const value = await dbService.getSetting(userId, key)
+      return value
+    } catch (error) {
+      console.error("Failed to get setting:", error)
+      return null
     }
   }
-
-  // 初始加载
-  useEffect(() => {
-    loadSettings()
-  }, [])
 
   return {
     settings,
     isLoading,
-    error,
     loadSettings,
-    setCurrentUser,
-    updateSettings,
+    setSetting,
+    getSetting,
   }
 }
