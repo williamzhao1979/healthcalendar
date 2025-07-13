@@ -110,11 +110,11 @@ const stoolColors = [
 
 export default function StoolRecordPage() {
   const router = useRouter()
-  const { currentUser, users } = useDatabase()
+  const { currentUser, users, isLoading } = useDatabase()
   const { addRecord } = useHealthRecords(currentUser?.id || null)
 
   // 表单状态
-  const [selectedUser, setSelectedUser] = useState(currentUser?.id || "")
+  const [selectedUser, setSelectedUser] = useState("")
   const [dateTime, setDateTime] = useState(() => {
     const now = new Date()
     const year = now.getFullYear()
@@ -132,6 +132,37 @@ export default function StoolRecordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 当 currentUser 加载完成后，设置默认选中用户
+  useState(() => {
+    if (currentUser && !selectedUser) {
+      setSelectedUser(currentUser.id)
+    }
+  }, [currentUser, selectedUser])
+
+  // 如果正在加载，显示加载状态
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 如果没有用户，显示提示
+  if (!users || users.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">请先添加用户</p>
+          <Button onClick={() => router.push("/user-management")}>前往用户管理</Button>
+        </div>
+      </div>
+    )
+  }
 
   // 获取选中的大便类型信息
   const selectedStoolType = stoolTypes.find((type) => type.id === stoolType)
