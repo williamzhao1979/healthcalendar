@@ -1,56 +1,63 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import dbService, { type User } from "../services/db"
+import dbService, { type User } from "@/services/db"
 
 export function useUsers() {
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
+  // 加载用户列表
   const loadUsers = async () => {
     try {
       setIsLoading(true)
-      const allUsers = await dbService.getAllUsers()
-      setUsers(allUsers)
-    } catch (error) {
-      console.error("Failed to load users:", error)
-      setUsers([])
+      const loadedUsers = await dbService.getUsers()
+      setUsers(loadedUsers)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)))
     } finally {
       setIsLoading(false)
     }
   }
 
-  const addUser = async (userData: Omit<User, "id" | "createdAt">) => {
+  // 添加新用户
+  const addUser = async (userData: Omit<User, "id" | "createdAt" | "updatedAt">) => {
     try {
       const newUser = await dbService.addUser(userData)
-      setUsers((prev) => [...prev, newUser])
+      setUsers((prevUsers) => [...prevUsers, newUser])
       return newUser
-    } catch (error) {
-      console.error("Failed to add user:", error)
-      throw error
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)))
+      throw err
     }
   }
 
-  const updateUser = async (id: string, updates: Partial<User>) => {
+  // 更新用户
+  const updateUser = async (id: string, userData: Partial<Omit<User, "id" | "createdAt" | "updatedAt">>) => {
     try {
-      await dbService.updateUser(id, updates)
-      await loadUsers() // Reload users after update
-    } catch (error) {
-      console.error("Failed to update user:", error)
-      throw error
+      const updatedUser = await dbService.updateUser(id, userData)
+      setUsers((prevUsers) => prevUsers.map((user) => (user.id === id ? updatedUser : user)))
+      return updatedUser
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)))
+      throw err
     }
   }
 
+  // 删除用户
   const deleteUser = async (id: string) => {
     try {
       await dbService.deleteUser(id)
-      setUsers((prev) => prev.filter((user) => user.id !== id))
-    } catch (error) {
-      console.error("Failed to delete user:", error)
-      throw error
+      setUsers((prevUsers) => prevUsers.filter((user) => user.id !== id))
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)))
+      throw err
     }
   }
 
+  // 初始加载
   useEffect(() => {
     loadUsers()
   }, [])
@@ -58,9 +65,10 @@ export function useUsers() {
   return {
     users,
     isLoading,
+    error,
+    loadUsers,
     addUser,
     updateUser,
     deleteUser,
-    refreshUsers: loadUsers,
   }
 }

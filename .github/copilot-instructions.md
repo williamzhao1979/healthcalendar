@@ -27,15 +27,4 @@ Common instructions for Copilot
 - Use UPPER_CASE for constants.
 - Use descriptive names that clearly indicate the purpose of the variable or function.
 
-## Porject Structure
-src/
-├── app/                 # Next.js App Router页面
-├── components/          # React组件
-│   ├── ui/             # shadcn/ui组件库
-│   └── theme-provider.tsx
-├── context/            # React Context
-├── hooks/              # 自定义React Hooks
-├── lib/                # 工具函数
-└── services/           # 服务层（数据库等）
-
 ## Preferences
