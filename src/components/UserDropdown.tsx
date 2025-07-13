@@ -9,6 +9,12 @@ export default function UserDropdown() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { currentUser, users, setCurrentUser } = useDatabase()
 
+  // 调试当前用户状态
+  useEffect(() => {
+    console.log("UserDropdown - 当前用户:", currentUser?.name || "无")
+    console.log("UserDropdown - 用户列表:", users.map(u => u.name))
+  }, [currentUser, users])
+
   // 点击外部关闭下拉菜单
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -57,7 +63,7 @@ export default function UserDropdown() {
         className="calendar-filter flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 transition-colors"
       >
         <span className="text-sm">
-          {isLoading ? "切换中..." : currentUser ? getUserDisplayName(currentUser) : "选择用户"}
+          {isLoading ? "切换中..." : currentUser ? getUserDisplayName(currentUser) : "我"}
         </span>
         <span className={`dropdown-icon text-xs transition-transform ${isOpen ? "rotate-180" : ""}`}>▼</span>
       </button>

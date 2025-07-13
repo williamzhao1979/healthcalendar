@@ -332,27 +332,62 @@ class DatabaseService {
     try {
       const existingUsers = await this.getUsers()
 
-      // 如果已经有用户，不需要创建默认用户
-      if (existingUsers.length > 0) {
-        console.log("用户已存在，跳过默认用户创建")
+      // 检查是否已经有"我"这个用户
+      const meUser = existingUsers.find(user => user.name === "我" && user.relationship === "本人")
+      
+      if (meUser) {
+        console.log("默认用户'我'已存在，跳过创建")
         return
       }
 
-      console.log("创建默认用户...")
-      const defaultUsers = [
-        { name: "我", relationship: "本人" },
-        { name: "爸爸", relationship: "父亲" },
-        { name: "妈妈", relationship: "母亲" },
-      ]
-
-      for (const userData of defaultUsers) {
-        await this.addUser(userData)
-        console.log(`已创建默认用户: ${userData.name}`)
+      // 如果没有"我"这个用户，创建它（即使有其他用户）
+      if (!meUser) {
+        console.log("创建默认用户'我'...")
+        const defaultUser = { name: "我", relationship: "本人" }
+        await this.addUser(defaultUser)
+        console.log(`已创建默认用户: ${defaultUser.name}`)
       }
 
-      console.log("默认用户创建完成")
+      // 如果完全没有用户，创建所有默认用户
+      if (existingUsers.length === 0) {
+        console.log("创建其他默认用户...")
+        const otherDefaultUsers = [
+          { name: "爸爸", relationship: "父亲" },
+          { name: "妈妈", relationship: "母亲" },
+        ]
+
+        for (const userData of otherDefaultUsers) {
+          await this.addUser(userData)
+          console.log(`已创建默认用户: ${userData.name}`)
+        }
+      }
+
+      console.log("默认用户初始化完成")
     } catch (error) {
       console.error("创建默认用户失败:", error)
+      throw error
+    }
+  }
+
+  // 确保默认用户"我"存在
+  async ensureDefaultUserExists(): Promise<User> {
+    try {
+      const existingUsers = await this.getUsers()
+      
+      // 查找"我"这个用户
+      let meUser = existingUsers.find(user => user.name === "我" && user.relationship === "本人")
+      
+      if (!meUser) {
+        console.log("默认用户'我'不存在，正在创建...")
+        meUser = await this.addUser({ name: "我", relationship: "本人" })
+        console.log("默认用户'我'创建成功:", meUser)
+      } else {
+        console.log("默认用户'我'已存在:", meUser.name)
+      }
+      
+      return meUser
+    } catch (error) {
+      console.error("确保默认用户存在时出错:", error)
       throw error
     }
   }
@@ -500,72 +535,6 @@ class DatabaseService {
     } catch (error) {
       console.error("更新设置时出错:", error)
       throw error
-    }
-  }
-
-  // 从localStorage迁移数据
-  async migrateFromLocalStorage(): Promise<void> {
-    try {
-      // 确保数据库已经初始化
-      const db = await this.initDB()
-
-      // 检查必要的对象存储是否存在
-      if (!db.objectStoreNames.contains("users") || !db.objectStoreNames.contains("settings")) {
-        console.warn("数据库对象存储不完整，无法迁移数据")
-        return
-      }
-
-      // 迁移用户
-      const storedUsers = localStorage.getItem("healthCalendarUsers")
-      if (storedUsers) {
-        try {
-          const users = JSON.parse(storedUsers)
-          const timestamp = Date.now()
-
-          if (Array.isArray(users)) {
-            for (const user of users) {
-              if (user && typeof user === "object" && user.id) {
-                try {
-                  await this.performOperation("users", (store) => {
-                    return store.put({
-                      ...user,
-                      createdAt: user.createdAt || timestamp,
-                      updatedAt: timestamp,
-                    })
-                  })
-                  console.log(`已迁移用户: ${user.name || user.id}`)
-                } catch (userError) {
-                  console.error(`迁移用户 ${user.id} 失败:`, userError)
-                }
-              }
-            }
-          } else {
-            console.warn("localStorage中的用户数据格式无效")
-          }
-        } catch (parseError) {
-          console.error("解析localStorage中的用户数据失败:", parseError)
-        }
-      }
-
-      // 迁移当前用户ID
-      const currentUserId = localStorage.getItem("healthCalendarCurrentUserId")
-      if (currentUserId) {
-        try {
-          await this.updateSettings({ lastUserId: currentUserId })
-          console.log(`已迁移当前用户ID: ${currentUserId}`)
-        } catch (settingsError) {
-          console.error("迁移当前用户ID失败:", settingsError)
-        }
-      }
-
-      // 迁移后清理localStorage
-      // localStorage.removeItem("healthCalendarUsers");
-      // localStorage.removeItem("healthCalendarCurrentUserId");
-
-      console.log("从localStorage迁移数据完成")
-    } catch (error) {
-      console.error("从localStorage迁移数据时出错:", error)
-      throw error // 重新抛出错误以便调用者可以处理
     }
   }
 }

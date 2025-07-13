@@ -3,7 +3,6 @@
 import { createContext, useState, useContext, useEffect, type ReactNode } from "react"
 import { useUsers } from "@/hooks/useUsers"
 import { useSettings } from "@/hooks/useSettings"
-import { useMigration } from "@/hooks/useMigration"
 import dbService, { type User } from "@/services/db"
 
 interface DatabaseContextType {
@@ -22,9 +21,6 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUserState] = useState<User | null>(null)
   const { users, isLoading: usersLoading, addUser, updateUser, deleteUser } = useUsers()
   const { settings, isLoading: settingsLoading, setCurrentUser: updateCurrentUserId } = useSettings()
-
-  // 触发数据迁移
-  useMigration()
 
   // 更新当前用户
   const setCurrentUser = async (userId: string) => {
@@ -54,19 +50,32 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const updateCurrentUser = async () => {
       if (users.length > 0 && settings) {
+        console.log("开始更新当前用户，用户列表:", users.map(u => u.name))
+        console.log("当前设置:", settings)
+        
         if (settings.lastUserId) {
           // 查找当前选定的用户
           const user = users.find((u) => u.id === settings.lastUserId)
           if (user) {
+            console.log(`找到已保存的用户: ${user.name}`)
             setCurrentUserState(user)
           } else if (users.length > 0) {
-            // 如果找不到保存的用户，使用第一个用户
-            await setCurrentUser(users[0].id)
+            // 如果找不到保存的用户，优先选择"我"
+            const defaultUser = users.find((u) => u.name === "我") || users[0]
+            console.log(`未找到已保存用户，选择默认用户: ${defaultUser.name}`)
+            await setCurrentUser(defaultUser.id)
           }
         } else if (users.length > 0) {
-          // 如果没有保存的用户ID，使用第一个用户
-          await setCurrentUser(users[0].id)
+          // 如果没有保存的用户ID，优先选择"我"作为默认用户
+          const defaultUser = users.find((u) => u.name === "我") || users[0]
+          console.log(`没有保存的用户ID，选择默认用户: ${defaultUser.name}`)
+          await setCurrentUser(defaultUser.id)
         }
+      } else {
+        console.log("用户数据或设置未准备好:", { 
+          usersLength: users.length, 
+          hasSettings: !!settings 
+        })
       }
     }
 
@@ -81,13 +90,25 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initializeDatabase = async () => {
       try {
+        console.log("开始初始化数据库...")
         // 先尝试初始化数据库
-        await dbService.initDB()
+        const db = await dbService.initDB()
+        console.log("数据库初始化成功:", db)
         setDbInitialized(true)
-        console.log("数据库初始化成功")
       } catch (error) {
         console.error("数据库初始化失败:", error)
         // 可以在这里添加重试逻辑或提示用户刷新页面
+        // 重试一次
+        setTimeout(async () => {
+          try {
+            console.log("重试数据库初始化...")
+            const db = await dbService.initDB()
+            console.log("数据库重试初始化成功:", db)
+            setDbInitialized(true)
+          } catch (retryError) {
+            console.error("数据库重试初始化仍然失败:", retryError)
+          }
+        }, 2000)
       }
     }
 
@@ -101,18 +122,30 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
   // 在数据库初始化后，创建默认用户（如果需要）
   useEffect(() => {
     const createDefaultUsers = async () => {
+      console.log("检查是否需要创建默认用户...", {
+        dbInitialized,
+        usersLoading,
+        usersCount: users.length,
+        createUserAttempts
+      })
+
       if (dbInitialized && !usersLoading && users.length === 0 && createUserAttempts < MAX_CREATE_USER_ATTEMPTS) {
         try {
           console.log(`尝试创建默认用户 (尝试 ${createUserAttempts + 1}/${MAX_CREATE_USER_ATTEMPTS})`)
 
-          // 使用新的默认用户初始化方法
+          // 首先确保默认用户"我"存在
+          const defaultUser = await dbService.ensureDefaultUserExists()
+          console.log("默认用户'我'确保存在:", defaultUser)
+
+          // 然后初始化其他默认用户
           await dbService.initializeDefaultUsers()
-          console.log("默认用户创建成功")
+          console.log("所有默认用户创建成功")
 
           // 停止重试
           setCreateUserAttempts(MAX_CREATE_USER_ATTEMPTS)
 
           // 强制重新加载用户列表
+          console.log("1秒后刷新页面以加载新用户...")
           setTimeout(() => {
             window.location.reload()
           }, 1000)
@@ -120,7 +153,11 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
           console.error("创建默认用户失败:", error)
 
           // 增加重试次数
-          setCreateUserAttempts((prev) => prev + 1)
+          setCreateUserAttempts((prev) => {
+            const newAttempts = prev + 1
+            console.log(`重试次数更新: ${prev} -> ${newAttempts}`)
+            return newAttempts
+          })
 
           // 如果还可以重试，延迟后再试
           if (createUserAttempts < MAX_CREATE_USER_ATTEMPTS - 1) {
@@ -128,6 +165,8 @@ export function DatabaseProvider({ children }: { children: ReactNode }) {
             setTimeout(() => {
               createDefaultUsers()
             }, 2000)
+          } else {
+            console.error("已达到最大重试次数，停止尝试创建用户")
           }
         }
       }

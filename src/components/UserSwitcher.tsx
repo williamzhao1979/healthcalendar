@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useUsers } from "@/hooks/useUsers";
 import { useSettings } from "@/hooks/useSettings";
-import { useMigration } from "@/hooks/useMigration";
 import { User } from "@/services/db";
 
 interface UserSwitcherProps {
@@ -19,9 +18,6 @@ export default function UserSwitcher({ onUserChange }: UserSwitcherProps) {
   const { users, addUser, loadUsers } = useUsers();
   const { settings, currentUserId, setCurrentUser, loadSettings } = useSettings();
   
-  // 数据迁移hook
-  useMigration();
-
   // 处理用户变更
   const handleUserChange = async (userId: string) => {
     try {

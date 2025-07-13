@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import "../../components/ui/health-calendar/calendar.css"
 import { useDatabase } from "@/context/DatabaseContext"
 import { useHealthRecords } from "@/hooks/useHealthRecords"
-// import { useMigration } from '@/hooks/useMigration';
 import dbService from "@/services/db"
 import UserDropdown from "@/components/UserDropdown"
 import { useRouter } from "next/navigation"
@@ -24,12 +23,31 @@ export default function HealthCalendarPage() {
   const daysInMonth = new Date(currentYear, currentMonth, 0).getDate()
 
   // 使用数据库上下文
-  const { currentUser } = useDatabase()
+  const { currentUser, users, isLoading: userLoading } = useDatabase()
   // 使用健康记录钩子
   const { records, isLoading, addRecord } = useHealthRecords(null)
 
-  // 使用迁移钩子
-  // const { migrationComplete, migrationError } = useMigration();
+  // 调试当前用户状态
+  useEffect(() => {
+    console.log("HealthCalendarPage - 当前用户:", currentUser?.name || "无")
+    console.log("HealthCalendarPage - 用户加载状态:", userLoading)
+    console.log("HealthCalendarPage - 用户列表:", users?.map(u => `${u.name}(${u.relationship})`))
+  }, [currentUser, userLoading, users])
+
+  // 手动创建默认用户的函数
+  const handleCreateDefaultUser = async () => {
+    try {
+      console.log("手动创建默认用户...")
+      await dbService.ensureDefaultUserExists()
+      await dbService.initializeDefaultUsers()
+      console.log("默认用户创建完成")
+      // 刷新页面以重新加载用户
+      window.location.reload()
+    } catch (error) {
+      console.error("手动创建默认用户失败:", error)
+      alert("创建默认用户失败，请检查控制台")
+    }
+  }
 
   // 初始化数据库
   useEffect(() => {
@@ -37,6 +55,14 @@ export default function HealthCalendarPage() {
       try {
         await dbService.initDB()
         console.log("HealthCalendarPage: 数据库已初始化")
+        
+        // 确保默认用户"我"存在
+        await dbService.ensureDefaultUserExists()
+        console.log("HealthCalendarPage: 默认用户'我'检查完成")
+        
+        // 初始化其他默认用户
+        await dbService.initializeDefaultUsers()
+        console.log("HealthCalendarPage: 所有默认用户检查完成")
       } catch (error) {
         console.error("HealthCalendarPage: 数据库初始化失败", error)
       }
@@ -154,8 +180,15 @@ export default function HealthCalendarPage() {
 
   // 添加记录的处理函数
   const handleAddRecord = async (typeId: string) => {
+    // 如果用户数据还在加载中，不执行操作
+    if (userLoading) {
+      console.log("用户数据加载中，请稍候...")
+      return
+    }
+
     if (!currentUser) {
-      alert("请先选择用户")
+      console.warn("当前没有选中的用户")
+      alert("系统正在初始化用户，请稍候再试")
       return
     }
 
@@ -180,8 +213,15 @@ export default function HealthCalendarPage() {
   // Record Type Selection Modal
   const RecordTypeModal = ({ onClose }: { onClose: () => void }) => {
     const handleAddRecord = async (typeId: string) => {
+      // 如果用户数据还在加载中，不执行操作
+      if (userLoading) {
+        console.log("用户数据加载中，请稍候...")
+        return
+      }
+
       if (!currentUser) {
-        alert("请先选择用户")
+        console.warn("当前没有选中的用户")
+        alert("系统正在初始化用户，请稍候再试")
         return
       }
 
@@ -300,9 +340,56 @@ export default function HealthCalendarPage() {
             <p>记录健康，管理生活</p>
           </div>
         </div>
-        <button className="add-record-btn" onClick={() => setShowModal(true)}>
-          <span className="plus-icon">+</span> 添加记录
+        <button 
+          className="add-record-btn" 
+          onClick={() => setShowModal(true)}
+          disabled={userLoading || !currentUser}
+        >
+          <span className="plus-icon">+</span> 
+          {userLoading ? "加载中..." : currentUser ? "添加记录" : "初始化中..."}
         </button>
+      </div>
+
+      {/* 调试信息 - 临时显示 */}
+      <div style={{ 
+        position: 'fixed', 
+        top: '10px', 
+        right: '10px', 
+        background: 'rgba(0,0,0,0.8)', 
+        color: 'white', 
+        padding: '10px', 
+        borderRadius: '5px', 
+        fontSize: '12px',
+        zIndex: 9999,
+        maxWidth: '300px'
+      }}>
+        <div>用户加载状态: {userLoading ? "加载中" : "已完成"}</div>
+        <div>当前用户: {currentUser?.name || "无"}</div>
+        <div>用户ID: {currentUser?.id || "无"}</div>
+        <div>关系: {currentUser?.relationship || "无"}</div>
+        <div>用户总数: {users?.length || 0}</div>
+        {users && users.length > 0 && (
+          <div>
+            用户列表: {users.map(u => `${u.name}(${u.relationship})`).join(", ")}
+          </div>
+        )}
+        {(!users || users.length === 0) && !userLoading && (
+          <button 
+            onClick={handleCreateDefaultUser}
+            style={{
+              background: '#007bff',
+              color: 'white',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '3px',
+              fontSize: '11px',
+              marginTop: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            创建默认用户
+          </button>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -454,6 +541,9 @@ export default function HealthCalendarPage() {
         <button className="view-more-btn">查看更多记录</button>
       </div>
 
+      {/* Logout Button */}
+      <button className="logout-btn">退出</button>
+
       {/* 系统管理卡片 - 可折叠 */}
       <div className="bg-white rounded-lg p-4 mb-4">
         <button
@@ -504,9 +594,6 @@ export default function HealthCalendarPage() {
           </div>
         )}
       </div>
-
-      {/* Logout Button */}
-      <button className="logout-btn">退出</button>
 
       {/* Record Type Modal */}
       {showModal && <RecordTypeModal onClose={() => setShowModal(false)} />}
