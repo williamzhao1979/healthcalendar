@@ -13,16 +13,13 @@ const eslintConfig = [
   ...compat.extends("next/core-web-vitals"),
   {
     rules: {
-      // 将错误降级为警告，避免构建失败
-      "@next/next/no-img-element": "warn",
-      "react-hooks/exhaustive-deps": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
       "@typescript-eslint/no-explicit-any": "warn",
+      "react-hooks/exhaustive-deps": "warn",
+      "react/no-unescaped-entities": "warn",
+      "@next/next/no-img-element": "warn",
       "prefer-const": "warn",
       "no-unused-vars": "warn",
-      // 完全禁用一些可能导致构建失败的规则
-      "react/no-unescaped-entities": "off",
-      "@typescript-eslint/ban-ts-comment": "off",
     },
   },
 ];

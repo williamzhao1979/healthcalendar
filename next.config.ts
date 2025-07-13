@@ -13,14 +13,6 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  // 确保 CSS 正确处理
-  webpack: (config) => {
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-    }
-    return config
-  },
 }
 
 export default nextConfig
