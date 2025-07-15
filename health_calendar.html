@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>健康日历</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --health-primary: #10B981;
+            --health-secondary: #059669;
+            --health-accent: #34D399;
+            --health-warm: #F59E0B;
+            --health-cool: #3B82F6;
+            --health-soft: #8B5CF6;
+        }
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .calendar-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin: 0 1px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        
+        .calendar-cell {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        
+        .calendar-cell:hover {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(52, 211, 153, 0.1) 100%);
+            transform: scale(1.05);
+        }
+        
+        .calendar-cell.today {
+            background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .record-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        
+        .record-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+        
+        .floating-action-btn {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .floating-action-btn:hover {
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 15px 35px rgba(16, 185, 129, 0.4);
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #667eea 50%, #f093fb 75%, #f5576c 100%);
+            background-size: 300% 300%;
+            animation: gradient 15s ease infinite;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .stat-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%);
+            border: 1px solid rgba(226, 232, 240, 0.6);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .health-icon {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .health-icon.primary {
+            background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+        }
+        
+        .health-icon.warm {
+            background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+        }
+        
+        .health-icon.soft {
+            background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+        }
+        
+        .pulse-ring {
+            animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+        }
+        
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.8);
+                opacity: 1;
+            }
+            80%, 100% {
+                transform: scale(1.2);
+                opacity: 0;
+            }
+        }
+        
+        .scroll-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .scroll-hide::-webkit-scrollbar {
+            display: none;
+        }
+        
+        /* Animation Classes */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        .animate-slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideUp {
+            0% { transform: translateY(100px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        
+        .text-health-primary {
+            color: #10B981;
+        }
+        
+        .hover\:text-health-primary:hover {
+            color: #10B981;
+        }
+        
+        /* Modal Styles */
+        .modal-open {
+            display: flex !important;
+        }
+        
+        .modal-content-show {
+            transform: scale(1) !important;
+            opacity: 1 !important;
+        }
+        
+        .record-type-option {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .record-type-option:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .record-type-option:active {
+            transform: translateY(0) scale(0.98);
+        }
+        
+        /* Tab Content Styles */
+        .tab-content {
+            transition: all 0.3s ease;
+        }
+        
+        .tab-content.hidden {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+    </style>
+</head>
+
+<body class="overflow-x-hidden">
+    <!-- Background -->
+    <div class="fixed inset-0 hero-gradient"></div>
+    <div class="fixed inset-0 bg-white/10"></div>
+    
+    <div class="relative min-h-screen">
+        <!-- Header -->
+        <header class="glass-morphism sticky top-0 z-50 px-6 py-3 animate-fade-in">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <div class="w-9 h-9 health-icon primary rounded-2xl flex items-center justify-center">
+                            <i class="fas fa-heartbeat text-white text-base"></i>
+                        </div>
+                        <div class="absolute inset-0 pulse-ring bg-green-500 bg-opacity-20 rounded-2xl"></div>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-800">健康日历</h1>
+                        <p class="text-xs text-gray-600 font-medium">生活离不开吃喝拉撒</p>
+                    </div>
+                </div>
+                
+                <!-- User Profile -->
+                <div class="flex items-center">
+                    <!-- User Switch -->
+                    <div class="relative">
+                        <button class="flex items-center space-x-2 px-3 py-1.5 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20">
+                            <img src="https://images.unsplash.com/photo-1494790108755-2616b2e4d93d?w=32&h=32&fit=crop&crop=face" 
+                                 alt="用户头像" class="w-6 h-6 rounded-full ring-2 ring-white/50">
+                            <span class="text-sm font-semibold text-gray-800">小雨</span>
+                            <i class="fas fa-chevron-down text-gray-500 text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Quick Stats -->
+        <section class="px-6 py-3 animate-slide-up">
+            <div class="grid grid-cols-3 gap-3">
+                <div class="stat-card rounded-2xl p-2.5 flex items-center space-x-2">
+                    <div class="health-icon warm w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-utensils text-white text-xs"></i>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-base font-bold text-gray-800 leading-tight">3</div>
+                        <div class="text-xs text-gray-600">今日饮食</div>
+                    </div>
+                </div>
+                <div class="stat-card rounded-2xl p-2.5 flex items-center space-x-2">
+                    <div class="health-icon primary w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-seedling text-white text-xs"></i>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-base font-bold text-gray-800 leading-tight">2</div>
+                        <div class="text-xs text-gray-600">排便记录</div>
+                    </div>
+                </div>
+                <div class="stat-card rounded-2xl p-2.5 flex items-center space-x-2">
+                    <div class="health-icon soft w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-folder text-white text-xs"></i>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-base font-bold text-gray-800 leading-tight">1</div>
+                        <div class="text-xs text-gray-600">我的记录</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Calendar Section -->
+        <main class="px-6 pb-8">
+            <div class="glass-morphism rounded-3xl p-6 mb-6 animate-fade-in shadow-2xl">
+                <!-- Calendar Header -->
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800">2025年 7月</h2>
+                        <p class="text-sm text-gray-600 mt-1">健康记录概览</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button class="p-3 rounded-2xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm">
+                            <i class="fas fa-chevron-left text-gray-700"></i>
+                        </button>
+                        <button class="p-3 rounded-2xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm">
+                            <i class="fas fa-chevron-right text-gray-700"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Calendar Grid -->
+                <div class="grid grid-cols-7 gap-2 mb-6">
+                    <!-- Week Header -->
+                    <div class="text-center text-sm font-semibold text-gray-500 py-3">日</div>
+                    <div class="text-center text-sm font-semibold text-gray-500 py-3">一</div>
+                    <div class="text-center text-sm font-semibold text-gray-500 py-3">二</div>
+                    <div class="text-center text-sm font-semibold text-gray-500 py-3">三</div>
+                    <div class="text-center text-sm font-semibold text-gray-500 py-3">四</div>
+                    <div class="text-center text-sm font-semibold text-gray-500 py-3">五</div>
+                    <div class="text-center text-sm font-semibold text-gray-500 py-3">六</div>
+
+                    <!-- Calendar Days -->
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-400 font-medium">30</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">1</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">2</span>
+                        <div class="flex mt-1">
+                            <div class="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
+                            <div class="calendar-dot bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                        </div>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">3</span>
+                        <div class="flex mt-1">
+                            <div class="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
+                            <div class="calendar-dot bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                            <div class="calendar-dot bg-gradient-to-r from-pink-400 to-purple-500"></div>
+                        </div>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">4</span>
+                        <div class="flex mt-1">
+                            <div class="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
+                        </div>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">5</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">6</span>
+                        <div class="flex mt-1">
+                            <div class="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
+                            <div class="calendar-dot bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                        </div>
+                    </div>
+
+                    <!-- Continue with more days -->
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">7</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">8</span>
+                        <div class="flex mt-1">
+                            <div class="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
+                        </div>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">9</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">10</span>
+                        <div class="flex mt-1">
+                            <div class="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
+                            <div class="calendar-dot bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                            <div class="calendar-dot bg-gradient-to-r from-pink-400 to-purple-500"></div>
+                        </div>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">11</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">12</span>
+                        <div class="flex mt-1">
+                            <div class="calendar-dot bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                        </div>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">13</span>
+                    </div>
+
+                    <!-- Today -->
+                    <div class="calendar-cell today h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer text-white">
+                        <span class="text-sm font-bold">14</span>
+                        <div class="flex mt-1">
+                            <div class="calendar-dot bg-white"></div>
+                            <div class="calendar-dot bg-white"></div>
+                        </div>
+                    </div>
+
+                    <!-- Remaining days simplified -->
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">15</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">16</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">17</span>
+                        <div class="flex mt-1">
+                            <div class="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
+                        </div>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">18</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">19</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">20</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">21</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">22</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">23</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">24</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">25</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">26</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">27</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">28</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">29</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">30</span>
+                    </div>
+                    <div class="calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer">
+                        <span class="text-sm text-gray-800 font-semibold">31</span>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="flex items-center justify-center space-x-6 pt-4 border-t border-white/20">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-4 h-4 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-full shadow-sm"></div>
+                        <span class="text-sm font-medium text-gray-700">饮食记录</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-4 h-4 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full shadow-sm"></div>
+                        <span class="text-sm font-medium text-gray-700">排便记录</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-4 h-4 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full shadow-sm"></div>
+                        <span class="text-sm font-medium text-gray-700">生理记录</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Records -->
+            <div class="glass-morphism rounded-3xl p-6 shadow-2xl animate-fade-in">
+                <!-- Tab Navigation -->
+                <div class="flex items-center mb-6 bg-gray-50 rounded-2xl p-1">
+                    <button id="recentTab" onclick="switchTab('recent')" class="flex-1 px-4 py-2 text-sm font-semibold text-health-primary bg-white rounded-xl shadow-sm transition-all">
+                        最近记录
+                    </button>
+                    <button id="updatesTab" onclick="switchTab('updates')" class="flex-1 px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">
+                        最近更新
+                    </button>
+                    <button id="settingsTab" onclick="switchTab('settings')" class="flex-1 px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors">
+                        设置
+                    </button>
+                </div>
+                
+                <!-- Tab Content -->
+                <div id="tabContent">
+                    <!-- Recent Records Tab -->
+                    <div id="recentContent" class="tab-content active">
+                        <div class="space-y-4">
+                            <!-- 早餐记录 -->
+                            <div class="record-card rounded-2xl p-4 shadow-sm">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-utensils text-orange-500 text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-base font-semibold text-gray-900">早餐记录</div>
+                                            <div class="text-sm text-gray-600 mt-1">全麦面包 + 鸡蛋 + 牛奶</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-gray-500">08:30</div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-md">有附件</span>
+                                </div>
+                            </div>
+
+                            <!-- 排便记录 -->
+                            <div class="record-card rounded-2xl p-4 shadow-sm">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-seedling text-green-500 text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-base font-semibold text-gray-900">排便记录</div>
+                                            <div class="text-sm text-gray-600 mt-1">正常，颜色健康</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-gray-500">今天 09:15</div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-md">状态: 良好</span>
+                                </div>
+                            </div>
+
+                            <!-- 午餐记录 -->
+                            <div class="record-card rounded-2xl p-4 shadow-sm">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-utensils text-orange-500 text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-base font-semibold text-gray-900">午餐记录</div>
+                                            <div class="text-sm text-gray-600 mt-1">米饭 + 青菜 + 鸡肉</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-gray-500">今天 12:30</div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
+                                    <span class="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded-md">心情不错</span>
+                                </div>
+                            </div>
+
+                            <!-- 生理记录 -->
+                            <div class="record-card rounded-2xl p-4 shadow-sm">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-heart text-pink-500 text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-base font-semibold text-gray-900">生理记录</div>
+                                            <div class="text-sm text-gray-600 mt-1">体温 36.5°C，血压正常</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-gray-500">7月10日 20:30</div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-md">状态: 正常</span>
+                                </div>
+                            </div>
+
+                            <!-- 我的记录 -->
+                            <div class="record-card rounded-2xl p-4 shadow-sm">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-folder text-purple-500 text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-base font-semibold text-gray-900">我的记录</div>
+                                            <div class="text-sm text-gray-600 mt-1">今日步数 8,500 步</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-sm text-gray-500">7月9日 22:45</div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-md">运动量: 良好</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Updates Tab -->
+                    <div id="updatesContent" class="tab-content hidden">
+                        <div class="space-y-4">
+                            <div class="text-center py-8">
+                                <div class="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                                    <i class="fas fa-clock text-gray-400 text-xl"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-gray-700 mb-2">最近更新</h3>
+                                <p class="text-sm text-gray-500">暂无更新内容</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Settings Tab -->
+                    <div id="settingsContent" class="tab-content hidden">
+                        <div class="space-y-4">
+                            <!-- User Management Section -->
+                            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                                <h4 class="text-base font-semibold text-gray-900 mb-3 flex items-center">
+                                    <i class="fas fa-users text-health-primary mr-2"></i>
+                                    用户管理
+                                </h4>
+                                <div class="space-y-3">
+                                    <!-- Current User -->
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                                        <div class="flex items-center space-x-3">
+                                            <img src="https://images.unsplash.com/photo-1494790108755-2616b2e4d93d?w=40&h=40&fit=crop&crop=face" 
+                                                 alt="小雨" class="w-10 h-10 rounded-full ring-2 ring-health-primary/20">
+                                            <div>
+                                                <div class="text-sm font-semibold text-gray-900">小雨</div>
+                                                <div class="text-xs text-gray-500">当前用户</div>
+                                            </div>
+                                        </div>
+                                        <span class="px-2 py-1 bg-health-primary/10 text-health-primary text-xs rounded-md">活跃</span>
+                                    </div>
+                                    
+                                    <!-- Add User Button -->
+                                    <button onclick="addUser()" class="w-full flex items-center justify-center space-x-2 p-3 border-2 border-dashed border-gray-300 rounded-xl hover:border-health-primary hover:bg-health-primary/5 transition-colors">
+                                        <i class="fas fa-plus text-gray-400"></i>
+                                        <span class="text-sm font-medium text-gray-600">添加新用户</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- General Settings -->
+                            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                                <h4 class="text-base font-semibold text-gray-900 mb-3 flex items-center">
+                                    <i class="fas fa-cog text-health-primary mr-2"></i>
+                                    常规设置
+                                </h4>
+                                <div class="space-y-3">
+                                    <!-- Notification Settings -->
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">推送通知</div>
+                                            <div class="text-xs text-gray-500">接收记录提醒通知</div>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary"></div>
+                                        </label>
+                                    </div>
+
+                                    <!-- Auto Backup -->
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">自动备份</div>
+                                            <div class="text-xs text-gray-500">自动备份健康数据</div>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary"></div>
+                                        </label>
+                                    </div>
+
+                                    <!-- Dark Mode -->
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-900">深色模式</div>
+                                            <div class="text-xs text-gray-500">使用深色主题</div>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary"></div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Data Management -->
+                            <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                                <h4 class="text-base font-semibold text-gray-900 mb-3 flex items-center">
+                                    <i class="fas fa-database text-health-primary mr-2"></i>
+                                    数据管理
+                                </h4>
+                                <div class="space-y-3">
+                                    <button onclick="exportData()" class="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                                        <div class="flex items-center space-x-3">
+                                            <i class="fas fa-download text-blue-500"></i>
+                                            <div class="text-left">
+                                                <div class="text-sm font-medium text-gray-900">导出数据</div>
+                                                <div class="text-xs text-gray-500">导出所有健康记录</div>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-chevron-right text-gray-400"></i>
+                                    </button>
+
+                                    <button onclick="importData()" class="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                                        <div class="flex items-center space-x-3">
+                                            <i class="fas fa-upload text-green-500"></i>
+                                            <div class="text-left">
+                                                <div class="text-sm font-medium text-gray-900">导入数据</div>
+                                                <div class="text-xs text-gray-500">从文件导入健康数据</div>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-chevron-right text-gray-400"></i>
+                                    </button>
+
+                                    <button onclick="clearData()" class="w-full flex items-center justify-between p-3 bg-red-50 rounded-xl hover:bg-red-100 transition-colors">
+                                        <div class="flex items-center space-x-3">
+                                            <i class="fas fa-trash text-red-500"></i>
+                                            <div class="text-left">
+                                                <div class="text-sm font-medium text-red-700">清除数据</div>
+                                                <div class="text-xs text-red-500">删除所有健康记录</div>
+                                            </div>
+                                        </div>
+                                        <i class="fas fa-chevron-right text-red-400"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Floating Action Button -->
+        <div class="fixed bottom-8 right-6 z-40">
+            <button onclick="openRecordModal()" class="floating-action-btn w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl">
+                <i class="fas fa-plus text-white text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Record Type Selection Modal -->
+        <div id="recordModal" class="fixed inset-0 z-50 hidden">
+            <!-- Backdrop -->
+            <div class="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onclick="closeRecordModal()"></div>
+            
+            <!-- Modal Content -->
+            <div class="relative flex items-center justify-center min-h-screen p-6">
+                <div class="glass-morphism rounded-3xl p-6 w-full max-w-sm transform transition-all scale-95 opacity-0" id="modalContent">
+                    <!-- Modal Header -->
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xl font-bold text-gray-800">选择记录类型</h3>
+                        <button onclick="closeRecordModal()" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                            <i class="fas fa-times text-gray-500"></i>
+                        </button>
+                    </div>
+
+                    <!-- Record Type Options -->
+                    <div class="space-y-3">
+                        <!-- 一日三餐 -->
+                        <button onclick="selectRecordType('meals')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                            <div class="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center">
+                                <i class="fas fa-utensils text-orange-500 text-lg"></i>
+                            </div>
+                            <div class="text-left flex-1">
+                                <div class="text-base font-semibold text-gray-900">一日三餐</div>
+                                <div class="text-sm text-gray-500">记录早餐、午餐、晚餐</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+
+                        <!-- 排便记录 -->
+                        <button onclick="selectRecordType('bowel')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                            <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center">
+                                <i class="fas fa-seedling text-green-500 text-lg"></i>
+                            </div>
+                            <div class="text-left flex-1">
+                                <div class="text-base font-semibold text-gray-900">排便记录</div>
+                                <div class="text-sm text-gray-500">记录排便状态和健康</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+
+                        <!-- 生理记录 -->
+                        <button onclick="selectRecordType('physical')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                            <div class="w-12 h-12 bg-pink-100 rounded-2xl flex items-center justify-center">
+                                <i class="fas fa-heart text-pink-500 text-lg"></i>
+                            </div>
+                            <div class="text-left flex-1">
+                                <div class="text-base font-semibold text-gray-900">生理记录</div>
+                                <div class="text-sm text-gray-500">记录体温、血压等数据</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+
+                        <!-- 我的记录 -->
+                        <button onclick="selectRecordType('personal')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                            <div class="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center">
+                                <i class="fas fa-folder text-purple-500 text-lg"></i>
+                            </div>
+                            <div class="text-left flex-1">
+                                <div class="text-base font-semibold text-gray-900">我的记录</div>
+                                <div class="text-sm text-gray-500">记录步数、运动等个人数据</div>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-400"></i>
+                        </button>
+                    </div>
+
+                    <!-- Cancel Button -->
+                    <button onclick="closeRecordModal()" class="w-full mt-6 py-3 text-gray-600 font-medium hover:text-gray-800 transition-colors">
+                        取消
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add some interactive animations
+        document.addEventListener('DOMContentLoaded', function() {
+            // Animate calendar cells on load
+            const calendarCells = document.querySelectorAll('.calendar-cell');
+            calendarCells.forEach((cell, index) => {
+                cell.style.animationDelay = `${index * 0.02}s`;
+                cell.classList.add('animate-fade-in');
+            });
+
+            // Animate record cards
+            const recordCards = document.querySelectorAll('.record-card');
+            recordCards.forEach((card, index) => {
+                card.style.animationDelay = `${0.1 + index * 0.1}s`;
+                card.classList.add('animate-slide-up');
+            });
+        });
+
+        // Modal Functions
+        function openRecordModal() {
+            const modal = document.getElementById('recordModal');
+            const modalContent = document.getElementById('modalContent');
+            
+            modal.classList.add('modal-open');
+            
+            // Add animation delay
+            setTimeout(() => {
+                modalContent.classList.add('modal-content-show');
+            }, 10);
+        }
+
+        function closeRecordModal() {
+            const modal = document.getElementById('recordModal');
+            const modalContent = document.getElementById('modalContent');
+            
+            modalContent.classList.remove('modal-content-show');
+            
+            // Wait for animation to complete
+            setTimeout(() => {
+                modal.classList.remove('modal-open');
+            }, 300);
+        }
+
+        function selectRecordType(type) {
+            // Close modal first
+            closeRecordModal();
+            
+            // Handle record type selection
+            switch(type) {
+                case 'meals':
+                    console.log('选择了一日三餐记录');
+                    // 跳转到一日三餐编辑页面
+                    window.location.href = 'meal_page.html';
+                    break;
+                case 'bowel':
+                    console.log('选择了排便记录');
+                    // 这里可以跳转到排便记录编辑页面
+                    break;
+                case 'physical':
+                    console.log('选择了生理记录');
+                    // 这里可以跳转到生理记录编辑页面
+                    break;
+                case 'personal':
+                    console.log('选择了我的记录');
+                    // 这里可以跳转到我的记录编辑页面
+                    break;
+            }
+        }
+
+        // Close modal when pressing Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeRecordModal();
+            }
+        });
+
+        // Tab Switching Functions
+        function switchTab(tabName) {
+            // Remove active class from all tabs
+            document.querySelectorAll('[id$="Tab"]').forEach(tab => {
+                tab.classList.remove('text-health-primary', 'bg-white', 'shadow-sm');
+                tab.classList.add('text-gray-500');
+            });
+            
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+                content.classList.add('hidden');
+            });
+            
+            // Activate selected tab
+            const selectedTab = document.getElementById(tabName + 'Tab');
+            selectedTab.classList.remove('text-gray-500');
+            selectedTab.classList.add('text-health-primary', 'bg-white', 'shadow-sm');
+            
+            // Show selected content
+            const selectedContent = document.getElementById(tabName + 'Content');
+            selectedContent.classList.remove('hidden');
+            selectedContent.classList.add('active');
+        }
+
+        // Settings Functions
+        function addUser() {
+            const userName = prompt('请输入新用户名称：');
+            if (userName && userName.trim()) {
+                alert('用户 "' + userName.trim() + '" 已添加！');
+                // 这里可以添加实际的用户添加逻辑
+            }
+        }
+
+        function exportData() {
+            alert('正在导出数据...');
+            // 这里可以添加实际的数据导出逻辑
+        }
+
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,.csv';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    alert('正在导入文件: ' + file.name);
+                    // 这里可以添加实际的数据导入逻辑
+                }
+            };
+            input.click();
+        }
+
+        function clearData() {
+            if (confirm('确定要清除所有数据吗？此操作不可恢复！')) {
+                alert('数据已清除！');
+                // 这里可以添加实际的数据清除逻辑
+            }
+        }
+    </script>
+</body>
+</html>
