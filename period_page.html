@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthTracker Pro - 生理记录</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --health-primary: #10B981;
+            --health-secondary: #059669;
+            --health-accent: #34D399;
+            --health-warm: #F59E0B;
+            --health-cool: #3B82F6;
+            --health-soft: #8B5CF6;
+            --health-pink: #EC4899;
+            --health-rose: #F43F5E;
+        }
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #667eea 50%, #f093fb 75%, #f5576c 100%);
+            background-size: 300% 300%;
+            animation: gradient 15s ease infinite;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .form-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            transition: all 0.3s ease;
+        }
+        
+        .form-card:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border-color: rgba(236, 72, 153, 0.2);
+        }
+        
+        .status-option, .flow-option, .color-option {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        
+        .status-option:hover, .flow-option:hover, .color-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-option.selected {
+            background: linear-gradient(135deg, #EC4899 0%, #F43F5E 100%);
+            color: white;
+            transform: scale(1.02);
+            box-shadow: 0 8px 25px rgba(236, 72, 153, 0.3);
+        }
+        
+        .flow-option.selected {
+            background: linear-gradient(135deg, #EC4899 0%, #F43F5E 100%);
+            color: white;
+            border-color: #EC4899;
+        }
+
+        
+        .color-option.selected {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.3);
+        }
+        
+        .upload-area {
+            transition: all 0.3s ease;
+            border: 2px dashed #cbd5e1;
+            background: #f8fafc;
+        }
+        
+        .upload-area:hover {
+            border-color: #EC4899;
+            background: rgba(236, 72, 153, 0.05);
+        }
+        
+        .upload-area.dragover {
+            border-color: #EC4899;
+            background: rgba(236, 72, 153, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .file-preview {
+            transition: all 0.3s ease;
+        }
+        
+        .file-preview:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        .text-health-primary {
+            color: #10B981;
+        }
+        
+        .text-health-pink {
+            color: #EC4899;
+        }
+        
+        .bg-health-pink {
+            background-color: #EC4899;
+        }
+        
+        .border-health-pink {
+            border-color: #EC4899;
+        }
+        
+        .focus\:border-health-pink:focus {
+            border-color: #EC4899;
+        }
+        
+        .focus\:ring-health-pink:focus {
+            --tw-ring-color: rgba(236, 72, 153, 0.5);
+        }
+        
+        /* Tag Styles */
+        .tag-option {
+            transition: all 0.3s ease;
+        }
+        
+        .tag-option:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tag-option.selected {
+            background: linear-gradient(135deg, #EC4899 0%, #F43F5E 100%);
+            color: white;
+            border-color: #EC4899;
+            box-shadow: 0 2px 10px rgba(236, 72, 153, 0.3);
+        }
+        
+        .add-tag-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(236, 72, 153, 0.2);
+        }
+        
+        .selected-tag {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            0% { opacity: 0; transform: translateX(-10px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        
+        /* Cycle Tracker Styles */
+        .cycle-day {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .cycle-day:hover {
+            transform: scale(1.1);
+        }
+        
+        .cycle-day.period {
+            background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
+            color: white;
+        }
+        
+        .cycle-day.fertile {
+            background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+            color: white;
+        }
+        
+        .cycle-day.ovulation {
+            background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+            color: white;
+        }
+        
+        .cycle-day.today {
+            box-shadow: 0 0 0 2px #EC4899;
+        }
+    </style>
+</head>
+
+<body class="overflow-x-hidden">
+    <!-- Background -->
+    <div class="fixed inset-0 hero-gradient"></div>
+    <div class="fixed inset-0 bg-white/10"></div>
+    
+    <div class="relative min-h-screen">
+        <!-- Header -->
+        <header class="glass-morphism sticky top-0 z-50 px-6 py-3 animate-fade-in">
+            <div class="flex items-center justify-between">
+                <!-- Back Button and Title -->
+                <div class="flex items-center space-x-4">
+                    <button onclick="goBack()" class="w-9 h-9 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20 flex items-center justify-center">
+                        <i class="fas fa-arrow-left text-gray-700"></i>
+                    </button>
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-800">生理记录</h1>
+                        <p class="text-xs text-gray-600 font-medium">记录您的月经周期</p>
+                    </div>
+                </div>
+                
+                <!-- User Switch -->
+                <div class="relative">
+                    <button class="flex items-center space-x-2 px-3 py-1.5 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20">
+                        <img src="https://images.unsplash.com/photo-1494790108755-2616b2e4d93d?w=32&h=32&fit=crop&crop=face" 
+                             alt="用户头像" class="w-6 h-6 rounded-full ring-2 ring-white/50">
+                        <span class="text-sm font-semibold text-gray-800">小雨</span>
+                        <i class="fas fa-chevron-down text-gray-500 text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="px-6 py-4 pb-20">
+            <!-- Main Form Card -->
+            <div class="form-card rounded-3xl p-5 mb-4 animate-fade-in relative">
+                <!-- Close Button -->
+                <button onclick="closeForm()" class="absolute top-4 right-4 w-8 h-8 bg-gray-100 hover:bg-red-100 rounded-full flex items-center justify-center transition-all z-10">
+                    <i class="fas fa-times text-gray-400 hover:text-red-500 text-sm"></i>
+                </button>
+                
+                <!-- Date and Time Section -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-calendar-alt text-health-pink mr-2"></i>
+                        日期时间
+                    </h3>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">选择日期和时间</label>
+                        <input type="datetime-local" 
+                               value="2025-07-14T08:00"
+                               class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all">
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- Period Status Selection -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-heart text-health-pink mr-2"></i>
+                        月经状态
+                    </h3>
+                    <div class="grid grid-cols-3 gap-2.5">
+                        <div class="status-option p-3 bg-gray-50 rounded-xl border border-gray-200 text-center selected">
+                            <div class="w-10 h-10 bg-red-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <i class="fas fa-play text-red-500 text-base"></i>
+                            </div>
+                            <div class="text-sm font-semibold">开始</div>
+                            <div class="text-xs text-gray-500 mt-0.5">月经开始</div>
+                        </div>
+                        <div class="status-option p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="w-10 h-10 bg-pink-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <i class="fas fa-circle text-pink-500 text-base"></i>
+                            </div>
+                            <div class="text-sm font-semibold">进行中</div>
+                            <div class="text-xs text-gray-500 mt-0.5">月经期间</div>
+                        </div>
+                        <div class="status-option p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="w-10 h-10 bg-gray-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <i class="fas fa-stop text-gray-500 text-base"></i>
+                            </div>
+                            <div class="text-sm font-semibold">结束</div>
+                            <div class="text-xs text-gray-500 mt-0.5">月经结束</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- Flow Amount Selection -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-tint text-health-pink mr-2"></i>
+                        流量大小
+                    </h3>
+                    <div class="grid grid-cols-4 gap-2.5">
+                        <div class="flow-option p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="text-sm font-semibold text-gray-700">极少</div>
+                            <div class="text-xs text-gray-500 mt-0.5">点滴状</div>
+                        </div>
+                        <div class="flow-option p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="text-sm font-semibold text-gray-700">较少</div>
+                            <div class="text-xs text-gray-500 mt-0.5">轻量</div>
+                        </div>
+                        <div class="flow-option p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center selected">
+                            <div class="text-sm font-semibold">正常</div>
+                            <div class="text-xs mt-0.5">中等量</div>
+                        </div>
+                        <div class="flow-option p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="text-sm font-semibold text-gray-700">较多</div>
+                            <div class="text-xs text-gray-500 mt-0.5">大量</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- Color Selection -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-palette text-health-pink mr-2"></i>
+                        颜色记录
+                    </h3>
+                    <div class="grid grid-cols-5 gap-3">
+                        <div class="color-option p-2 rounded-lg text-center cursor-pointer selected">
+                            <div class="w-8 h-8 bg-red-600 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                            <div class="text-xs font-medium text-gray-700">鲜红</div>
+                        </div>
+                        <div class="color-option p-2 rounded-lg text-center cursor-pointer">
+                            <div class="w-8 h-8 bg-red-800 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                            <div class="text-xs font-medium text-gray-700">暗红</div>
+                        </div>
+                        <div class="color-option p-2 rounded-lg text-center cursor-pointer">
+                            <div class="w-8 h-8 bg-red-900 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                            <div class="text-xs font-medium text-gray-700">深红</div>
+                        </div>
+                        <div class="color-option p-2 rounded-lg text-center cursor-pointer">
+                            <div class="w-8 h-8 bg-orange-600 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                            <div class="text-xs font-medium text-gray-700">橙红</div>
+                        </div>
+                        <div class="color-option p-2 rounded-lg text-center cursor-pointer">
+                            <div class="w-8 h-8 bg-pink-400 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                            <div class="text-xs font-medium text-gray-700">粉红</div>
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- Notes Section -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-edit text-health-pink mr-2"></i>
+                        备注信息
+                    </h3>
+                    <textarea 
+                        placeholder="请记录详细信息，如疼痛程度、情绪变化、特殊情况等..."
+                        rows="3"
+                        class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all resize-none">今天腹痛较为明显，情绪稍显烦躁，流量正常</textarea>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- Mood Tracking -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-smile text-health-pink mr-2"></i>
+                        情绪记录
+                    </h3>
+                    <div class="flex justify-between">
+                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer">
+                            <div class="text-2xl mb-1">😭</div>
+                            <div class="text-xs text-gray-600">很难过</div>
+                        </div>
+                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer">
+                            <div class="text-2xl mb-1">😟</div>
+                            <div class="text-xs text-gray-600">不开心</div>
+                        </div>
+                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer bg-pink-50 border border-pink-200">
+                            <div class="text-2xl mb-1">😐</div>
+                            <div class="text-xs text-pink-600 font-medium">一般</div>
+                        </div>
+                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer">
+                            <div class="text-2xl mb-1">😊</div>
+                            <div class="text-xs text-gray-600">开心</div>
+                        </div>
+                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer">
+                            <div class="text-2xl mb-1">😄</div>
+                            <div class="text-xs text-gray-600">很开心</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- Tags Selection -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-tags text-health-pink mr-2"></i>
+                        标签选择
+                    </h3>
+                    
+                    <!-- Tag Container -->
+                    <div class="flex flex-wrap gap-2 mb-3" id="tagContainer">
+                        <!-- Preset Tags -->
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="规律">
+                            规律
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200 selected" data-tag="正常">
+                            正常
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="疼痛">
+                            疼痛
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                            异常
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                            头痛
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                            腹痛
+                        </div>
+                         <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                            疲劳
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                            失眠
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                            情绪低落
+                        </div>                       
+                        <!-- Add Custom Tag Button -->
+                        <div class="add-tag-btn px-3 py-1.5 bg-health-pink/10 border border-health-pink/30 rounded-full text-sm font-medium text-health-pink cursor-pointer transition-all hover:bg-health-pink/20 flex items-center space-x-1">
+                            <i class="fas fa-plus text-xs"></i>
+                            <span>自定义</span>
+                        </div>
+                    </div>
+
+                    <!-- Custom Tag Input (Hidden by default) -->
+                    <div id="customTagInput" class="hidden">
+                        <div class="flex items-center space-x-2">
+                            <input type="text" 
+                                   id="newTagInput"
+                                   placeholder="输入自定义标签..."
+                                   class="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all text-sm"
+                                   maxlength="10">
+                            <button onclick="addCustomTag()" 
+                                    class="px-3 py-2 bg-health-pink text-white text-sm rounded-lg hover:bg-pink-600 transition-colors">
+                                添加
+                            </button>
+                            <button onclick="cancelCustomTag()" 
+                                    class="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Selected Tags Display -->
+                    <div class="mt-3" id="selectedTagsDisplay">
+                        <div class="text-xs text-gray-500 mb-1">已选择的标签：</div>
+                        <div class="flex flex-wrap gap-1" id="selectedTags">
+                            <span class="selected-tag px-2 py-1 bg-health-pink/10 text-health-pink text-xs rounded-md border border-health-pink/20">
+                                正常
+                                <button onclick="removeSelectedTag(this)" class="ml-1 text-health-pink/60 hover:text-health-pink">
+                                    <i class="fas fa-times text-xs"></i>
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- File Upload Section -->
+                <div>
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-paperclip text-health-pink mr-2"></i>
+                        附件上传
+                    </h3>
+                    
+                    <!-- Upload Area -->
+                    <div class="upload-area rounded-lg p-4 text-center mb-2" id="uploadArea">
+                        <div class="w-8 h-8 bg-gray-100 rounded-lg mx-auto mb-2 flex items-center justify-center">
+                            <i class="fas fa-cloud-upload-alt text-gray-400 text-sm"></i>
+                        </div>
+                        <div class="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽文件</div>
+                        <input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx,.txt" class="hidden">
+                        <button onclick="document.getElementById('fileInput').click()" 
+                                class="px-3 py-1.5 bg-health-pink text-white text-xs rounded-md hover:bg-pink-600 transition-colors">
+                            选择文件
+                        </button>
+                    </div>
+
+                    <!-- File Preview Area -->
+                    <div id="filePreview" class="space-y-1"></div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="goBack()" 
+                        class="py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    返回
+                </button>
+                <button onclick="saveRecord()" 
+                        class="py-3 bg-health-pink text-white font-semibold rounded-xl hover:bg-pink-600 transition-colors">
+                    <i class="fas fa-check mr-2"></i>
+                    保存记录
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Page load animations
+        document.addEventListener('DOMContentLoaded', function() {
+            const mainCard = document.querySelector('.form-card');
+            if (mainCard) {
+                mainCard.classList.add('animate-fade-in');
+            }
+
+            // Initialize file upload
+            initFileUpload();
+            
+            // Initialize selected tags display
+            updateSelectedTags();
+        });
+
+        // Status selection
+        document.querySelectorAll('.status-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.status-option').forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // Flow selection
+        document.querySelectorAll('.flow-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.flow-option').forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+        // Color selection
+        document.querySelectorAll('.color-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+
+// Mood selection
+        document.querySelectorAll('.mood-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.mood-option').forEach(opt => {
+                    opt.classList.remove('bg-pink-50', 'border-pink-200');
+                    opt.querySelector('.text-xs').classList.remove('text-pink-600', 'font-medium');
+                    opt.querySelector('.text-xs').classList.add('text-gray-600');
+                });
+                this.classList.add('bg-pink-50', 'border-pink-200');
+                this.querySelector('.text-xs').classList.remove('text-gray-600');
+                this.querySelector('.text-xs').classList.add('text-pink-600', 'font-medium');
+            });
+        });
+
+        // Tag selection
+        document.querySelectorAll('.tag-option').forEach(option => {
+            option.addEventListener('click', function() {
+                this.classList.toggle('selected');
+                updateSelectedTags();
+            });
+        });
+
+        // Add custom tag button
+        document.querySelector('.add-tag-btn').addEventListener('click', function() {
+            showCustomTagInput();
+        });
+
+        // Custom tag input enter key
+        document.getElementById('newTagInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addCustomTag();
+            }
+        });
+
+        // File Upload Functionality
+        function initFileUpload() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const filePreview = document.getElementById('filePreview');
+
+            // Drag and drop events
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                handleFiles(files);
+            });
+
+            // File input change event
+            fileInput.addEventListener('change', function(e) {
+                handleFiles(e.target.files);
+            });
+        }
+
+        function handleFiles(files) {
+            const filePreview = document.getElementById('filePreview');
+            
+            Array.from(files).forEach(file => {
+                const fileItem = createFilePreview(file);
+                filePreview.appendChild(fileItem);
+            });
+        }
+
+        function createFilePreview(file) {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-preview bg-white p-2 rounded-lg border border-gray-200 flex items-center space-x-2';
+
+            const isImage = file.type.startsWith('image/');
+            const icon = isImage ? 'fa-image' : 'fa-file-alt';
+            const iconColor = isImage ? 'text-blue-500' : 'text-gray-500';
+
+            fileItem.innerHTML = `
+                <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fas ${icon} ${iconColor} text-sm"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs font-medium text-gray-900 truncate">${file.name}</div>
+                    <div class="text-xs text-gray-500">${formatFileSize(file.size)}</div>
+                </div>
+                <button onclick="removeFile(this)" 
+                        class="w-6 h-6 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors">
+                    <i class="fas fa-times text-red-500 text-xs"></i>
+                </button>
+            `;
+
+            return fileItem;
+        }
+
+        function removeFile(button) {
+            button.closest('.file-preview').remove();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Button Actions
+        function goBack() {
+            console.log('返回上一页');
+            // 返回到主页面
+            window.location.href = 'health_calendar.html';
+        }
+
+        function saveRecord() {
+            console.log('保存记录');
+            // 这里可以添加保存记录的逻辑
+            alert('生理记录已保存！');
+        }
+
+        function closeForm() {
+            window.location.href = 'health_calendar.html';
+        }
+
+        // Tag Management Functions
+        function updateSelectedTags() {
+            const selectedTags = document.getElementById('selectedTags');
+            const selectedOptions = document.querySelectorAll('.tag-option.selected');
+            
+            selectedTags.innerHTML = '';
+            
+            selectedOptions.forEach(option => {
+                const tagName = option.getAttribute('data-tag');
+                const tagElement = createSelectedTag(tagName);
+                selectedTags.appendChild(tagElement);
+            });
+        }
+
+        function createSelectedTag(tagName) {
+            const tagElement = document.createElement('span');
+            tagElement.className = 'selected-tag px-2 py-1 bg-health-pink/10 text-health-pink text-xs rounded-md border border-health-pink/20';
+            tagElement.innerHTML = `
+                ${tagName}
+                <button onclick="removeSelectedTag(this)" class="ml-1 text-health-pink/60 hover:text-health-pink">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            `;
+            return tagElement;
+        }
+
+        function removeSelectedTag(button) {
+            const tagElement = button.closest('.selected-tag');
+            const tagName = tagElement.textContent.trim();
+            
+            // Remove from selected tags display
+            tagElement.remove();
+            
+            // Unselect the corresponding tag option
+            const tagOption = document.querySelector(`.tag-option[data-tag="${tagName}"]`);
+            if (tagOption) {
+                tagOption.classList.remove('selected');
+            }
+        }
+
+        function showCustomTagInput() {
+            document.getElementById('customTagInput').classList.remove('hidden');
+            document.getElementById('newTagInput').focus();
+        }
+
+        function addCustomTag() {
+            const input = document.getElementById('newTagInput');
+            const tagName = input.value.trim();
+            
+            if (tagName && tagName.length <= 10) {
+                // Check if tag already exists
+                const existingTag = document.querySelector(`.tag-option[data-tag="${tagName}"]`);
+                if (!existingTag) {
+                    // Create new tag option
+                    const newTagOption = document.createElement('div');
+                    newTagOption.className = 'tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200 selected';
+                    newTagOption.setAttribute('data-tag', tagName);
+                    newTagOption.textContent = tagName;
+                    
+                    // Add click event
+                    newTagOption.addEventListener('click', function() {
+                        this.classList.toggle('selected');
+                        updateSelectedTags();
+                    });
+                    
+                    // Insert before the add button
+                    const addButton = document.querySelector('.add-tag-btn');
+                    addButton.parentNode.insertBefore(newTagOption, addButton);
+                    
+                    // Update selected tags
+                    updateSelectedTags();
+                }
+                
+                // Clear input and hide
+                input.value = '';
+                cancelCustomTag();
+            }
+        }
+
+        function cancelCustomTag() {
+            document.getElementById('customTagInput').classList.add('hidden');
+            document.getElementById('newTagInput').value = '';
+        }
+    </script>
+</body>
+</html>
