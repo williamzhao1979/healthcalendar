@@ -115,6 +115,10 @@
             background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
         }
         
+        .health-icon.privacy {
+            background: linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%);
+        }
+        
         .pulse-ring {
             animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
         }
@@ -280,9 +284,14 @@
             <div class="glass-morphism rounded-3xl p-6 mb-6 animate-fade-in shadow-2xl">
                 <!-- Calendar Header -->
                 <div class="flex items-center justify-between mb-6">
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-800">2025年 7月</h2>
-                        <p class="text-sm text-gray-600 mt-1">健康记录概览</p>
+                    <div class="flex items-center space-x-3">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">2025年 7月</h2>
+                            <p class="text-sm text-gray-600 mt-1">健康记录概览</p>
+                        </div>
+                        <button onclick="goToPrivacyCalendar()" class="p-3 rounded-2xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm health-icon privacy">
+                            <i class="fas fa-venus text-white text-sm"></i>
+                        </button>
                     </div>
                     <div class="flex items-center space-x-2">
                         <button class="p-3 rounded-2xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm">
@@ -456,7 +465,7 @@
                     </div>
                     <div class="flex items-center space-x-2">
                         <div class="w-4 h-4 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full shadow-sm"></div>
-                        <span class="text-sm font-medium text-gray-700">生理记录</span>
+                        <span class="text-sm font-medium text-gray-700">我的记录</span>
                     </div>
                 </div>
             </div>
@@ -754,7 +763,7 @@
                         </button>
 
                         <!-- 排便记录 -->
-                        <button onclick="selectRecordType('bowel')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                        <button onclick="selectRecordType('stool')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
                             <div class="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center">
                                 <i class="fas fa-seedling text-green-500 text-lg"></i>
                             </div>
@@ -766,19 +775,19 @@
                         </button>
 
                         <!-- 生理记录 -->
-                        <button onclick="selectRecordType('physical')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                        <button onclick="selectRecordType('period')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
                             <div class="w-12 h-12 bg-pink-100 rounded-2xl flex items-center justify-center">
                                 <i class="fas fa-heart text-pink-500 text-lg"></i>
                             </div>
                             <div class="text-left flex-1">
                                 <div class="text-base font-semibold text-gray-900">生理记录</div>
-                                <div class="text-sm text-gray-500">记录体温、血压等数据</div>
+                                <div class="text-sm text-gray-500">记录生理日期和状态</div>
                             </div>
                             <i class="fas fa-chevron-right text-gray-400"></i>
                         </button>
 
                         <!-- 我的记录 -->
-                        <button onclick="selectRecordType('personal')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                        <button onclick="selectRecordType('myrecord')" class="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
                             <div class="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center">
                                 <i class="fas fa-folder text-purple-500 text-lg"></i>
                             </div>
@@ -853,15 +862,17 @@
                     // 跳转到一日三餐编辑页面
                     window.location.href = 'meal_page.html';
                     break;
-                case 'bowel':
+                case 'stool':
                     console.log('选择了排便记录');
                     // 这里可以跳转到排便记录编辑页面
+                    window.location.href = 'stool_page.html';
                     break;
-                case 'physical':
+                case 'period':
                     console.log('选择了生理记录');
                     // 这里可以跳转到生理记录编辑页面
+                    window.location.href = 'period_page.html';
                     break;
-                case 'personal':
+                case 'myrecord':
                     console.log('选择了我的记录');
                     // 这里可以跳转到我的记录编辑页面
                     break;
@@ -933,6 +944,12 @@
                 alert('数据已清除！');
                 // 这里可以添加实际的数据清除逻辑
             }
+        }
+
+        // Privacy Calendar Navigation
+        function goToPrivacyCalendar() {
+            console.log('跳转到隐私日历');
+            window.location.href = 'period_calendar.html';
         }
     </script>
 </body>
