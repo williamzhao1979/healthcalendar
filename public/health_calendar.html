@@ -206,6 +206,98 @@
             display: block;
             animation: fadeIn 0.3s ease-in-out;
         }
+
+        /* 新增时间线样式 */
+        .timeline-container {
+            position: relative;
+            padding-left: 1.5rem;
+        }
+        
+        .timeline-line {
+            position: absolute;
+            left: 1.75rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, 
+                rgba(16, 185, 129, 0.3) 0%, 
+                rgba(16, 185, 129, 0.15) 100%);
+        }
+        
+        .timeline-date {
+            position: relative;
+            margin-bottom: 1rem;
+            padding-left: 2.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--health-primary);
+        }
+        
+        .timeline-date::before {
+            content: '';
+            position: absolute;
+            left: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 50%;
+            background-color: var(--health-primary);
+            border: 3px solid white;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+        
+        .timeline-date.past-date {
+            color: #6b7280;
+        }
+        
+        .timeline-date.past-date::before {
+            background-color: #d1d5db;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+            padding-left: 2.5rem;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 1.25rem;
+            top: 1.5rem;
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            background-color: var(--health-accent);
+            border: 2px solid white;
+            z-index: 10;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+        }
+        
+        .timeline-item.past-item::before {
+            background-color: #9ca3af;
+        }
+        
+        .timeline-time {
+            position: absolute;
+            left: -0.5rem;
+            top: 1.5rem;
+            background: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--health-secondary);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            z-index: 10;
+        }
+        
+        .timeline-item.past-item .timeline-time {
+            color: #6b7280;
+        }
     </style>
 </head>
 
@@ -485,109 +577,155 @@
                     </button>
                 </div>
                 
-                <!-- Tab Content -->
-                <div id="tabContent">
-                    <!-- Recent Records Tab -->
-                    <div id="recentContent" class="tab-content active">
-                        <div class="space-y-4">
-                            <!-- 早餐记录 -->
-                            <div class="record-card rounded-2xl p-4 shadow-sm">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                                            <i class="fas fa-utensils text-orange-500 text-lg"></i>
-                                        </div>
-                                        <div>
-                                            <div class="text-base font-semibold text-gray-900">早餐记录</div>
-                                            <div class="text-sm text-gray-600 mt-1">全麦面包 + 鸡蛋 + 牛奶</div>
-                                        </div>
+        <!-- Tab Content -->
+        <div id="tabContent">
+            <!-- Recent Records Tab - 时间线布局 -->
+            <div id="recentContent" class="tab-content active">
+                <div class="timeline-container">
+                    <div class="timeline-line"></div>
+                    
+                    <!-- 今天的记录 -->
+                    <div class="timeline-date">今天, 2025年7月20日</div>
+                    
+                    <!-- 早餐记录 -->
+                    <div class="timeline-item">
+                        <div class="timeline-time">08:30</div>
+                        <div class="record-card rounded-2xl p-4 shadow-sm">
+                            <div class="flex items-start">
+                                <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-utensils text-orange-500"></i>
+                                </div>
+                                <div class="ml-3 flex-1">
+                                    <div class="flex justify-between items-start">
+                                        <div class="text-base font-semibold text-gray-900">早餐记录</div>
                                     </div>
-                                    <div class="text-sm text-gray-500">08:30</div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
-                                    <span class="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-md">有附件</span>
-                                </div>
-                            </div>
-
-                            <!-- 排便记录 -->
-                            <div class="record-card rounded-2xl p-4 shadow-sm">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                            <i class="fas fa-seedling text-green-500 text-lg"></i>
-                                        </div>
-                                        <div>
-                                            <div class="text-base font-semibold text-gray-900">排便记录</div>
-                                            <div class="text-sm text-gray-600 mt-1">正常，颜色健康</div>
-                                        </div>
+                                    <div class="text-sm text-gray-600 mt-1">全麦面包 + 鸡蛋 + 牛奶</div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <span class="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
+                                        <span class="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-md">有附件</span>
                                     </div>
-                                    <div class="text-sm text-gray-500">今天 09:15</div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-md">状态: 良好</span>
-                                </div>
-                            </div>
-
-                            <!-- 午餐记录 -->
-                            <div class="record-card rounded-2xl p-4 shadow-sm">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                                            <i class="fas fa-utensils text-orange-500 text-lg"></i>
-                                        </div>
-                                        <div>
-                                            <div class="text-base font-semibold text-gray-900">午餐记录</div>
-                                            <div class="text-sm text-gray-600 mt-1">米饭 + 青菜 + 鸡肉</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-sm text-gray-500">今天 12:30</div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
-                                    <span class="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded-md">心情不错</span>
-                                </div>
-                            </div>
-
-                            <!-- 生理记录 -->
-                            <div class="record-card rounded-2xl p-4 shadow-sm">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center">
-                                            <i class="fas fa-heart text-pink-500 text-lg"></i>
-                                        </div>
-                                        <div>
-                                            <div class="text-base font-semibold text-gray-900">生理记录</div>
-                                            <div class="text-sm text-gray-600 mt-1">体温 36.5°C，血压正常</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-sm text-gray-500">7月10日 20:30</div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-md">状态: 正常</span>
-                                </div>
-                            </div>
-
-                            <!-- 我的记录 -->
-                            <div class="record-card rounded-2xl p-4 shadow-sm">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                                            <i class="fas fa-folder text-purple-500 text-lg"></i>
-                                        </div>
-                                        <div>
-                                            <div class="text-base font-semibold text-gray-900">我的记录</div>
-                                            <div class="text-sm text-gray-600 mt-1">今日步数 8,500 步</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-sm text-gray-500">7月9日 22:45</div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-md">运动量: 良好</span>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- 排便记录 -->
+                    <div class="timeline-item">
+                        <div class="timeline-time">09:15</div>
+                        <div class="record-card rounded-2xl p-4 shadow-sm">
+                            <div class="flex items-start">
+                                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-seedling text-green-500"></i>
+                                </div>
+                                <div class="ml-3 flex-1">
+                                    <div class="flex justify-between items-start">
+                                        <div class="text-base font-semibold text-gray-900">排便记录</div>
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-1">正常，颜色健康</div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <span class="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-md">状态: 良好</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 午餐记录 -->
+                    <div class="timeline-item">
+                        <div class="timeline-time">12:30</div>
+                        <div class="record-card rounded-2xl p-4 shadow-sm">
+                            <div class="flex items-start">
+                                <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-utensils text-orange-500"></i>
+                                </div>
+                                <div class="ml-3 flex-1">
+                                    <div class="flex justify-between items-start">
+                                        <div class="text-base font-semibold text-gray-900">午餐记录</div>
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-1">米饭 + 青菜 + 鸡肉</div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <span class="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
+                                        <span class="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded-md">心情不错</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 昨天的记录 -->
+                    <div class="timeline-date past-date">昨天, 2025年7月19日</div>
+                    
+                    <!-- 晚餐记录 -->
+                    <div class="timeline-item past-item">
+                        <div class="timeline-time">19:45</div>
+                        <div class="record-card rounded-2xl p-4 shadow-sm">
+                            <div class="flex items-start">
+                                <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-utensils text-orange-500"></i>
+                                </div>
+                                <div class="ml-3 flex-1">
+                                    <div class="flex justify-between items-start">
+                                        <div class="text-base font-semibold text-gray-900">晚餐记录</div>
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-1">蔬菜沙拉 + 鸡胸肉</div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <span class="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 较少</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 7月18日的记录 -->
+                    <div class="timeline-date past-date">2025年7月18日</div>
+                    
+                    <!-- 我的记录 -->
+                    <div class="timeline-item past-item">
+                        <div class="timeline-time">22:30</div>
+                        <div class="record-card rounded-2xl p-4 shadow-sm">
+                            <div class="flex items-start">
+                                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-folder text-purple-500"></i>
+                                </div>
+                                <div class="ml-3 flex-1">
+                                    <div class="flex justify-between items-start">
+                                        <div class="text-base font-semibold text-gray-900">我的记录</div>
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-1">今日步数 7,200 步</div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <span class="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-md">运动量: 一般</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 7月10日的记录 -->
+                    <div class="timeline-date past-date">2025年7月10日</div>
+                    
+                    <!-- 生理记录 -->
+                    <div class="timeline-item past-item">
+                        <div class="timeline-time">20:30</div>
+                        <div class="record-card rounded-2xl p-4 shadow-sm">
+                            <div class="flex items-start">
+                                <div class="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-heart text-pink-500"></i>
+                                </div>
+                                <div class="ml-3 flex-1">
+                                    <div class="flex justify-between items-start">
+                                        <div class="text-base font-semibold text-gray-900">生理记录</div>
+                                    </div>
+                                    <div class="text-sm text-gray-600 mt-1">体温 36.5°C，血压正常</div>
+                                    <div class="flex items-center space-x-2 mt-2">
+                                        <span class="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-md">状态: 正常</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
 
                     <!-- Recent Updates Tab -->
                     <div id="updatesContent" class="tab-content hidden">
@@ -875,6 +1013,7 @@
                 case 'myrecord':
                     console.log('选择了我的记录');
                     // 这里可以跳转到我的记录编辑页面
+                    window.location.href = 'myrecord_page.html';
                     break;
             }
         }
