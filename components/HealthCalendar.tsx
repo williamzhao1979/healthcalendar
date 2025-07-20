@@ -33,10 +33,40 @@ interface AddUserModalProps {
   onAddUser: (userName: string, avatarUrl: string) => void
 }
 
+// 通用头像组件，带错误处理
+const SafeAvatar: React.FC<{
+  src: string
+  alt: string
+  className?: string
+  fallbackClassName?: string
+}> = ({ src, alt, className = "", fallbackClassName = "" }) => {
+  const [hasError, setHasError] = useState(false)
+
+  const DefaultAvatar = () => (
+    <div className={`bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center rounded-full ${fallbackClassName}`}>
+      <User className="text-white w-1/2 h-1/2" />
+    </div>
+  )
+
+  if (hasError || !src) {
+    return <DefaultAvatar />
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setHasError(true)}
+    />
+  )
+}
+
 // AddUserModal Component
 const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onAddUser }) => {
   const [userName, setUserName] = useState('')
   const [selectedAvatar, setSelectedAvatar] = useState('')
+  const [imageErrors, setImageErrors] = useState<{[key: string]: boolean}>({})
   
   const avatarOptions = [
     'https://images.unsplash.com/photo-1494790108755-2616b2e4d93d?w=80&h=80&fit=crop&crop=face',
@@ -46,6 +76,17 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onAddUser 
     'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=80&h=80&fit=crop&crop=face',
     'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face'
   ]
+
+  // 默认头像 SVG
+  const DefaultAvatar = ({ className = "" }) => (
+    <div className={`bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center ${className}`}>
+      <User className="text-white w-1/2 h-1/2" />
+    </div>
+  )
+
+  const handleImageError = (imageUrl: string) => {
+    setImageErrors(prev => ({ ...prev, [imageUrl]: true }))
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -118,11 +159,16 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, onAddUser 
                         : 'ring-2 ring-gray-200 hover:ring-health-primary/50 hover:scale-102'
                     }`}
                   >
-                    <img 
-                      src={avatar} 
-                      alt={`头像选项 ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    {imageErrors[avatar] ? (
+                      <DefaultAvatar className="w-full h-full rounded-2xl" />
+                    ) : (
+                      <img 
+                        src={avatar} 
+                        alt={`头像选项 ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        onError={() => handleImageError(avatar)}
+                      />
+                    )}
                   </button>
                 ))}
               </div>
@@ -416,17 +462,17 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       
       <div className="relative min-h-screen">
         {/* Header */}
-        <header className="glass-morphism sticky top-0 z-50 px-6 py-3 animate-fade-in">
+        <header className="glass-morphism sticky top-0 z-50 px-3 py-2 animate-fade-in">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
               <div className="relative">
-                <div className="w-9 h-9 health-icon primary rounded-2xl flex items-center justify-center">
-                  <Heart className="text-white text-base" />
+                <div className="w-8 h-8 health-icon primary rounded-xl flex items-center justify-center">
+                  <Heart className="text-white text-sm" />
                 </div>
-                <div className="absolute inset-0 pulse-ring bg-green-500 bg-opacity-20 rounded-2xl"></div>
+                <div className="absolute inset-0 pulse-ring bg-green-500 bg-opacity-20 rounded-xl"></div>
               </div>
               <div>
-                <h1 className="text-lg font-bold text-gray-800">健康日历</h1>
+                <h1 className="text-base font-bold text-gray-800">健康日历</h1>
                 <p className="text-xs text-gray-600 font-medium">生活离不开吃喝拉撒</p>
               </div>
             </div>
@@ -439,27 +485,34 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                     {/* User Button */}
                     <button 
                       onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                      className="flex items-center space-x-2 px-3 py-1.5 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20"
+                      className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-lg hover:bg-white/40 transition-all border border-white/20"
                     >
-                      <img src={currentUser.avatarUrl} 
-                           alt="用户头像" className="w-6 h-6 rounded-full ring-2 ring-white/50" />
-                      <span className="text-sm font-semibold text-gray-800">{currentUser.name}</span>
+                      <SafeAvatar
+                        src={currentUser.avatarUrl}
+                        alt="用户头像"
+                        className="w-5 h-5 rounded-full ring-1 ring-white/50 object-cover"
+                        fallbackClassName="w-5 h-5"
+                      />
+                      <span className="text-xs font-semibold text-gray-800">{currentUser.name}</span>
                       <ChevronLeft className={`text-gray-500 text-xs transition-transform ${isUserMenuOpen ? 'rotate-180' : 'rotate-90'}`} />
                     </button>
 
                     {/* User Dropdown Menu */}
                     {isUserMenuOpen && (
-                      <div className="absolute top-full right-0 mt-2 w-64 bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 z-50 p-2">
+                      <div className="absolute top-full right-0 mt-1.5 w-56 bg-white/95 backdrop-blur-lg rounded-xl shadow-2xl border border-white/30 z-50 p-1.5">
                         {/* Current User Section */}
-                        <div className="px-3 py-2 border-b border-gray-100 mb-2">
-                          <div className="flex items-center space-x-3">
-                            <img src={currentUser.avatarUrl} 
-                                 alt={currentUser.name} 
-                                 className="w-8 h-8 rounded-full ring-2 ring-health-primary/30" />
+                        <div className="px-2 py-1.5 border-b border-gray-100 mb-1.5">
+                          <div className="flex items-center space-x-2">
+                            <SafeAvatar
+                              src={currentUser.avatarUrl}
+                              alt={currentUser.name}
+                              className="w-6 h-6 rounded-full ring-1 ring-health-primary/30 object-cover"
+                              fallbackClassName="w-6 h-6"
+                            />
                             <div>
-                              <div className="text-sm font-semibold text-gray-900">{currentUser.name}</div>
+                              <div className="text-xs font-semibold text-gray-900">{currentUser.name}</div>
                               <div className="text-xs text-health-primary flex items-center">
-                                <CheckCircle className="w-3 h-3 mr-1" />
+                                <CheckCircle className="w-2 h-2 mr-1" />
                                 当前用户
                               </div>
                             </div>
@@ -467,7 +520,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                         </div>
 
                         {/* Other Users */}
-                        <div className="max-h-40 overflow-y-auto">
+                        <div className="max-h-32 overflow-y-auto">
                           {users.filter(user => !user.isActive).map((user) => (
                             <button
                               key={user.id}
@@ -475,13 +528,16 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                                 switchUser(user.id)
                                 setIsUserMenuOpen(false)
                               }}
-                              className="w-full flex items-center space-x-3 px-3 py-2 rounded-xl hover:bg-health-primary/10 transition-colors text-left"
+                              className="w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-health-primary/10 transition-colors text-left"
                             >
-                              <img src={user.avatarUrl} 
-                                   alt={user.name} 
-                                   className="w-8 h-8 rounded-full ring-2 ring-gray-200" />
+                              <SafeAvatar
+                                src={user.avatarUrl}
+                                alt={user.name}
+                                className="w-6 h-6 rounded-full ring-1 ring-gray-200 object-cover"
+                                fallbackClassName="w-6 h-6"
+                              />
                               <div className="flex-1">
-                                <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                                <div className="text-xs font-medium text-gray-900">{user.name}</div>
                               </div>
                             </button>
                           ))}
@@ -491,9 +547,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                   </div>
                 )}
                 {isLoading && (
-                  <div className="flex items-center space-x-2 px-3 py-1.5 bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
-                    <div className="w-6 h-6 rounded-full bg-gray-300 animate-pulse"></div>
-                    <div className="w-12 h-4 bg-gray-300 rounded animate-pulse"></div>
+                  <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-lg border border-white/20">
+                    <div className="w-5 h-5 rounded-full bg-gray-300 animate-pulse"></div>
+                    <div className="w-10 h-3 bg-gray-300 rounded animate-pulse"></div>
                   </div>
                 )}
               </div>
@@ -502,32 +558,32 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         </header>
 
         {/* Quick Stats */}
-        <section className="px-6 py-3 animate-slide-up">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="stat-card rounded-2xl p-2.5 flex items-center space-x-2">
-              <div className="health-icon warm w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0">
+        <section className="px-3 py-2 animate-slide-up">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="stat-card rounded-xl p-2 flex items-center space-x-1.5">
+              <div className="health-icon warm w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Utensils className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-base font-bold text-gray-800 leading-tight">3</div>
+                <div className="text-sm font-bold text-gray-800 leading-tight">3</div>
                 <div className="text-xs text-gray-600">今日饮食</div>
               </div>
             </div>
-            <div className="stat-card rounded-2xl p-2.5 flex items-center space-x-2">
-              <div className="health-icon primary w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0">
+            <div className="stat-card rounded-xl p-2 flex items-center space-x-1.5">
+              <div className="health-icon primary w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Sprout className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-base font-bold text-gray-800 leading-tight">2</div>
-                <div className="text-xs text-gray-600">排便记录</div>
+                <div className="text-sm font-bold text-gray-800 leading-tight">2</div>
+                <div className="text-xs text-gray-600">上次排便</div>
               </div>
             </div>
-            <div className="stat-card rounded-2xl p-2.5 flex items-center space-x-2">
-              <div className="health-icon soft w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0">
+            <div className="stat-card rounded-xl p-2 flex items-center space-x-1.5">
+              <div className="health-icon soft w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Folder className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-base font-bold text-gray-800 leading-tight">1</div>
+                <div className="text-sm font-bold text-gray-800 leading-tight">1</div>
                 <div className="text-xs text-gray-600">我的记录</div>
               </div>
             </div>
@@ -535,34 +591,34 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         </section>
 
         {/* Calendar Section */}
-        <main className="px-6 pb-8">
-          <div className="glass-morphism rounded-3xl p-6 mb-6 animate-fade-in shadow-2xl">
+        <main className="px-3 pb-6">
+          <div className="glass-morphism rounded-2xl p-3 mb-4 animate-fade-in shadow-2xl">
             {/* Calendar Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-800">2025年 7月</h2>
-                  <p className="text-sm text-gray-600 mt-1">健康记录概览</p>
+                  <h2 className="text-xl font-bold text-gray-800">2025年 7月</h2>
+                  <p className="text-xs text-gray-600 mt-0.5">健康记录概览</p>
                 </div>
-                <button onClick={goToPrivacyCalendar} className="p-3 rounded-2xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm health-icon privacy">
+                <button onClick={goToPrivacyCalendar} className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm health-icon privacy">
                   <Flower2 className="text-white text-sm" />
                 </button>
               </div>
-              <div className="flex items-center space-x-2">
-                <button className="p-3 rounded-2xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm">
-                  <ChevronLeft className="text-gray-700" />
+              <div className="flex items-center space-x-1">
+                <button className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm">
+                  <ChevronLeft className="text-gray-700 w-4 h-4" />
                 </button>
-                <button className="p-3 rounded-2xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm">
-                  <ChevronRight className="text-gray-700" />
+                <button className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm">
+                  <ChevronRight className="text-gray-700 w-4 h-4" />
                 </button>
               </div>
             </div>
 
             {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-2 mb-6">
+            <div className="grid grid-cols-7 gap-1 mb-4">
               {/* Week Header */}
               {['日', '一', '二', '三', '四', '五', '六'].map((day, index) => (
-                <div key={index} className="text-center text-sm font-semibold text-gray-500 py-3">{day}</div>
+                <div key={index} className="text-center text-xs font-semibold text-gray-500 py-2">{day}</div>
               ))}
 
               {/* Calendar Days */}
@@ -573,13 +629,13 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                 const displayDay = day < 1 ? 30 + day : day > 31 ? day - 31 : day
                 
                 return (
-                  <div key={i} className={`calendar-cell h-14 flex flex-col items-center justify-center rounded-2xl cursor-pointer ${isToday ? 'today text-white' : ''}`}>
-                    <span className={`text-sm font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'text-gray-400' : 'text-gray-800'}`}>
+                  <div key={i} className={`calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`}>
+                    <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'text-gray-400' : 'text-gray-800'}`}>
                       {displayDay}
                     </span>
                     {/* Sample dots for some dates */}
                     {(day === 2 || day === 3 || day === 6 || day === 8 || day === 10 || day === 12 || day === 14 || day === 17) && (
-                      <div className="flex mt-1">
+                      <div className="flex mt-0.5">
                         {day === 3 || day === 10 || day === 14 ? (
                           <>
                             <div className="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
@@ -604,41 +660,41 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-center space-x-6 pt-4 border-t border-white/20">
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-full shadow-sm"></div>
-                <span className="text-sm font-medium text-gray-700">饮食记录</span>
+            <div className="flex items-center justify-center space-x-4 pt-3 border-t border-white/20">
+              <div className="flex items-center space-x-1.5">
+                <div className="w-3 h-3 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-full shadow-sm"></div>
+                <span className="text-xs font-medium text-gray-700">饮食</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full shadow-sm"></div>
-                <span className="text-sm font-medium text-gray-700">排便记录</span>
+              <div className="flex items-center space-x-1.5">
+                <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full shadow-sm"></div>
+                <span className="text-xs font-medium text-gray-700">排便</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full shadow-sm"></div>
-                <span className="text-sm font-medium text-gray-700">我的记录</span>
+              <div className="flex items-center space-x-1.5">
+                <div className="w-3 h-3 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full shadow-sm"></div>
+                <span className="text-xs font-medium text-gray-700">记录</span>
               </div>
             </div>
           </div>
 
           {/* Recent Records */}
-          <div className="glass-morphism rounded-3xl p-6 shadow-2xl animate-fade-in">
+          <div className="glass-morphism rounded-2xl p-3 shadow-2xl animate-fade-in">
             {/* Tab Navigation */}
-            <div className="flex items-center mb-6 bg-gray-50 rounded-2xl p-1">
+            <div className="flex items-center mb-4 bg-gray-50 rounded-xl p-0.5">
               <button 
                 onClick={() => switchTab('recent')} 
-                className={`flex-1 px-4 py-2 text-sm font-semibold transition-all rounded-xl ${activeTab === 'recent' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-all rounded-lg ${activeTab === 'recent' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 最近记录
               </button>
               <button 
                 onClick={() => switchTab('updates')} 
-                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'updates' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'updates' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 最近更新
               </button>
               <button 
                 onClick={() => switchTab('settings')} 
-                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${activeTab === 'settings' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'settings' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 设置
               </button>
@@ -658,19 +714,19 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                     {/* Breakfast record */}
                     <div className="timeline-item">
                       <div className="timeline-time">08:30</div>
-                      <div className="record-card rounded-2xl p-4 shadow-sm">
+                      <div className="record-card rounded-xl p-2.5 shadow-sm">
                         <div className="flex items-start">
-                          <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Utensils className="text-orange-500" />
+                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Utensils className="text-orange-500 w-4 h-4" />
                           </div>
-                          <div className="ml-3 flex-1">
+                          <div className="ml-2 flex-1">
                             <div className="flex justify-between items-start">
-                              <div className="text-base font-semibold text-gray-900">早餐记录</div>
+                              <div className="text-sm font-semibold text-gray-900">早餐记录</div>
                             </div>
-                            <div className="text-sm text-gray-600 mt-1">全麦面包 + 鸡蛋 + 牛奶</div>
-                            <div className="flex items-center space-x-2 mt-2">
-                              <span className="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
-                              <span className="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-md">有附件</span>
+                            <div className="text-xs text-gray-600 mt-0.5">全麦面包 + 鸡蛋 + 牛奶</div>
+                            <div className="flex items-center space-x-1.5 mt-1.5">
+                              <span className="px-1.5 py-0.5 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
+                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-xs rounded-md">有附件</span>
                             </div>
                           </div>
                         </div>
@@ -680,18 +736,18 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                     {/* Bowel record */}
                     <div className="timeline-item">
                       <div className="timeline-time">09:15</div>
-                      <div className="record-card rounded-2xl p-4 shadow-sm">
+                      <div className="record-card rounded-xl p-2.5 shadow-sm">
                         <div className="flex items-start">
-                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Sprout className="text-green-500" />
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Sprout className="text-green-500 w-4 h-4" />
                           </div>
-                          <div className="ml-3 flex-1">
+                          <div className="ml-2 flex-1">
                             <div className="flex justify-between items-start">
-                              <div className="text-base font-semibold text-gray-900">排便记录</div>
+                              <div className="text-sm font-semibold text-gray-900">排便记录</div>
                             </div>
-                            <div className="text-sm text-gray-600 mt-1">正常，颜色健康</div>
-                            <div className="flex items-center space-x-2 mt-2">
-                              <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-md">状态: 良好</span>
+                            <div className="text-xs text-gray-600 mt-0.5">正常，颜色健康</div>
+                            <div className="flex items-center space-x-1.5 mt-1.5">
+                              <span className="px-1.5 py-0.5 bg-green-100 text-green-600 text-xs rounded-md">状态: 良好</span>
                             </div>
                           </div>
                         </div>
@@ -701,19 +757,19 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                     {/* Lunch record */}
                     <div className="timeline-item">
                       <div className="timeline-time">12:30</div>
-                      <div className="record-card rounded-2xl p-4 shadow-sm">
+                      <div className="record-card rounded-xl p-2.5 shadow-sm">
                         <div className="flex items-start">
-                          <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Utensils className="text-orange-500" />
+                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Utensils className="text-orange-500 w-4 h-4" />
                           </div>
-                          <div className="ml-3 flex-1">
+                          <div className="ml-2 flex-1">
                             <div className="flex justify-between items-start">
-                              <div className="text-base font-semibold text-gray-900">午餐记录</div>
+                              <div className="text-sm font-semibold text-gray-900">午餐记录</div>
                             </div>
-                            <div className="text-sm text-gray-600 mt-1">米饭 + 青菜 + 鸡肉</div>
-                            <div className="flex items-center space-x-2 mt-2">
-                              <span className="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
-                              <span className="px-2 py-1 bg-purple-100 text-purple-600 text-xs rounded-md">心情不错</span>
+                            <div className="text-xs text-gray-600 mt-0.5">米饭 + 青菜 + 鸡肉</div>
+                            <div className="flex items-center space-x-1.5 mt-1.5">
+                              <span className="px-1.5 py-0.5 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 适中</span>
+                              <span className="px-1.5 py-0.5 bg-purple-100 text-purple-600 text-xs rounded-md">心情不错</span>
                             </div>
                           </div>
                         </div>
@@ -726,18 +782,18 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                     {/* Dinner record */}
                     <div className="timeline-item past-item">
                       <div className="timeline-time">19:45</div>
-                      <div className="record-card rounded-2xl p-4 shadow-sm">
+                      <div className="record-card rounded-xl p-2.5 shadow-sm">
                         <div className="flex items-start">
-                          <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Utensils className="text-orange-500" />
+                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Utensils className="text-orange-500 w-4 h-4" />
                           </div>
-                          <div className="ml-3 flex-1">
+                          <div className="ml-2 flex-1">
                             <div className="flex justify-between items-start">
-                              <div className="text-base font-semibold text-gray-900">晚餐记录</div>
+                              <div className="text-sm font-semibold text-gray-900">晚餐记录</div>
                             </div>
-                            <div className="text-sm text-gray-600 mt-1">蔬菜沙拉 + 鸡胸肉</div>
-                            <div className="flex items-center space-x-2 mt-2">
-                              <span className="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 较少</span>
+                            <div className="text-xs text-gray-600 mt-0.5">蔬菜沙拉 + 鸡胸肉</div>
+                            <div className="flex items-center space-x-1.5 mt-1.5">
+                              <span className="px-1.5 py-0.5 bg-orange-100 text-orange-600 text-xs rounded-md">食量: 较少</span>
                             </div>
                           </div>
                         </div>
@@ -750,18 +806,18 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                     {/* Personal record */}
                     <div className="timeline-item past-item">
                       <div className="timeline-time">22:30</div>
-                      <div className="record-card rounded-2xl p-4 shadow-sm">
+                      <div className="record-card rounded-xl p-2.5 shadow-sm">
                         <div className="flex items-start">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Folder className="text-purple-500" />
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Folder className="text-purple-500 w-4 h-4" />
                           </div>
-                          <div className="ml-3 flex-1">
+                          <div className="ml-2 flex-1">
                             <div className="flex justify-between items-start">
-                              <div className="text-base font-semibold text-gray-900">我的记录</div>
+                              <div className="text-sm font-semibold text-gray-900">我的记录</div>
                             </div>
-                            <div className="text-sm text-gray-600 mt-1">今日步数 7,200 步</div>
-                            <div className="flex items-center space-x-2 mt-2">
-                              <span className="px-2 py-1 bg-blue-100 text-blue-600 text-xs rounded-md">运动量: 一般</span>
+                            <div className="text-xs text-gray-600 mt-0.5">今日步数 7,200 步</div>
+                            <div className="flex items-center space-x-1.5 mt-1.5">
+                              <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 text-xs rounded-md">运动量: 一般</span>
                             </div>
                           </div>
                         </div>
@@ -774,18 +830,18 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                     {/* Physical record */}
                     <div className="timeline-item past-item">
                       <div className="timeline-time">20:30</div>
-                      <div className="record-card rounded-2xl p-4 shadow-sm">
+                      <div className="record-card rounded-xl p-2.5 shadow-sm">
                         <div className="flex items-start">
-                          <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Heart className="text-pink-500" />
+                          <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Heart className="text-pink-500 w-4 h-4" />
                           </div>
-                          <div className="ml-3 flex-1">
+                          <div className="ml-2 flex-1">
                             <div className="flex justify-between items-start">
-                              <div className="text-base font-semibold text-gray-900">生理记录</div>
+                              <div className="text-sm font-semibold text-gray-900">生理记录</div>
                             </div>
-                            <div className="text-sm text-gray-600 mt-1">体温 36.5°C，血压正常</div>
-                            <div className="flex items-center space-x-2 mt-2">
-                              <span className="px-2 py-1 bg-green-100 text-green-600 text-xs rounded-md">状态: 正常</span>
+                            <div className="text-xs text-gray-600 mt-0.5">体温 36.5°C，血压正常</div>
+                            <div className="flex items-center space-x-1.5 mt-1.5">
+                              <span className="px-1.5 py-0.5 bg-green-100 text-green-600 text-xs rounded-md">状态: 正常</span>
                             </div>
                           </div>
                         </div>
@@ -844,10 +900,14 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                                 user.isActive ? 'bg-health-primary/5 border border-health-primary/20' : 'bg-gray-50 hover:bg-gray-100'
                               }`}>
                                 <div className="flex items-center space-x-3">
-                                  <img src={user.avatarUrl} 
-                                       alt={user.name} className={`w-10 h-10 rounded-full ring-2 ${
-                                         user.isActive ? 'ring-health-primary/40' : 'ring-gray-200'
-                                       }`} />
+                                  <SafeAvatar
+                                    src={user.avatarUrl}
+                                    alt={user.name}
+                                    className={`w-10 h-10 rounded-full ring-2 object-cover ${
+                                      user.isActive ? 'ring-health-primary/40' : 'ring-gray-200'
+                                    }`}
+                                    fallbackClassName="w-10 h-10"
+                                  />
                                   <div>
                                     <div className="text-sm font-semibold text-gray-900 flex items-center">
                                       {user.name}
@@ -991,9 +1051,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         </main>
 
         {/* Floating Action Button */}
-        <div className="fixed bottom-8 right-6 z-40">
-          <button onClick={openRecordModal} className="floating-action-btn w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl">
-            <Plus className="text-white text-xl" />
+        <div className="fixed bottom-6 right-4 z-40">
+          <button onClick={openRecordModal} className="floating-action-btn w-14 h-14 rounded-xl flex items-center justify-center shadow-2xl">
+            <Plus className="text-white text-lg" />
           </button>
         </div>
 
@@ -1007,49 +1067,49 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
             <div className="relative flex items-center justify-center min-h-screen p-6 w-full">
               <div className={`glass-morphism rounded-3xl p-6 w-full max-w-sm transform transition-all ${isModalOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
                 {/* Modal Header */}
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-800">选择记录类型</h3>
-                  <button onClick={closeRecordModal} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                    <X className="text-gray-500" />
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-gray-800">选择记录类型</h3>
+                  <button onClick={closeRecordModal} className="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                    <X className="text-gray-500 w-4 h-4" />
                   </button>
                 </div>
 
                 {/* Record Type Options */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {/* 一日三餐 */}
-                  <button onClick={() => selectRecordType('meals')} className="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
-                    <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center">
-                      <Utensils className="text-orange-500 text-lg" />
+                  <button onClick={() => selectRecordType('meals')} className="w-full record-type-option flex items-center space-x-3 p-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                    <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                      <Utensils className="text-orange-500 text-base" />
                     </div>
                     <div className="text-left flex-1">
-                      <div className="text-base font-semibold text-gray-900">一日三餐</div>
-                      <div className="text-sm text-gray-500">记录早餐、午餐、晚餐</div>
+                      <div className="text-sm font-semibold text-gray-900">一日三餐</div>
+                      <div className="text-xs text-gray-500">记录早餐、午餐、晚餐</div>
                     </div>
-                    <ChevronRight className="text-gray-400" />
+                    <ChevronRight className="text-gray-400 w-4 h-4" />
                   </button>
 
                   {/* 排便记录 */}
-                  <button onClick={() => selectRecordType('stool')} className="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
-                    <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center">
-                      <Sprout className="text-green-500 text-lg" />
+                  <button onClick={() => selectRecordType('stool')} className="w-full record-type-option flex items-center space-x-3 p-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                      <Sprout className="text-green-500 text-base" />
                     </div>
                     <div className="text-left flex-1">
-                      <div className="text-base font-semibold text-gray-900">排便记录</div>
-                      <div className="text-sm text-gray-500">记录排便状态和健康</div>
+                      <div className="text-sm font-semibold text-gray-900">排便记录</div>
+                      <div className="text-xs text-gray-500">记录排便状态和健康</div>
                     </div>
-                    <ChevronRight className="text-gray-400" />
+                    <ChevronRight className="text-gray-400 w-4 h-4" />
                   </button>
 
                   {/* 生理记录 */}
-                  <button onClick={() => selectRecordType('period')} className="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
-                    <div className="w-12 h-12 bg-pink-100 rounded-2xl flex items-center justify-center">
-                      <Heart className="text-pink-500 text-lg" />
+                  <button onClick={() => selectRecordType('period')} className="w-full record-type-option flex items-center space-x-3 p-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                    <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
+                      <Heart className="text-pink-500 text-base" />
                     </div>
                     <div className="text-left flex-1">
-                      <div className="text-base font-semibold text-gray-900">生理记录</div>
-                      <div className="text-sm text-gray-500">记录生理日期和状态</div>
+                      <div className="text-sm font-semibold text-gray-900">生理记录</div>
+                      <div className="text-xs text-gray-500">记录生理日期和状态</div>
                     </div>
-                    <ChevronRight className="text-gray-400" />
+                    <ChevronRight className="text-gray-400 w-4 h-4" />
                   </button>
 
                   {/* 我的记录 */}
@@ -1244,12 +1304,12 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         /* Timeline Styles */
         .timeline-container {
           position: relative;
-          padding-left: 1.5rem;
+          padding-left: 1rem;
         }
         
         .timeline-line {
           position: absolute;
-          left: 1.75rem;
+          left: 1.25rem;
           top: 0;
           bottom: 0;
           width: 2px;
@@ -1260,9 +1320,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         
         .timeline-date {
           position: relative;
-          margin-bottom: 1rem;
-          padding-left: 2.5rem;
-          font-size: 0.875rem;
+          margin-bottom: 0.75rem;
+          padding-left: 2rem;
+          font-size: 0.8rem;
           font-weight: 600;
           color: var(--health-primary);
         }
@@ -1270,16 +1330,16 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         .timeline-date::before {
           content: '';
           position: absolute;
-          left: 0.5rem;
+          left: 0.25rem;
           top: 50%;
           transform: translateY(-50%);
-          width: 1.25rem;
-          height: 1.25rem;
+          width: 1rem;
+          height: 1rem;
           border-radius: 50%;
           background-color: var(--health-primary);
-          border: 3px solid white;
+          border: 2px solid white;
           z-index: 10;
-          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+          box-shadow: 0 1px 4px rgba(16, 185, 129, 0.3);
         }
         
         .timeline-date.past-date {
@@ -1288,27 +1348,27 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         
         .timeline-date.past-date::before {
           background-color: #d1d5db;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
         }
         
         .timeline-item {
           position: relative;
-          margin-bottom: 1.5rem;
-          padding-left: 2.5rem;
+          margin-bottom: 1rem;
+          padding-left: 2rem;
         }
         
         .timeline-item::before {
           content: '';
           position: absolute;
-          left: 1.25rem;
-          top: 1.5rem;
-          width: 0.75rem;
-          height: 0.75rem;
+          left: 0.75rem;
+          top: 1rem;
+          width: 0.5rem;
+          height: 0.5rem;
           border-radius: 50%;
           background-color: var(--health-accent);
-          border: 2px solid white;
+          border: 1px solid white;
           z-index: 10;
-          box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+          box-shadow: 0 1px 3px rgba(16, 185, 129, 0.3);
         }
         
         .timeline-item.past-item::before {
@@ -1317,15 +1377,15 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         
         .timeline-time {
           position: absolute;
-          left: -0.5rem;
-          top: 1.5rem;
+          left: -0.25rem;
+          top: 1rem;
           background: white;
-          padding: 0.25rem 0.5rem;
-          border-radius: 12px;
-          font-size: 0.75rem;
+          padding: 0.125rem 0.375rem;
+          border-radius: 8px;
+          font-size: 0.65rem;
           font-weight: 500;
           color: var(--health-secondary);
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
           z-index: 10;
         }
         
