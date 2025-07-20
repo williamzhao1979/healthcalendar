@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthTracker Pro - 排便记录</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --health-primary: #10B981;
+            --health-secondary: #059669;
+            --health-accent: #34D399;
+            --health-warm: #F59E0B;
+            --health-cool: #3B82F6;
+            --health-soft: #8B5CF6;
+        }
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #667eea 50%, #f093fb 75%, #f5576c 100%);
+            background-size: 300% 300%;
+            animation: gradient 15s ease infinite;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .form-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            transition: all 0.3s ease;
+        }
+        
+        .form-card:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+        
+        .option-item {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        
+        .option-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .option-item.selected {
+            background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+            color: white;
+            transform: scale(1.02);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+        }
+        
+        .option-item.selected .option-icon {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
+        .upload-area {
+            transition: all 0.3s ease;
+            border: 2px dashed #cbd5e1;
+            background: #f8fafc;
+        }
+        
+        .upload-area:hover {
+            border-color: #10B981;
+            background: rgba(16, 185, 129, 0.05);
+        }
+        
+        .upload-area.dragover {
+            border-color: #10B981;
+            background: rgba(16, 185, 129, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .file-preview {
+            transition: all 0.3s ease;
+        }
+        
+        .file-preview:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        .text-health-primary {
+            color: #10B981;
+        }
+        
+        .bg-health-primary {
+            background-color: #10B981;
+        }
+        
+        .border-health-primary {
+            border-color: #10B981;
+        }
+        
+        .focus\:border-health-primary:focus {
+            border-color: #10B981;
+        }
+        
+        .focus\:ring-health-primary:focus {
+            --tw-ring-color: rgba(16, 185, 129, 0.5);
+        }
+        
+        /* Tag Styles */
+        .tag-option {
+            transition: all 0.3s ease;
+        }
+        
+        .tag-option:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tag-option.selected {
+            background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+            color: white;
+            border-color: #10B981;
+            box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+        }
+        
+        .add-tag-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+        }
+        
+        .selected-tag {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            0% { opacity: 0; transform: translateX(-10px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        
+        /* Bristol Stool Chart Styles */
+        .stool-type {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .stool-type:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stool-type.selected {
+            background: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+            color: white;
+            border-color: #10B981;
+        }
+    </style>
+</head>
+
+<body class="overflow-x-hidden">
+    <!-- Background -->
+    <div class="fixed inset-0 hero-gradient"></div>
+    <div class="fixed inset-0 bg-white/10"></div>
+    
+    <div class="relative min-h-screen">
+        <!-- Header -->
+        <header class="glass-morphism sticky top-0 z-50 px-6 py-3 animate-fade-in">
+            <div class="flex items-center justify-between">
+                <!-- Back Button and Title -->
+                <div class="flex items-center space-x-4">
+                    <button onclick="goBack()" class="w-9 h-9 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20 flex items-center justify-center">
+                        <i class="fas fa-arrow-left text-gray-700"></i>
+                    </button>
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-800">排便记录</h1>
+                        <p class="text-xs text-gray-600 font-medium">记录您的排便健康状况</p>
+                    </div>
+                </div>
+                
+                <!-- User Switch -->
+                <div class="relative">
+                    <button class="flex items-center space-x-2 px-3 py-1.5 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20">
+                        <img src="https://images.unsplash.com/photo-1494790108755-2616b2e4d93d?w=32&h=32&fit=crop&crop=face" 
+                             alt="用户头像" class="w-6 h-6 rounded-full ring-2 ring-white/50">
+                        <span class="text-sm font-semibold text-gray-800">小雨</span>
+                        <i class="fas fa-chevron-down text-gray-500 text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="px-6 py-4 pb-20">
+            <!-- Main Form Card -->
+            <div class="form-card rounded-3xl p-5 mb-4 animate-fade-in relative">
+                <!-- Close Button -->
+                <button onclick="closeForm()" class="absolute top-4 right-4 w-8 h-8 bg-gray-100 hover:bg-red-100 rounded-full flex items-center justify-center transition-all z-10">
+                    <i class="fas fa-times text-gray-400 hover:text-red-500 text-sm"></i>
+                </button>
+                
+                <!-- Date and Time Section -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-calendar-alt text-health-primary mr-2"></i>
+                        日期时间
+                    </h3>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">选择日期和时间</label>
+                        <input type="datetime-local" 
+                               value="2025-07-14T09:30"
+                               class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:border-health-primary focus:ring-2 focus:ring-health-primary/20 transition-all">
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- stool Movement Status -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-seedling text-health-primary mr-2"></i>
+                        排便状态
+                    </h3>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div class="option-item p-3 bg-gray-50 rounded-xl border border-gray-200 text-center selected">
+                            <div class="option-icon w-10 h-10 bg-green-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <i class="fas fa-check text-green-500 text-base"></i>
+                            </div>
+                            <div class="text-sm font-semibold">正常</div>
+                            <div class="text-xs text-gray-500 mt-0.5">顺畅排便</div>
+                        </div>
+                        <div class="option-item p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-yellow-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <i class="fas fa-exclamation text-yellow-500 text-base"></i>
+                            </div>
+                            <div class="text-sm font-semibold">困难</div>
+                            <div class="text-xs text-gray-500 mt-0.5">需要用力</div>
+                        </div>
+                        <div class="option-item p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-orange-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <i class="fas fa-clock text-orange-500 text-base"></i>
+                            </div>
+                            <div class="text-sm font-semibold">便秘</div>
+                            <div class="text-xs text-gray-500 mt-0.5">排便困难</div>
+                        </div>
+                        <div class="option-item p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-red-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <i class="fas fa-tint text-red-500 text-base"></i>
+                            </div>
+                            <div class="text-sm font-semibold">腹泻</div>
+                            <div class="text-xs text-gray-500 mt-0.5">稀软不成形</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- Bristol Stool Chart -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-chart-bar text-health-primary mr-2"></i>
+                        大便形状 (布里斯托尔分类)
+                    </h3>
+                    <div class="grid grid-cols-2 gap-2.5 mb-3">
+                        <!-- Type 1 -->
+                        <div class="option-item stool-type p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-red-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <span class="text-lg">🔴</span>
+                            </div>
+                            <div class="text-sm font-semibold">类型1 - 硬球状</div>
+                            <div class="text-xs text-gray-500 mt-0.5">分离硬球，严重便秘</div>
+                        </div>
+
+                        <!-- Type 2 -->
+                        <div class="option-item stool-type p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-orange-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <span class="text-lg">🥖</span>
+                            </div>
+                            <div class="text-sm font-semibold">类型2 - 块状</div>
+                            <div class="text-xs text-gray-500 mt-0.5">香肠状但凹凸不平</div>
+                        </div>
+
+                        <!-- Type 3 -->
+                        <div class="option-item stool-type p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-yellow-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <span class="text-lg">🌭</span>
+                            </div>
+                            <div class="text-sm font-semibold">类型3 - 有裂痕</div>
+                            <div class="text-xs text-gray-500 mt-0.5">香肠状，表面有裂痕</div>
+                        </div>
+
+                        <!-- Type 4 -->
+                        <div class="option-item stool-type p-3 bg-gray-50 rounded-xl border border-gray-200 text-center selected">
+                            <div class="option-icon w-10 h-10 bg-green-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <span class="text-lg">🍌</span>
+                            </div>
+                            <div class="text-sm font-semibold">类型4 - 理想型</div>
+                            <div class="text-xs text-gray-500 mt-0.5">光滑柔软，最理想</div>
+                        </div>
+
+                        <!-- Type 5 -->
+                        <div class="option-item stool-type p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-blue-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <span class="text-lg">🥔</span>
+                            </div>
+                            <div class="text-sm font-semibold">类型5 - 软团块</div>
+                            <div class="text-xs text-gray-500 mt-0.5">柔软团块，边缘清晰</div>
+                        </div>
+
+                        <!-- Type 6 -->
+                        <div class="option-item stool-type p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-purple-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <span class="text-lg">🍯</span>
+                            </div>
+                            <div class="text-sm font-semibold">类型6 - 糊状</div>
+                            <div class="text-xs text-gray-500 mt-0.5">糊状便，边缘蓬松</div>
+                        </div>
+
+                        <!-- Type 7 -->
+                        <div class="option-item stool-type p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-red-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <span class="text-lg">💧</span>
+                            </div>
+                            <div class="text-sm font-semibold">类型7 - 水状</div>
+                            <div class="text-xs text-gray-500 mt-0.5">完全液体，严重腹泻</div>
+                        </div>
+
+                        <!-- Not Sure Option -->
+                        <div class="option-item stool-type p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                            <div class="option-icon w-10 h-10 bg-gray-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
+                                <span class="text-lg">❓</span>
+                            </div>
+                            <div class="text-sm font-semibold">不确定</div>
+                            <div class="text-xs text-gray-500 mt-0.5">无法准确判断类型</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bristol Chart Reference -->
+                    <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i class="fas fa-info-circle text-blue-500"></i>
+                            <span class="text-sm font-medium text-blue-700">布里斯托尔大便分类参考</span>
+                        </div>
+                        <div class="text-xs text-blue-600 space-y-1">
+                            <div><strong>类型 1-2：</strong> 便秘（硬便，排便困难）</div>
+                            <div><strong>类型 3-4：</strong> 正常（理想的大便形状）</div>
+                            <div><strong>类型 5-7：</strong> 腹泻倾向（偏软或液体状）</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- stool Movement Volume -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-weight text-health-primary mr-2"></i>
+                        排便量
+                    </h3>
+                    <div class="grid grid-cols-3 gap-2.5">
+                        <div class="option-item p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="text-sm font-semibold text-gray-700">少量</div>
+                            <div class="text-xs text-gray-500 mt-0.5">较少</div>
+                        </div>
+                        <div class="option-item p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center selected">
+                            <div class="text-sm font-semibold">适中</div>
+                            <div class="text-xs mt-0.5">正常量</div>
+                        </div>
+                        <div class="option-item p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="text-sm font-semibold text-gray-700">大量</div>
+                            <div class="text-xs text-gray-500 mt-0.5">较多</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- Color and Additional Info -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-palette text-health-primary mr-2"></i>
+                        颜色与特征
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">颜色</label>
+                            <select class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:border-health-primary focus:ring-2 focus:ring-health-primary/20 transition-all">
+                                <option value="brown">正常棕色</option>
+                                <option value="dark">深棕色</option>
+                                <option value="light">浅棕色</option>
+                                <option value="yellow">黄色</option>
+                                <option value="green">绿色</option>
+                                <option value="black">黑色</option>
+                                <option value="red">带血红色</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">其他特征</label>
+                            <select class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:border-health-primary focus:ring-2 focus:ring-health-primary/20 transition-all">
+                                <option value="normal">无异常</option>
+                                <option value="mucus">有粘液</option>
+                                <option value="blood">有血丝</option>
+                                <option value="undigested">有未消化食物</option>
+                                <option value="oil">有油脂</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- stool Description -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-edit text-health-primary mr-2"></i>
+                        排便备注
+                    </h3>
+                    <textarea 
+                        placeholder="请描述排便过程，如：是否顺畅、有无腹痛、排便时间长短、感受等..."
+                        rows="3"
+                        class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:border-health-primary focus:ring-2 focus:ring-health-primary/20 transition-all resize-none">排便顺畅，无不适感，时间正常</textarea>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- Tags Selection -->
+                <div class="mb-5">
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-tags text-health-primary mr-2"></i>
+                        标签选择
+                    </h3>
+                    
+                    <!-- Tag Container -->
+                    <div class="flex flex-wrap gap-2 mb-3" id="tagContainer">
+                        <!-- Preset Tags -->
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200 selected" data-tag="正常">
+                            正常
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="顺畅">
+                            顺畅
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="规律">
+                            规律
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="健康">
+                            健康
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="困难">
+                            困难
+                        </div>
+                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="疼痛">
+                            疼痛
+                        </div>
+                        
+                        <!-- Add Custom Tag Button -->
+                        <div class="add-tag-btn px-3 py-1.5 bg-health-primary/10 border border-health-primary/30 rounded-full text-sm font-medium text-health-primary cursor-pointer transition-all hover:bg-health-primary/20 flex items-center space-x-1">
+                            <i class="fas fa-plus text-xs"></i>
+                            <span>自定义</span>
+                        </div>
+                    </div>
+
+                    <!-- Custom Tag Input (Hidden by default) -->
+                    <div id="customTagInput" class="hidden">
+                        <div class="flex items-center space-x-2">
+                            <input type="text" 
+                                   id="newTagInput"
+                                   placeholder="输入自定义标签..."
+                                   class="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-health-primary focus:ring-2 focus:ring-health-primary/20 transition-all text-sm"
+                                   maxlength="10">
+                            <button onclick="addCustomTag()" 
+                                    class="px-3 py-2 bg-health-primary text-white text-sm rounded-lg hover:bg-green-600 transition-colors">
+                                添加
+                            </button>
+                            <button onclick="cancelCustomTag()" 
+                                    class="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Selected Tags Display -->
+                    <div class="mt-3" id="selectedTagsDisplay">
+                        <div class="text-xs text-gray-500 mb-1">已选择的标签：</div>
+                        <div class="flex flex-wrap gap-1" id="selectedTags">
+                            <span class="selected-tag px-2 py-1 bg-health-primary/10 text-health-primary text-xs rounded-md border border-health-primary/20">
+                                正常
+                                <button onclick="removeSelectedTag(this)" class="ml-1 text-health-primary/60 hover:text-health-primary">
+                                    <i class="fas fa-times text-xs"></i>
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-gray-200 mb-5">
+
+                <!-- File Upload Section -->
+                <div>
+                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-paperclip text-health-primary mr-2"></i>
+                        附件上传
+                    </h3>
+                    
+                    <!-- Upload Area -->
+                    <div class="upload-area rounded-lg p-4 text-center mb-2" id="uploadArea">
+                        <div class="w-8 h-8 bg-gray-100 rounded-lg mx-auto mb-2 flex items-center justify-center">
+                            <i class="fas fa-cloud-upload-alt text-gray-400 text-sm"></i>
+                        </div>
+                        <div class="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽文件</div>
+                        <input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx,.txt" class="hidden">
+                        <button onclick="document.getElementById('fileInput').click()" 
+                                class="px-3 py-1.5 bg-health-primary text-white text-xs rounded-md hover:bg-green-600 transition-colors">
+                            选择文件
+                        </button>
+                    </div>
+
+                    <!-- Image Compression Option -->
+                    <div class="flex items-center space-x-2 mb-2">
+                        <input type="checkbox" id="compressImages" checked 
+                               class="w-3 h-3 text-health-primary border-gray-300 rounded focus:ring-health-primary">
+                        <label for="compressImages" class="text-xs text-gray-600">
+                            自动压缩图片
+                        </label>
+                    </div>
+
+                    <!-- File Preview Area -->
+                    <div id="filePreview" class="space-y-1"></div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="goBack()" 
+                        class="py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    返回
+                </button>
+                <button onclick="saveRecord()" 
+                        class="py-3 bg-health-primary text-white font-semibold rounded-xl hover:bg-green-600 transition-colors">
+                    <i class="fas fa-check mr-2"></i>
+                    保存记录
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Page load animations
+        document.addEventListener('DOMContentLoaded', function() {
+            const mainCard = document.querySelector('.form-card');
+            if (mainCard) {
+                mainCard.classList.add('animate-fade-in');
+            }
+
+            // Initialize file upload
+            initFileUpload();
+            
+            // Initialize selected tags display
+            updateSelectedTags();
+        });
+
+        // Option selection (for status and volume, not stool types)
+        document.querySelectorAll('.option-item:not(.stool-type)').forEach(option => {
+            option.addEventListener('click', function() {
+                // Remove selected class from siblings
+                const siblings = this.parentElement.querySelectorAll('.option-item:not(.stool-type)');
+                siblings.forEach(sibling => sibling.classList.remove('selected'));
+                // Add selected class to this option
+                this.classList.add('selected');
+            });
+        });
+
+        // Stool type selection (separate logic for Bristol chart)
+        document.querySelectorAll('.stool-type').forEach(option => {
+            option.addEventListener('click', function() {
+                // Remove selected class from all stool types
+                document.querySelectorAll('.stool-type').forEach(opt => opt.classList.remove('selected'));
+                // Add selected class to clicked option
+                this.classList.add('selected');
+            });
+        });
+
+        // Tag selection
+        document.querySelectorAll('.tag-option').forEach(option => {
+            option.addEventListener('click', function() {
+                this.classList.toggle('selected');
+                updateSelectedTags();
+            });
+        });
+
+        // Add custom tag button
+        document.querySelector('.add-tag-btn').addEventListener('click', function() {
+            showCustomTagInput();
+        });
+
+        // Custom tag input enter key
+        document.getElementById('newTagInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addCustomTag();
+            }
+        });
+
+        // File Upload Functionality
+        function initFileUpload() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+
+            // Drag and drop events
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                handleFiles(files);
+            });
+
+            // File input change event
+            fileInput.addEventListener('change', function(e) {
+                handleFiles(e.target.files);
+            });
+        }
+
+        function handleFiles(files) {
+            const filePreview = document.getElementById('filePreview');
+            
+            Array.from(files).forEach(file => {
+                const fileItem = createFilePreview(file);
+                filePreview.appendChild(fileItem);
+            });
+        }
+
+        function createFilePreview(file) {
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-preview bg-white p-2 rounded-lg border border-gray-200 flex items-center space-x-2';
+
+            const isImage = file.type.startsWith('image/');
+            const icon = isImage ? 'fa-image' : 'fa-file-alt';
+            const iconColor = isImage ? 'text-blue-500' : 'text-gray-500';
+
+            fileItem.innerHTML = `
+                <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fas ${icon} ${iconColor} text-sm"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs font-medium text-gray-900 truncate">${file.name}</div>
+                    <div class="text-xs text-gray-500">${formatFileSize(file.size)}</div>
+                </div>
+                <button onclick="removeFile(this)" 
+                        class="w-6 h-6 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors">
+                    <i class="fas fa-times text-red-500 text-xs"></i>
+                </button>
+            `;
+
+            return fileItem;
+        }
+
+        function removeFile(button) {
+            button.closest('.file-preview').remove();
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Button Actions
+        function goBack() {
+            console.log('返回上一页');
+            // 返回到主页面
+            window.location.href = 'health_calendar.html';
+        }
+
+        function saveRecord() {
+            console.log('保存排便记录');
+            alert('排便记录已保存！');
+        }
+
+        function closeForm() {
+            window.location.href = 'health_calendar.html';
+        }
+
+        // Tag Management Functions
+        function updateSelectedTags() {
+            const selectedTags = document.getElementById('selectedTags');
+            const selectedOptions = document.querySelectorAll('.tag-option.selected');
+            
+            selectedTags.innerHTML = '';
+            
+            selectedOptions.forEach(option => {
+                const tagName = option.getAttribute('data-tag');
+                const tagElement = createSelectedTag(tagName);
+                selectedTags.appendChild(tagElement);
+            });
+        }
+
+        function createSelectedTag(tagName) {
+            const tagElement = document.createElement('span');
+            tagElement.className = 'selected-tag px-2 py-1 bg-health-primary/10 text-health-primary text-xs rounded-md border border-health-primary/20';
+            tagElement.innerHTML = `
+                ${tagName}
+                <button onclick="removeSelectedTag(this)" class="ml-1 text-health-primary/60 hover:text-health-primary">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            `;
+            return tagElement;
+        }
+
+        function removeSelectedTag(button) {
+            const tagElement = button.closest('.selected-tag');
+            const tagName = tagElement.textContent.trim();
+            
+            // Remove from selected tags display
+            tagElement.remove();
+            
+            // Unselect the corresponding tag option
+            const tagOption = document.querySelector(`.tag-option[data-tag="${tagName}"]`);
+            if (tagOption) {
+                tagOption.classList.remove('selected');
+            }
+        }
+
+        function showCustomTagInput() {
+            document.getElementById('customTagInput').classList.remove('hidden');
+            document.getElementById('newTagInput').focus();
+        }
+
+        function addCustomTag() {
+            const input = document.getElementById('newTagInput');
+            const tagName = input.value.trim();
+            
+            if (tagName && tagName.length <= 10) {
+                // Check if tag already exists
+                const existingTag = document.querySelector(`.tag-option[data-tag="${tagName}"]`);
+                if (!existingTag) {
+                    // Create new tag option
+                    const newTagOption = document.createElement('div');
+                    newTagOption.className = 'tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200 selected';
+                    newTagOption.setAttribute('data-tag', tagName);
+                    newTagOption.textContent = tagName;
+                    
+                    // Add click event
+                    newTagOption.addEventListener('click', function() {
+                        this.classList.toggle('selected');
+                        updateSelectedTags();
+                    });
+                    
+                    // Insert before the add button
+                    const addButton = document.querySelector('.add-tag-btn');
+                    addButton.parentNode.insertBefore(newTagOption, addButton);
+                    
+                    // Update selected tags
+                    updateSelectedTags();
+                }
+                
+                // Clear input and hide
+                input.value = '';
+                cancelCustomTag();
+            }
+        }
+
+        function cancelCustomTag() {
+            document.getElementById('customTagInput').classList.add('hidden');
+            document.getElementById('newTagInput').value = '';
+        }
+    </script>
+</body>
+</html>
