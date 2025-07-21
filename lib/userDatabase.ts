@@ -4,12 +4,13 @@ export interface User {
   name: string;
   avatarUrl: string;
   isActive: boolean;
-  createdAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 class UserDatabase {
   private dbName = 'HealthCalendarDB';
-  private version = 2; // 增加版本号以触发数据库升级
+  private version = 4; // 增加版本号以支持 createdAt 和 updatedAt 字段
   private storeName = 'users';
   private isInitialized = false;
 
@@ -52,6 +53,12 @@ class UserDatabase {
               store.createIndex('name', 'name', { unique: false });
               store.createIndex('isActive', 'isActive', { unique: false });
             }
+            // 创建排便记录存储表（与排便记录模块兼容）
+            if (!upgradeDB.objectStoreNames.contains('stoolRecords')) {
+              const stoolStore = upgradeDB.createObjectStore('stoolRecords', { keyPath: 'id' });
+              stoolStore.createIndex('userId', 'userId', { unique: false });
+              stoolStore.createIndex('date', 'date', { unique: false });
+            }
           };
           
           upgradeRequest.onsuccess = () => {
@@ -68,6 +75,8 @@ class UserDatabase {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
+        const transaction = (event.target as IDBOpenDBRequest).transaction!;
+        const oldVersion = event.oldVersion;
         
         // 创建用户存储表
         if (!db.objectStoreNames.contains(this.storeName)) {
@@ -75,19 +84,73 @@ class UserDatabase {
           store.createIndex('name', 'name', { unique: false });
           store.createIndex('isActive', 'isActive', { unique: false });
         }
+        
+        // 创建排便记录存储表（与排便记录模块兼容）
+        if (!db.objectStoreNames.contains('stoolRecords')) {
+          const stoolStore = db.createObjectStore('stoolRecords', { keyPath: 'id' });
+          stoolStore.createIndex('userId', 'userId', { unique: false });
+          stoolStore.createIndex('date', 'date', { unique: false });
+        }
+        
+        // 版本 4：添加 createdAt 和 updatedAt 字段迁移
+        if (oldVersion < 4) {
+          const usersStore = transaction.objectStore(this.storeName);
+          const stoolRecordsStore = transaction.objectStore('stoolRecords');
+          
+          // 迁移用户数据
+          const userRequest = usersStore.getAll();
+          userRequest.onsuccess = () => {
+            const users = userRequest.result;
+            users.forEach((user: any) => {
+              const now = new Date().toISOString();
+              if (!user.createdAt) {
+                user.createdAt = user.date || now;
+              }
+              if (!user.updatedAt) {
+                user.updatedAt = user.date || now;
+              }
+              // 确保 createdAt 和 updatedAt 都是字符串格式
+              if (user.createdAt instanceof Date) {
+                user.createdAt = user.createdAt.toISOString();
+              }
+              if (user.updatedAt instanceof Date) {
+                user.updatedAt = user.updatedAt.toISOString();
+              }
+              usersStore.put(user);
+            });
+          };
+          
+          // 迁移排便记录数据
+          const stoolRequest = stoolRecordsStore.getAll();
+          stoolRequest.onsuccess = () => {
+            const records = stoolRequest.result;
+            records.forEach((record: any) => {
+              const now = new Date().toISOString();
+              if (!record.createdAt) {
+                record.createdAt = record.date || now;
+              }
+              if (!record.updatedAt) {
+                record.updatedAt = record.date || now;
+              }
+              stoolRecordsStore.put(record);
+            });
+          };
+        }
       };
     });
   }
 
   // 添加用户
-  async addUser(userData: Omit<User, 'id' | 'createdAt'>, customId?: string): Promise<User> {
+  async addUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>, customId?: string): Promise<User> {
     await this.ensureInitialized(); // 确保数据库已初始化
     const db = await this.openDB();
     
+    const now = new Date().toISOString();
     const user: User = {
       id: customId || `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       ...userData,
-      createdAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     return new Promise((resolve, reject) => {
@@ -157,7 +220,7 @@ class UserDatabase {
   }
 
   // 更新用户
-  async updateUser(id: string, updates: Partial<Omit<User, 'id' | 'createdAt'>>): Promise<User> {
+  async updateUser(id: string, updates: Partial<Omit<User, 'id' | 'createdAt' | 'updatedAt'>>): Promise<User> {
     const db = await this.openDB();
 
     return new Promise(async (resolve, reject) => {
@@ -171,6 +234,7 @@ class UserDatabase {
         const updatedUser: User = {
           ...existingUser,
           ...updates,
+          updatedAt: new Date().toISOString(),
         };
 
         const transaction = db.transaction([this.storeName], 'readwrite');
