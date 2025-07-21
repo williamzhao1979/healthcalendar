@@ -362,117 +362,6 @@ const TagManager: React.FC<{
   )
 }
 
-// 文件上传组件
-const FileUpload: React.FC<{
-  files: File[]
-  onFilesChange: (files: File[]) => void
-}> = ({ files, onFilesChange }) => {
-  const [isDragover, setIsDragover] = useState(false)
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragover(true)
-  }
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragover(false)
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragover(false)
-    const droppedFiles = Array.from(e.dataTransfer.files)
-    onFilesChange([...files, ...droppedFiles])
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files)
-      onFilesChange([...files, ...selectedFiles])
-    }
-  }
-
-  const removeFile = (index: number) => {
-    onFilesChange(files.filter((_, i) => i !== index))
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
-  return (
-    <div className="space-y-2">
-      {/* 上传区域 */}
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`border-2 border-dashed rounded-lg p-3 text-center transition-all ${
-          isDragover
-            ? 'border-green-500 bg-green-50 transform scale-102'
-            : 'border-gray-300 bg-gray-50'
-        }`}
-      >
-        <div className="w-6 h-6 bg-gray-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
-          <CloudUpload className="w-4 h-4 text-gray-400" />
-        </div>
-        <div className="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽文件</div>
-        <input
-          type="file"
-          multiple
-          accept="image/*,.pdf,.doc,.docx,.txt"
-          onChange={handleFileSelect}
-          className="hidden"
-          id="file-input"
-        />
-        <label
-          htmlFor="file-input"
-          className="px-2.5 py-1.5 bg-green-500 text-white text-xs rounded-md hover:bg-green-600 transition-colors cursor-pointer"
-        >
-          选择文件
-        </label>
-      </div>
-
-      {/* 文件预览 */}
-      {files.length > 0 && (
-        <div className="space-y-1">
-          {files.map((file, index) => {
-            const isImage = file.type.startsWith('image/')
-            return (
-              <div
-                key={index}
-                className="bg-white p-1.5 rounded-lg border border-gray-200 flex items-center space-x-2 transition-all hover:shadow-md"
-              >
-                <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  {isImage ? (
-                    <FileImage className="w-4 h-4 text-blue-500" />
-                  ) : (
-                    <File className="w-4 h-4 text-gray-500" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-gray-900 truncate">{file.name}</div>
-                  <div className="text-xs text-gray-500">{formatFileSize(file.size)}</div>
-                </div>
-                <button
-                  onClick={() => removeFile(index)}
-                  className="w-5 h-5 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors"
-                >
-                  <X className="w-3 h-3 text-red-500" />
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function MyRecordPageContent() {
   const router = useRouter()
@@ -489,7 +378,11 @@ function MyRecordPageContent() {
   const [dateTime, setDateTime] = useState('')
   const [content, setContent] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>(['想法', '灵感'])
-  const [files, setFiles] = useState<File[]>([])
+  const [attachments, setAttachments] = useState<string[]>([])
+  
+  // UI状态 - 仿照stool页面
+  const [showFullImageModal, setShowFullImageModal] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string>('')
 
   // 初始化
   useEffect(() => {
@@ -504,6 +397,25 @@ function MyRecordPageContent() {
       loadRecordForEdit(editId)
     }
   }, [searchParams])
+
+  // 键盘事件处理
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showFullImageModal) {
+        setShowFullImageModal(false)
+      }
+    }
+
+    if (showFullImageModal) {
+      document.addEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = 'hidden' // 防止背景滚动
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = 'unset'
+    }
+  }, [showFullImageModal])
 
   const loadUsers = async () => {
     try {
@@ -520,7 +432,9 @@ function MyRecordPageContent() {
 
   const initializeDateTime = () => {
     const now = new Date()
-    setDateTime(now.toISOString().slice(0, 16))
+    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    setDateTime(localDateTime.toISOString().slice(0, 16))
+    // setDateTime(now.toISOString().slice(0, 16))
   }
 
   const loadRecordForEdit = async (id: string) => {
@@ -530,7 +444,7 @@ function MyRecordPageContent() {
         setDateTime(record.dateTime)
         setContent(record.content)
         setSelectedTags(record.tags)
-        // 注意：文件附件在编辑时不会重新加载，因为它们只是文件名数组
+        setAttachments(record.attachments)
       }
     } catch (error) {
       console.error('Failed to load record for edit:', error)
@@ -547,6 +461,64 @@ function MyRecordPageContent() {
     setUsers(updatedUsers)
   }
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    const maxFiles = 5
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
+    const processFiles = async () => {
+      const newAttachments: string[] = []
+      const filesToProcess = Array.from(files).slice(0, maxFiles - attachments.length)
+
+      for (const file of filesToProcess) {
+        if (file.size > maxSize) {
+          alert(`文件 ${file.name} 太大，请选择小于5MB的文件`)
+          continue
+        }
+
+        if (!allowedTypes.includes(file.type)) {
+          alert(`文件 ${file.name} 格式不支持，请选择图片文件`)
+          continue
+        }
+
+        try {
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = (e) => resolve(e.target?.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(file)
+          })
+
+          newAttachments.push(dataUrl)
+        } catch (error) {
+          console.error('读取文件失败:', error)
+          alert(`读取文件 ${file.name} 失败`)
+        }
+      }
+
+      if (newAttachments.length > 0) {
+        setAttachments(prev => [...prev, ...newAttachments])
+      }
+    }
+
+    processFiles()
+
+    // 清空input value 以允许重复选择同一文件
+    event.target.value = ''
+  }
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleViewFullImage = (imageUrl: string) => {
+    setSelectedImage(imageUrl)
+    setShowFullImageModal(true)
+  }
+
   const handleSave = async () => {
     if (!currentUser || !content.trim()) {
       alert('请填写记录内容')
@@ -559,7 +531,7 @@ function MyRecordPageContent() {
         dateTime,
         content: content.trim(),
         tags: selectedTags,
-        attachments: files.map(f => f.name) // 这里简化处理，实际应用中可能需要上传文件
+        attachments
       }
 
       if (isEditing && editingId) {
@@ -583,7 +555,7 @@ function MyRecordPageContent() {
   }
 
   const handleClose = () => {
-    if (content.trim() || selectedTags.length > 0 || files.length > 0) {
+    if (content.trim() || selectedTags.length > 0 || attachments.length > 0) {
       if (confirm('确定要关闭表单吗？未保存的数据将丢失。')) {
         router.push('/health-calendar')
       }
@@ -594,7 +566,7 @@ function MyRecordPageContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
           <p className="mt-2 text-gray-600">加载中...</p>
@@ -604,7 +576,7 @@ function MyRecordPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500">
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500">
       {/* 背景层 */}
       <div className="fixed inset-0 bg-white/10"></div>
       
@@ -707,8 +679,146 @@ function MyRecordPageContent() {
               <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
                 <Paperclip className="w-4 h-4 text-green-500 mr-1.5" />
                 附件上传
+                {attachments.length > 0 && (
+                  <span className="ml-2 text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
+                    {attachments.length}/5
+                  </span>
+                )}
               </h3>
-              <FileUpload files={files} onFilesChange={setFiles} />
+
+              {/* Upload Area */}
+              {attachments.length < 5 && (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center mb-3 hover:border-green-500 transition-colors">
+                  <div className="w-8 h-8 bg-gray-100 rounded-lg mx-auto mb-2 flex items-center justify-center">
+                    <CloudUpload className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div className="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽图片</div>
+                  <div className="text-xs text-gray-500 mb-2">支持 JPG, PNG, GIF, WebP 格式，单个文件不超过5MB</div>
+                  <input
+                    type="file"
+                    onChange={handleFileUpload}
+                    multiple
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    id="fileInput"
+                  />
+                  <button
+                    onClick={() => document.getElementById('fileInput')?.click()}
+                    className="px-3 py-1.5 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    选择图片
+                  </button>
+                </div>
+              )}
+
+              {/* Attached Images Preview */}
+              {attachments.length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-600 mb-2 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <FileImage className="w-3 h-3 mr-1" />
+                      已上传的图片 ({attachments.length})
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      悬停图片显示删除按钮
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {attachments.map((attachment, index) => (
+                      <div key={index} className="relative group">
+                        <div 
+                          className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer border-2 border-transparent hover:border-green-500 transition-all transform hover:scale-105 shadow-sm"
+                          onClick={() => handleViewFullImage(attachment)}
+                        >
+                          <img
+                            src={attachment}
+                            alt={`附件 ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              console.error('图片加载失败:', attachment.substring(0, 50))
+                              e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMCAyNkM3LjI1IDI2IDIgMTUuMjUgMiAxNS4yNUMyIDE1LjI1IDcuMjUgNC41IDIwIDQuNUMzMi43NSA0LjUgMzggMTUuMjUgMzggMTUuMjVDMzggMTUuMjUgMzIuNzUgMjYgMjAgMjZaIiBzdHJva2U9IiM5Q0EzQUYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxjaXJjbGUgY3g9IjIwIiBjeT0iMTUuMjUiIHI9IjMuNzUiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg=='
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-all flex items-center justify-center">
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                                <FileImage className="w-4 h-4 text-gray-700" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Delete Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm('确定要删除这张图片吗？')) {
+                              handleRemoveAttachment(index)
+                            }
+                          }}
+                          className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-all shadow-lg border-2 border-white opacity-80 hover:opacity-100 group-hover:scale-110"
+                          title="删除图片"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+
+                        {/* Image Index */}
+                        <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-full backdrop-blur-sm font-medium">
+                          {index + 1}
+                        </div>
+
+                        {/* Image Size Info */}
+                        <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                          {Math.round(attachment.length / 1024)} KB
+                        </div>
+
+                        {/* 删除提示（悬停时显示） */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <div className="bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
+                            点击右上角 × 删除
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* 批量删除按钮 */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-500">共 {attachments.length} 张图片</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (confirm(`确定要删除所有 ${attachments.length} 张图片吗？`)) {
+                          setAttachments([])
+                        }
+                      }}
+                      className="px-2 py-1 bg-red-50 text-red-600 text-xs rounded-md hover:bg-red-100 transition-colors border border-red-200 flex items-center space-x-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>全部删除</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Tips */}
+              <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
+                <div className="flex items-center space-x-1.5 mb-1">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                    <div className="w-1 h-1 bg-white rounded-full"></div>
+                  </div>
+                  <span className="text-xs font-medium text-blue-700">使用说明</span>
+                </div>
+                <div className="text-xs text-blue-600 space-y-0.5">
+                  <div>• 最多可上传5张图片，每张不超过5MB</div>
+                  <div>• 支持JPG、PNG、GIF、WebP格式</div>
+                  <div>• 点击图片可查看大图</div>
+                  <div>• <strong>删除图片</strong>：将鼠标悬停在图片上，点击右上角红色 × 按钮</div>
+                  <div>• 或使用"全部删除"按钮清除所有图片</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -730,6 +840,62 @@ function MyRecordPageContent() {
             </button>
           </div>
         </main>
+
+        {/* Full Image Modal */}
+        {showFullImageModal && selectedImage && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/90 backdrop-blur-sm"
+              onClick={() => setShowFullImageModal(false)}
+            ></div>
+            
+            {/* Modal Content */}
+            <div className="relative w-full h-full max-w-4xl max-h-full flex items-center justify-center">
+              <div className="relative bg-white rounded-2xl overflow-hidden shadow-2xl max-w-full max-h-full">
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowFullImageModal(false)}
+                  className="absolute top-4 right-4 z-10 w-10 h-10 bg-black/70 text-white rounded-full flex items-center justify-center hover:bg-black/90 transition-colors backdrop-blur-sm shadow-lg"
+                  title="关闭 (ESC)"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+
+                {/* Image Container */}
+                <div className="relative bg-gray-100 flex items-center justify-center min-h-[50vh]">
+                  <img
+                    src={selectedImage}
+                    alt="全图预览"
+                    className="max-w-full max-h-[85vh] object-contain"
+                    style={{ maxWidth: '100%', height: 'auto' }}
+                    onError={(e) => {
+                      console.error('全屏图片加载失败')
+                      e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMDAgMTMwQzM2LjI1IDEzMCAxMCA3Ni4yNSAxMCA3Ni4yNUMxMCA3Ni4yNSAzNi4yNSAyMi41IDEwMCAyMi41QzE2My43NSAyMi41IDE5MCA3Ni4yNSAxOTAgNzYuMjVDMTkwIDc2LjI1IDE2My43NSAxMzAgMTAwIDEzMFoiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPGNpcmNsZSBjeD0iMTAwIiBjeT0iNzYuMjUiIHI9IjE4Ljc1IiBzdHJva2U9IiM5Q0EzQUYiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjx0ZXh0IHg9IjEwMCIgeT0iMTcwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjU3Mzg0Ij7lm77niYfliqDovb3lpLHotKU8L3RleHQ+Cjwvc3ZnPgo='
+                    }}
+                  />
+                </div>
+
+                {/* Image Info Bar */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+                  <div className="text-white">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <FileImage className="w-5 h-5" />
+                      <span className="font-medium">附件预览</span>
+                    </div>
+                    <div className="text-sm text-white/80 flex items-center space-x-4">
+                      <span>点击任意位置关闭</span>
+                      <span>•</span>
+                      <span>按 ESC 键退出</span>
+                      <span>•</span>
+                      <span>大小: {Math.round(selectedImage.length / 1024)} KB</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -738,7 +904,7 @@ function MyRecordPageContent() {
 export default function MyRecordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
           <p className="mt-2 text-gray-600">加载中...</p>
