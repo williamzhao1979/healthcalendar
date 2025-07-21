@@ -8,9 +8,10 @@ export interface User {
   updatedAt: string;
 }
 
+import { HEALTH_CALENDAR_DB_VERSION } from './dbVersion'
 class UserDatabase {
   private dbName = 'HealthCalendarDB';
-  private version = 4; // 增加版本号以支持 createdAt 和 updatedAt 字段
+  private version = HEALTH_CALENDAR_DB_VERSION; // 全局版本号
   private storeName = 'users';
   private isInitialized = false;
 
@@ -59,6 +60,13 @@ class UserDatabase {
               stoolStore.createIndex('userId', 'userId', { unique: false });
               stoolStore.createIndex('date', 'date', { unique: false });
             }
+            
+            // 创建我的记录存储表
+            if (!upgradeDB.objectStoreNames.contains('myRecords')) {
+              const myRecordsStore = upgradeDB.createObjectStore('myRecords', { keyPath: 'id' });
+              myRecordsStore.createIndex('userId', 'userId', { unique: false });
+              myRecordsStore.createIndex('dateTime', 'dateTime', { unique: false });
+            }
           };
           
           upgradeRequest.onsuccess = () => {
@@ -90,6 +98,13 @@ class UserDatabase {
           const stoolStore = db.createObjectStore('stoolRecords', { keyPath: 'id' });
           stoolStore.createIndex('userId', 'userId', { unique: false });
           stoolStore.createIndex('date', 'date', { unique: false });
+        }
+        
+        // 版本 5：创建我的记录存储表
+        if (!db.objectStoreNames.contains('myRecords')) {
+          const myRecordsStore = db.createObjectStore('myRecords', { keyPath: 'id' });
+          myRecordsStore.createIndex('userId', 'userId', { unique: false });
+          myRecordsStore.createIndex('dateTime', 'dateTime', { unique: false });
         }
         
         // 版本 4：添加 createdAt 和 updatedAt 字段迁移

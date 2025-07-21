@@ -1,0 +1,751 @@
+'use client'
+
+import React, { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  ChevronLeft,
+  Calendar,
+  Edit3,
+  Tags,
+  Paperclip,
+  CloudUpload,
+  X,
+  Check,
+  Plus,
+  Trash2,
+  FileImage,
+  File,
+  Clock,
+  ArrowLeft
+} from 'lucide-react'
+import { userDB, User as UserType } from '../../lib/userDatabase'
+import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
+
+// 导入数据库类型，避免重复定义
+interface MyRecord {
+  id: string
+  userId: string
+  dateTime: string
+  content: string
+  tags: string[]
+  attachments: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+// 使用简化的数据库接口，实际实现在 HealthCalendar 中
+class MyRecordDB {
+  private dbName = 'HealthCalendarDB'
+  private version = HEALTH_CALENDAR_DB_VERSION  // 全局版本号
+  private db: IDBDatabase | null = null
+
+  async ensureInitialized(): Promise<void> {
+    if (this.db) return
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version)
+
+      request.onerror = () => {
+        console.error('MyRecordDB IndexedDB error:', request.error)
+        reject(request.error)
+      }
+      
+      request.onsuccess = () => {
+        this.db = request.result
+        console.log('MyRecordDB initialized successfully')
+        resolve()
+      }
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        console.log('MyRecordDB upgrade needed, current stores:', Array.from(db.objectStoreNames))
+        
+        // 这些表应该已经由其他组件创建了，这里只是确保兼容性
+        if (!db.objectStoreNames.contains('users')) {
+          const userStore = db.createObjectStore('users', { keyPath: 'id' })
+          userStore.createIndex('name', 'name', { unique: false })
+          userStore.createIndex('isActive', 'isActive', { unique: false })
+        }
+        
+        if (!db.objectStoreNames.contains('stoolRecords')) {
+          const stoolStore = db.createObjectStore('stoolRecords', { keyPath: 'id' })
+          stoolStore.createIndex('userId', 'userId', { unique: false })
+          stoolStore.createIndex('date', 'date', { unique: false })
+        }
+        
+        if (!db.objectStoreNames.contains('myRecords')) {
+          const store = db.createObjectStore('myRecords', { keyPath: 'id' })
+          store.createIndex('userId', 'userId', { unique: false })
+          store.createIndex('dateTime', 'dateTime', { unique: false })
+          console.log('Created myRecords object store')
+        }
+      }
+
+      request.onblocked = () => {
+        console.warn('MyRecordDB IndexedDB upgrade blocked.')
+        reject(new Error('Database upgrade blocked'))
+      }
+    })
+  }
+
+  async saveRecord(record: Omit<MyRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    await this.ensureInitialized()
+    
+    const id = Date.now().toString()
+    const now = new Date().toISOString()
+    const fullRecord: MyRecord = {
+      ...record,
+      id,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readwrite')
+      const store = transaction.objectStore('myRecords')
+      const request = store.add(fullRecord)
+
+      request.onsuccess = () => resolve(id)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateRecord(id: string, updates: Partial<MyRecord>): Promise<void> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readwrite')
+      const store = transaction.objectStore('myRecords')
+      const getRequest = store.get(id)
+
+      getRequest.onsuccess = () => {
+        const record = getRequest.result
+        if (!record) {
+          reject(new Error('Record not found'))
+          return
+        }
+
+        const updatedRecord = {
+          ...record,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        }
+
+        const putRequest = store.put(updatedRecord)
+        putRequest.onsuccess = () => resolve()
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async getRecord(id: string): Promise<MyRecord | null> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readonly')
+      const store = transaction.objectStore('myRecords')
+      const request = store.get(id)
+
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getUserRecords(userId: string): Promise<MyRecord[]> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readonly')
+      const store = transaction.objectStore('myRecords')
+      const index = store.index('userId')
+      const request = index.getAll(userId)
+
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async deleteRecord(id: string): Promise<void> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readwrite')
+      const store = transaction.objectStore('myRecords')
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  }
+}
+
+const myRecordDB = new MyRecordDB()
+
+// 用户切换组件
+const UserSwitcher: React.FC<{
+  currentUser: UserType | null
+  users: UserType[]
+  onUserChange: (user: UserType) => void
+}> = ({ currentUser, users, onUserChange }) => {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20"
+      >
+        {currentUser && (
+          <img 
+            src={currentUser.avatarUrl} 
+            alt="用户头像" 
+            className="w-5 h-5 rounded-full ring-1 ring-white/50"
+            onError={(e) => {
+              e.currentTarget.src = '/placeholder-user.jpg'
+            }}
+          />
+        )}
+        <span className="text-xs font-semibold text-gray-800">
+          {currentUser?.name || '选择用户'}
+        </span>
+        <ChevronLeft className={`w-3 h-3 text-gray-500 transform transition-transform ${isOpen ? 'rotate-90' : '-rotate-90'}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full right-0 mt-1 w-48 bg-white/90 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg z-50">
+          <div className="p-2">
+            {users.map((user) => (
+              <button
+                key={user.id}
+                onClick={() => {
+                  onUserChange(user)
+                  setIsOpen(false)
+                }}
+                className={`w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg text-left hover:bg-white/50 transition-colors ${
+                  currentUser?.id === user.id ? 'bg-green-100/80 text-green-800' : 'text-gray-700'
+                }`}
+              >
+                <img 
+                  src={user.avatarUrl} 
+                  alt={user.name} 
+                  className="w-4 h-4 rounded-full"
+                  onError={(e) => {
+                    e.currentTarget.src = '/placeholder-user.jpg'
+                  }}
+                />
+                <span className="text-xs font-medium">{user.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// 标签管理组件
+const TagManager: React.FC<{
+  selectedTags: string[]
+  onTagsChange: (tags: string[]) => void
+}> = ({ selectedTags, onTagsChange }) => {
+  const [showCustomInput, setShowCustomInput] = useState(false)
+  const [customTag, setCustomTag] = useState('')
+
+  // 预设标签
+  const presetTags = [
+    '重要', '待办', '完成', '想法', '灵感', '提醒',
+    '工作', '学习', '生活', '健康', '旅行', '其他', '东西放哪儿了'
+  ]
+
+  const toggleTag = (tag: string) => {
+    const newTags = selectedTags.includes(tag)
+      ? selectedTags.filter(t => t !== tag)
+      : [...selectedTags, tag]
+    onTagsChange(newTags)
+  }
+
+  const addCustomTag = () => {
+    if (customTag.trim() && customTag.length <= 10 && !selectedTags.includes(customTag.trim())) {
+      onTagsChange([...selectedTags, customTag.trim()])
+      setCustomTag('')
+      setShowCustomInput(false)
+    }
+  }
+
+  const removeTag = (tag: string) => {
+    onTagsChange(selectedTags.filter(t => t !== tag))
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* 标签选择区域 */}
+      <div className="flex flex-wrap gap-1.5">
+        {presetTags.map((tag) => (
+          <button
+            key={tag}
+            onClick={() => toggleTag(tag)}
+            className={`px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-all ${
+              selectedTags.includes(tag)
+                ? 'bg-gradient-to-r from-green-500 to-green-600 text-white shadow-md transform scale-105'
+                : 'bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200 hover:shadow-md hover:-translate-y-0.5'
+            }`}
+          >
+            {tag}
+          </button>
+        ))}
+        
+        {/* 自定义标签按钮 */}
+        <button
+          onClick={() => setShowCustomInput(true)}
+          className="px-2 py-1 bg-green-100 border border-green-300 rounded-full text-xs font-medium text-green-600 cursor-pointer transition-all hover:bg-green-200 hover:shadow-md hover:-translate-y-0.5 flex items-center space-x-1"
+        >
+          <Plus className="w-3 h-3" />
+          <span>自定义</span>
+        </button>
+      </div>
+
+      {/* 自定义标签输入 */}
+      {showCustomInput && (
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            value={customTag}
+            onChange={(e) => setCustomTag(e.target.value)}
+            placeholder="输入自定义标签..."
+            className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all text-xs"
+            maxLength={10}
+            onKeyPress={(e) => e.key === 'Enter' && addCustomTag()}
+          />
+          <button
+            onClick={addCustomTag}
+            className="px-2.5 py-1.5 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition-colors"
+          >
+            添加
+          </button>
+          <button
+            onClick={() => {
+              setShowCustomInput(false)
+              setCustomTag('')
+            }}
+            className="px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            取消
+          </button>
+        </div>
+      )}
+
+      {/* 已选择的标签显示 */}
+      {selectedTags.length > 0 && (
+        <div>
+          <div className="text-xs text-gray-500 mb-1">已选择的标签：</div>
+          <div className="flex flex-wrap gap-1">
+            {selectedTags.map((tag) => (
+              <span
+                key={tag}
+                className="px-1.5 py-0.5 bg-green-100 text-green-600 text-xs rounded-md border border-green-200 flex items-center space-x-1"
+              >
+                <span>{tag}</span>
+                <button
+                  onClick={() => removeTag(tag)}
+                  className="text-green-500 hover:text-green-700 ml-1"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// 文件上传组件
+const FileUpload: React.FC<{
+  files: File[]
+  onFilesChange: (files: File[]) => void
+}> = ({ files, onFilesChange }) => {
+  const [isDragover, setIsDragover] = useState(false)
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragover(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragover(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragover(false)
+    const droppedFiles = Array.from(e.dataTransfer.files)
+    onFilesChange([...files, ...droppedFiles])
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files)
+      onFilesChange([...files, ...selectedFiles])
+    }
+  }
+
+  const removeFile = (index: number) => {
+    onFilesChange(files.filter((_, i) => i !== index))
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* 上传区域 */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`border-2 border-dashed rounded-lg p-3 text-center transition-all ${
+          isDragover
+            ? 'border-green-500 bg-green-50 transform scale-102'
+            : 'border-gray-300 bg-gray-50'
+        }`}
+      >
+        <div className="w-6 h-6 bg-gray-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+          <CloudUpload className="w-4 h-4 text-gray-400" />
+        </div>
+        <div className="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽文件</div>
+        <input
+          type="file"
+          multiple
+          accept="image/*,.pdf,.doc,.docx,.txt"
+          onChange={handleFileSelect}
+          className="hidden"
+          id="file-input"
+        />
+        <label
+          htmlFor="file-input"
+          className="px-2.5 py-1.5 bg-green-500 text-white text-xs rounded-md hover:bg-green-600 transition-colors cursor-pointer"
+        >
+          选择文件
+        </label>
+      </div>
+
+      {/* 文件预览 */}
+      {files.length > 0 && (
+        <div className="space-y-1">
+          {files.map((file, index) => {
+            const isImage = file.type.startsWith('image/')
+            return (
+              <div
+                key={index}
+                className="bg-white p-1.5 rounded-lg border border-gray-200 flex items-center space-x-2 transition-all hover:shadow-md"
+              >
+                <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  {isImage ? (
+                    <FileImage className="w-4 h-4 text-blue-500" />
+                  ) : (
+                    <File className="w-4 h-4 text-gray-500" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-gray-900 truncate">{file.name}</div>
+                  <div className="text-xs text-gray-500">{formatFileSize(file.size)}</div>
+                </div>
+                <button
+                  onClick={() => removeFile(index)}
+                  className="w-5 h-5 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors"
+                >
+                  <X className="w-3 h-3 text-red-500" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MyRecordPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // 状态管理
+  const [users, setUsers] = useState<UserType[]>([])
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  
+  // 表单状态
+  const [dateTime, setDateTime] = useState('')
+  const [content, setContent] = useState('')
+  const [selectedTags, setSelectedTags] = useState<string[]>(['想法', '灵感'])
+  const [files, setFiles] = useState<File[]>([])
+
+  // 初始化
+  useEffect(() => {
+    loadUsers()
+    initializeDateTime()
+    
+    // 检查是否为编辑模式
+    const editId = searchParams.get('edit')
+    if (editId) {
+      setIsEditing(true)
+      setEditingId(editId)
+      loadRecordForEdit(editId)
+    }
+  }, [searchParams])
+
+  const loadUsers = async () => {
+    try {
+      const allUsers = await userDB.getAllUsers()
+      setUsers(allUsers)
+      const activeUser = allUsers.find(user => user.isActive) || allUsers[0]
+      setCurrentUser(activeUser)
+      setLoading(false)
+    } catch (error) {
+      console.error('Failed to load users:', error)
+      setLoading(false)
+    }
+  }
+
+  const initializeDateTime = () => {
+    const now = new Date()
+    setDateTime(now.toISOString().slice(0, 16))
+  }
+
+  const loadRecordForEdit = async (id: string) => {
+    try {
+      const record = await myRecordDB.getRecord(id)
+      if (record) {
+        setDateTime(record.dateTime)
+        setContent(record.content)
+        setSelectedTags(record.tags)
+        // 注意：文件附件在编辑时不会重新加载，因为它们只是文件名数组
+      }
+    } catch (error) {
+      console.error('Failed to load record for edit:', error)
+    }
+  }
+
+  const handleUserChange = async (user: UserType) => {
+    // 更新用户活跃状态
+    await userDB.setActiveUser(user.id)
+    setCurrentUser(user)
+    
+    // 重新加载用户列表以更新活跃状态
+    const updatedUsers = await userDB.getAllUsers()
+    setUsers(updatedUsers)
+  }
+
+  const handleSave = async () => {
+    if (!currentUser || !content.trim()) {
+      alert('请填写记录内容')
+      return
+    }
+
+    try {
+      const recordData = {
+        userId: currentUser.id,
+        dateTime,
+        content: content.trim(),
+        tags: selectedTags,
+        attachments: files.map(f => f.name) // 这里简化处理，实际应用中可能需要上传文件
+      }
+
+      if (isEditing && editingId) {
+        await myRecordDB.updateRecord(editingId, recordData)
+        alert('记录已更新！')
+      } else {
+        await myRecordDB.saveRecord(recordData)
+        alert('记录已保存！')
+      }
+
+      // 返回到健康日历页面
+      router.push('/health-calendar')
+    } catch (error) {
+      console.error('Failed to save record:', error)
+      alert('保存失败，请重试')
+    }
+  }
+
+  const handleBack = () => {
+    router.push('/health-calendar')
+  }
+
+  const handleClose = () => {
+    if (content.trim() || selectedTags.length > 0 || files.length > 0) {
+      if (confirm('确定要关闭表单吗？未保存的数据将丢失。')) {
+        router.push('/health-calendar')
+      }
+    } else {
+      router.push('/health-calendar')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
+          <p className="mt-2 text-gray-600">加载中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500">
+      {/* 背景层 */}
+      <div className="fixed inset-0 bg-white/10"></div>
+      
+      <div className="relative min-h-screen">
+        {/* Header */}
+        <header className="sticky top-0 z-50 px-3 py-2 bg-white/25 backdrop-blur-md border-b border-white/20">
+          <div className="flex items-center justify-between">
+            {/* 左侧：返回按钮和标题 */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleBack}
+                className="w-8 h-8 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20 flex items-center justify-center"
+              >
+                <ArrowLeft className="w-4 h-4 text-gray-700" />
+              </button>
+              <div>
+                <h1 className="text-base font-bold text-gray-800">
+                  {isEditing ? '编辑记录' : '我的记录'}
+                </h1>
+                <p className="text-xs text-gray-600">记录您的生活点滴</p>
+              </div>
+            </div>
+            
+            {/* 右侧：用户切换 */}
+            <UserSwitcher
+              currentUser={currentUser}
+              users={users}
+              onUserChange={handleUserChange}
+            />
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <main className="px-3 py-2 pb-16">
+          {/* 主表单卡片 */}
+          <div className="bg-gradient-to-b from-white to-gray-50 rounded-2xl p-3 mb-3 shadow-lg border border-white/40 relative">
+            {/* 关闭按钮 */}
+            <button
+              onClick={handleClose}
+              className="absolute top-3 right-3 w-6 h-6 bg-gray-100 hover:bg-red-100 rounded-full flex items-center justify-center transition-all z-10"
+            >
+              <X className="w-3 h-3 text-gray-400 hover:text-red-500" />
+            </button>
+            
+            {/* 日期时间部分 */}
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                <Calendar className="w-4 h-4 text-green-500 mr-1.5" />
+                记录时间
+              </h3>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">选择日期和时间</label>
+                <input
+                  type="datetime-local"
+                  value={dateTime}
+                  onChange={(e) => setDateTime(e.target.value)}
+                  className="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            {/* 分隔线 */}
+            <hr className="border-gray-200 mb-3" />
+
+            {/* 记录内容 */}
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                <Edit3 className="w-4 h-4 text-green-500 mr-1.5" />
+                记录内容
+              </h3>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="请输入您的记录内容..."
+                rows={3}
+                className="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all resize-none text-sm"
+              />
+            </div>
+
+            {/* 分隔线 */}
+            <hr className="border-gray-200 mb-3" />
+
+            {/* 标签选择 */}
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                <Tags className="w-4 h-4 text-green-500 mr-1.5" />
+                标签选择
+              </h3>
+              <TagManager
+                selectedTags={selectedTags}
+                onTagsChange={setSelectedTags}
+              />
+            </div>
+
+            {/* 分隔线 */}
+            <hr className="border-gray-200 mb-3" />
+
+            {/* 文件上传 */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                <Paperclip className="w-4 h-4 text-green-500 mr-1.5" />
+                附件上传
+              </h3>
+              <FileUpload files={files} onFilesChange={setFiles} />
+            </div>
+          </div>
+
+          {/* 操作按钮 */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleBack}
+              className="py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm flex items-center justify-center space-x-1"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>返回</span>
+            </button>
+            <button
+              onClick={handleSave}
+              className="py-2.5 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors text-sm flex items-center justify-center space-x-1"
+            >
+              <Check className="w-4 h-4" />
+              <span>{isEditing ? '更新记录' : '保存记录'}</span>
+            </button>
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+export default function MyRecordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto"></div>
+          <p className="mt-2 text-gray-600">加载中...</p>
+        </div>
+      </div>
+    }>
+      <MyRecordPageContent />
+    </Suspense>
+  )
+}

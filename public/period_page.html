@@ -220,25 +220,25 @@
     
     <div class="relative min-h-screen">
         <!-- Header -->
-        <header class="glass-morphism sticky top-0 z-50 px-6 py-3 animate-fade-in">
+        <header class="glass-morphism sticky top-0 z-50 px-3 py-2 animate-fade-in">
             <div class="flex items-center justify-between">
                 <!-- Back Button and Title -->
-                <div class="flex items-center space-x-4">
-                    <button onclick="goBack()" class="w-9 h-9 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20 flex items-center justify-center">
-                        <i class="fas fa-arrow-left text-gray-700"></i>
+                <div class="flex items-center space-x-2">
+                    <button onclick="goBack()" class="w-8 h-8 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20 flex items-center justify-center">
+                        <i class="fas fa-arrow-left text-gray-700 text-sm"></i>
                     </button>
                     <div>
-                        <h1 class="text-lg font-bold text-gray-800">生理记录</h1>
-                        <p class="text-xs text-gray-600 font-medium">记录您的月经周期</p>
+                        <h1 class="text-base font-bold text-gray-800">生理记录</h1>
+                        <p class="text-xs text-gray-600">记录您的月经周期</p>
                     </div>
                 </div>
                 
                 <!-- User Switch -->
                 <div class="relative">
-                    <button class="flex items-center space-x-2 px-3 py-1.5 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20">
+                    <button class="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20">
                         <img src="https://images.unsplash.com/photo-1494790108755-2616b2e4d93d?w=32&h=32&fit=crop&crop=face" 
-                             alt="用户头像" class="w-6 h-6 rounded-full ring-2 ring-white/50">
-                        <span class="text-sm font-semibold text-gray-800">小雨</span>
+                             alt="用户头像" class="w-5 h-5 rounded-full ring-1 ring-white/50">
+                        <span class="text-xs font-semibold text-gray-800">小雨</span>
                         <i class="fas fa-chevron-down text-gray-500 text-xs"></i>
                     </button>
                 </div>
@@ -246,119 +246,119 @@
         </header>
 
         <!-- Main Content -->
-        <main class="px-6 py-4 pb-20">
+        <main class="px-3 py-2 pb-16">
             <!-- Main Form Card -->
-            <div class="form-card rounded-3xl p-5 mb-4 animate-fade-in relative">
+            <div class="form-card rounded-2xl p-3 mb-3 animate-fade-in relative">
                 <!-- Close Button -->
-                <button onclick="closeForm()" class="absolute top-4 right-4 w-8 h-8 bg-gray-100 hover:bg-red-100 rounded-full flex items-center justify-center transition-all z-10">
-                    <i class="fas fa-times text-gray-400 hover:text-red-500 text-sm"></i>
+                <button onclick="closeForm()" class="absolute top-3 right-3 w-6 h-6 bg-gray-100 hover:bg-red-100 rounded-full flex items-center justify-center transition-all z-10">
+                    <i class="fas fa-times text-gray-400 hover:text-red-500 text-xs"></i>
                 </button>
                 
                 <!-- Date and Time Section -->
-                <div class="mb-5">
-                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-calendar-alt text-health-pink mr-2"></i>
+                <div class="mb-3">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                        <i class="fas fa-calendar-alt text-health-pink mr-1.5 text-sm"></i>
                         日期时间
                     </h3>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1.5">选择日期和时间</label>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">选择日期和时间</label>
                         <input type="datetime-local" 
                                value="2025-07-14T08:00"
-                               class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all">
+                               class="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all text-sm">
                     </div>
                 </div>
 
                 <!-- Divider -->
-                <hr class="border-gray-200 mb-5">
+                <hr class="border-gray-200 mb-3">
 
                 <!-- Period Status Selection -->
-                <div class="mb-5">
-                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-heart text-health-pink mr-2"></i>
+                <div class="mb-3">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                        <i class="fas fa-heart text-health-pink mr-1.5 text-sm"></i>
                         月经状态
                     </h3>
-                    <div class="grid grid-cols-3 gap-2.5">
-                        <div class="status-option p-3 bg-gray-50 rounded-xl border border-gray-200 text-center selected">
-                            <div class="w-10 h-10 bg-red-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
-                                <i class="fas fa-play text-red-500 text-base"></i>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="status-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center selected">
+                            <div class="w-7 h-7 bg-red-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+                                <i class="fas fa-play text-red-500 text-sm"></i>
                             </div>
-                            <div class="text-sm font-semibold">开始</div>
+                            <div class="text-xs font-semibold">开始</div>
                             <div class="text-xs text-gray-500 mt-0.5">月经开始</div>
                         </div>
-                        <div class="status-option p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
-                            <div class="w-10 h-10 bg-pink-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
-                                <i class="fas fa-circle text-pink-500 text-base"></i>
+                        <div class="status-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="w-7 h-7 bg-pink-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+                                <i class="fas fa-circle text-pink-500 text-sm"></i>
                             </div>
-                            <div class="text-sm font-semibold">进行中</div>
+                            <div class="text-xs font-semibold">进行中</div>
                             <div class="text-xs text-gray-500 mt-0.5">月经期间</div>
                         </div>
-                        <div class="status-option p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
-                            <div class="w-10 h-10 bg-gray-100 rounded-xl mx-auto mb-2 flex items-center justify-center">
-                                <i class="fas fa-stop text-gray-500 text-base"></i>
+                        <div class="status-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="w-7 h-7 bg-gray-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+                                <i class="fas fa-stop text-gray-500 text-sm"></i>
                             </div>
-                            <div class="text-sm font-semibold">结束</div>
+                            <div class="text-xs font-semibold">结束</div>
                             <div class="text-xs text-gray-500 mt-0.5">月经结束</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Divider -->
-                <hr class="border-gray-200 mb-5">
+                <hr class="border-gray-200 mb-3">
 
                 <!-- Flow Amount Selection -->
-                <div class="mb-5">
-                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-tint text-health-pink mr-2"></i>
+                <div class="mb-3">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                        <i class="fas fa-tint text-health-pink mr-1.5 text-sm"></i>
                         流量大小
                     </h3>
-                    <div class="grid grid-cols-4 gap-2.5">
-                        <div class="flow-option p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center">
-                            <div class="text-sm font-semibold text-gray-700">极少</div>
+                    <div class="grid grid-cols-4 gap-1.5">
+                        <div class="flow-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="text-xs font-semibold text-gray-700">极少</div>
                             <div class="text-xs text-gray-500 mt-0.5">点滴状</div>
                         </div>
-                        <div class="flow-option p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center">
-                            <div class="text-sm font-semibold text-gray-700">较少</div>
+                        <div class="flow-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="text-xs font-semibold text-gray-700">较少</div>
                             <div class="text-xs text-gray-500 mt-0.5">轻量</div>
                         </div>
-                        <div class="flow-option p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center selected">
-                            <div class="text-sm font-semibold">正常</div>
+                        <div class="flow-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center selected">
+                            <div class="text-xs font-semibold">正常</div>
                             <div class="text-xs mt-0.5">中等量</div>
                         </div>
-                        <div class="flow-option p-2.5 bg-gray-50 rounded-lg border border-gray-200 text-center">
-                            <div class="text-sm font-semibold text-gray-700">较多</div>
+                        <div class="flow-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                            <div class="text-xs font-semibold text-gray-700">较多</div>
                             <div class="text-xs text-gray-500 mt-0.5">大量</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Divider -->
-                <hr class="border-gray-200 mb-5">
+                <hr class="border-gray-200 mb-3">
 
                 <!-- Color Selection -->
-                <div class="mb-5">
-                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-palette text-health-pink mr-2"></i>
+                <div class="mb-3">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                        <i class="fas fa-palette text-health-pink mr-1.5 text-sm"></i>
                         颜色记录
                     </h3>
-                    <div class="grid grid-cols-5 gap-3">
-                        <div class="color-option p-2 rounded-lg text-center cursor-pointer selected">
-                            <div class="w-8 h-8 bg-red-600 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                    <div class="grid grid-cols-5 gap-2">
+                        <div class="color-option p-1.5 rounded-lg text-center cursor-pointer selected">
+                            <div class="w-6 h-6 bg-red-600 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
                             <div class="text-xs font-medium text-gray-700">鲜红</div>
                         </div>
-                        <div class="color-option p-2 rounded-lg text-center cursor-pointer">
-                            <div class="w-8 h-8 bg-red-800 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                        <div class="color-option p-1.5 rounded-lg text-center cursor-pointer">
+                            <div class="w-6 h-6 bg-red-800 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
                             <div class="text-xs font-medium text-gray-700">暗红</div>
                         </div>
-                        <div class="color-option p-2 rounded-lg text-center cursor-pointer">
-                            <div class="w-8 h-8 bg-red-900 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                        <div class="color-option p-1.5 rounded-lg text-center cursor-pointer">
+                            <div class="w-6 h-6 bg-red-900 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
                             <div class="text-xs font-medium text-gray-700">深红</div>
                         </div>
-                        <div class="color-option p-2 rounded-lg text-center cursor-pointer">
-                            <div class="w-8 h-8 bg-orange-600 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                        <div class="color-option p-1.5 rounded-lg text-center cursor-pointer">
+                            <div class="w-6 h-6 bg-orange-600 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
                             <div class="text-xs font-medium text-gray-700">橙红</div>
                         </div>
-                        <div class="color-option p-2 rounded-lg text-center cursor-pointer">
-                            <div class="w-8 h-8 bg-pink-400 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                        <div class="color-option p-1.5 rounded-lg text-center cursor-pointer">
+                            <div class="w-6 h-6 bg-pink-400 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
                             <div class="text-xs font-medium text-gray-700">粉红</div>
                         </div>
                     </div>
@@ -367,95 +367,95 @@
 
 
                 <!-- Divider -->
-                <hr class="border-gray-200 mb-5">
+                <hr class="border-gray-200 mb-3">
 
                 <!-- Notes Section -->
-                <div class="mb-5">
-                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-edit text-health-pink mr-2"></i>
+                <div class="mb-3">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                        <i class="fas fa-edit text-health-pink mr-1.5 text-sm"></i>
                         备注信息
                     </h3>
                     <textarea 
                         placeholder="请记录详细信息，如疼痛程度、情绪变化、特殊情况等..."
-                        rows="3"
-                        class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all resize-none">今天腹痛较为明显，情绪稍显烦躁，流量正常</textarea>
+                        rows="2"
+                        class="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all resize-none text-sm">今天腹痛较为明显，情绪稍显烦躁，流量正常</textarea>
                 </div>
 
                 <!-- Divider -->
-                <hr class="border-gray-200 mb-5">
+                <hr class="border-gray-200 mb-3">
 
                 <!-- Mood Tracking -->
-                <div class="mb-5">
-                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-smile text-health-pink mr-2"></i>
+                <div class="mb-3">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                        <i class="fas fa-smile text-health-pink mr-1.5 text-sm"></i>
                         情绪记录
                     </h3>
                     <div class="flex justify-between">
-                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer">
-                            <div class="text-2xl mb-1">😭</div>
+                        <div class="mood-option p-1.5 rounded-lg text-center cursor-pointer">
+                            <div class="text-xl mb-1">😭</div>
                             <div class="text-xs text-gray-600">很难过</div>
                         </div>
-                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer">
-                            <div class="text-2xl mb-1">😟</div>
+                        <div class="mood-option p-1.5 rounded-lg text-center cursor-pointer">
+                            <div class="text-xl mb-1">😟</div>
                             <div class="text-xs text-gray-600">不开心</div>
                         </div>
-                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer bg-pink-50 border border-pink-200">
-                            <div class="text-2xl mb-1">😐</div>
+                        <div class="mood-option p-1.5 rounded-lg text-center cursor-pointer bg-pink-50 border border-pink-200">
+                            <div class="text-xl mb-1">😐</div>
                             <div class="text-xs text-pink-600 font-medium">一般</div>
                         </div>
-                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer">
-                            <div class="text-2xl mb-1">😊</div>
+                        <div class="mood-option p-1.5 rounded-lg text-center cursor-pointer">
+                            <div class="text-xl mb-1">😊</div>
                             <div class="text-xs text-gray-600">开心</div>
                         </div>
-                        <div class="mood-option p-2 rounded-lg text-center cursor-pointer">
-                            <div class="text-2xl mb-1">😄</div>
+                        <div class="mood-option p-1.5 rounded-lg text-center cursor-pointer">
+                            <div class="text-xl mb-1">😄</div>
                             <div class="text-xs text-gray-600">很开心</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Divider -->
-                <hr class="border-gray-200 mb-5">
+                <hr class="border-gray-200 mb-3">
 
                 <!-- Tags Selection -->
-                <div class="mb-5">
-                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-tags text-health-pink mr-2"></i>
+                <div class="mb-3">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                        <i class="fas fa-tags text-health-pink mr-1.5 text-sm"></i>
                         标签选择
                     </h3>
                     
                     <!-- Tag Container -->
-                    <div class="flex flex-wrap gap-2 mb-3" id="tagContainer">
+                    <div class="flex flex-wrap gap-1.5 mb-2" id="tagContainer">
                         <!-- Preset Tags -->
-                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="规律">
+                        <div class="tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="规律">
                             规律
                         </div>
-                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200 selected" data-tag="正常">
+                        <div class="tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200 selected" data-tag="正常">
                             正常
                         </div>
-                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="疼痛">
+                        <div class="tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="疼痛">
                             疼痛
                         </div>
-                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                        <div class="tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
                             异常
                         </div>
-                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                        <div class="tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="头痛">
                             头痛
                         </div>
-                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                        <div class="tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="腹痛">
                             腹痛
                         </div>
-                         <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                         <div class="tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="疲劳">
                             疲劳
                         </div>
-                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                        <div class="tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="失眠">
                             失眠
                         </div>
-                        <div class="tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="异常">
+                        <div class="tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200" data-tag="情绪低落">
                             情绪低落
                         </div>                       
                         <!-- Add Custom Tag Button -->
-                        <div class="add-tag-btn px-3 py-1.5 bg-health-pink/10 border border-health-pink/30 rounded-full text-sm font-medium text-health-pink cursor-pointer transition-all hover:bg-health-pink/20 flex items-center space-x-1">
+                        <div class="add-tag-btn px-2 py-1 bg-health-pink/10 border border-health-pink/30 rounded-full text-xs font-medium text-health-pink cursor-pointer transition-all hover:bg-health-pink/20 flex items-center space-x-1">
                             <i class="fas fa-plus text-xs"></i>
                             <span>自定义</span>
                         </div>
@@ -467,24 +467,24 @@
                             <input type="text" 
                                    id="newTagInput"
                                    placeholder="输入自定义标签..."
-                                   class="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all text-sm"
+                                   class="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all text-xs"
                                    maxlength="10">
                             <button onclick="addCustomTag()" 
-                                    class="px-3 py-2 bg-health-pink text-white text-sm rounded-lg hover:bg-pink-600 transition-colors">
+                                    class="px-2.5 py-1.5 bg-health-pink text-white text-xs rounded-lg hover:bg-pink-600 transition-colors">
                                 添加
                             </button>
                             <button onclick="cancelCustomTag()" 
-                                    class="px-3 py-2 bg-gray-100 text-gray-600 text-sm rounded-lg hover:bg-gray-200 transition-colors">
+                                    class="px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200 transition-colors">
                                 取消
                             </button>
                         </div>
                     </div>
 
                     <!-- Selected Tags Display -->
-                    <div class="mt-3" id="selectedTagsDisplay">
+                    <div class="mt-2" id="selectedTagsDisplay">
                         <div class="text-xs text-gray-500 mb-1">已选择的标签：</div>
                         <div class="flex flex-wrap gap-1" id="selectedTags">
-                            <span class="selected-tag px-2 py-1 bg-health-pink/10 text-health-pink text-xs rounded-md border border-health-pink/20">
+                            <span class="selected-tag px-1.5 py-0.5 bg-health-pink/10 text-health-pink text-xs rounded-md border border-health-pink/20">
                                 正常
                                 <button onclick="removeSelectedTag(this)" class="ml-1 text-health-pink/60 hover:text-health-pink">
                                     <i class="fas fa-times text-xs"></i>
@@ -495,24 +495,24 @@
                 </div>
 
                 <!-- Divider -->
-                <hr class="border-gray-200 mb-5">
+                <hr class="border-gray-200 mb-3">
 
                 <!-- File Upload Section -->
                 <div>
-                    <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center">
-                        <i class="fas fa-paperclip text-health-pink mr-2"></i>
+                    <h3 class="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                        <i class="fas fa-paperclip text-health-pink mr-1.5 text-sm"></i>
                         附件上传
                     </h3>
                     
                     <!-- Upload Area -->
-                    <div class="upload-area rounded-lg p-4 text-center mb-2" id="uploadArea">
-                        <div class="w-8 h-8 bg-gray-100 rounded-lg mx-auto mb-2 flex items-center justify-center">
-                            <i class="fas fa-cloud-upload-alt text-gray-400 text-sm"></i>
+                    <div class="upload-area rounded-lg p-3 text-center mb-2" id="uploadArea">
+                        <div class="w-6 h-6 bg-gray-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+                            <i class="fas fa-cloud-upload-alt text-gray-400 text-xs"></i>
                         </div>
                         <div class="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽文件</div>
                         <input type="file" id="fileInput" multiple accept="image/*,.pdf,.doc,.docx,.txt" class="hidden">
                         <button onclick="document.getElementById('fileInput').click()" 
-                                class="px-3 py-1.5 bg-health-pink text-white text-xs rounded-md hover:bg-pink-600 transition-colors">
+                                class="px-2.5 py-1.5 bg-health-pink text-white text-xs rounded-md hover:bg-pink-600 transition-colors">
                             选择文件
                         </button>
                     </div>
@@ -523,15 +523,15 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-2 gap-2">
                 <button onclick="goBack()" 
-                        class="py-3 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors">
-                    <i class="fas fa-arrow-left mr-2"></i>
+                        class="py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm">
+                    <i class="fas fa-arrow-left mr-1.5"></i>
                     返回
                 </button>
                 <button onclick="saveRecord()" 
-                        class="py-3 bg-health-pink text-white font-semibold rounded-xl hover:bg-pink-600 transition-colors">
-                    <i class="fas fa-check mr-2"></i>
+                        class="py-2.5 bg-health-pink text-white font-semibold rounded-xl hover:bg-pink-600 transition-colors text-sm">
+                    <i class="fas fa-check mr-1.5"></i>
                     保存记录
                 </button>
             </div>
@@ -652,22 +652,22 @@
 
         function createFilePreview(file) {
             const fileItem = document.createElement('div');
-            fileItem.className = 'file-preview bg-white p-2 rounded-lg border border-gray-200 flex items-center space-x-2';
+            fileItem.className = 'file-preview bg-white p-1.5 rounded-lg border border-gray-200 flex items-center space-x-2';
 
             const isImage = file.type.startsWith('image/');
             const icon = isImage ? 'fa-image' : 'fa-file-alt';
             const iconColor = isImage ? 'text-blue-500' : 'text-gray-500';
 
             fileItem.innerHTML = `
-                <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <i class="fas ${icon} ${iconColor} text-sm"></i>
+                <div class="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fas ${icon} ${iconColor} text-xs"></i>
                 </div>
                 <div class="flex-1 min-w-0">
                     <div class="text-xs font-medium text-gray-900 truncate">${file.name}</div>
                     <div class="text-xs text-gray-500">${formatFileSize(file.size)}</div>
                 </div>
                 <button onclick="removeFile(this)" 
-                        class="w-6 h-6 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors">
+                        class="w-5 h-5 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors">
                     <i class="fas fa-times text-red-500 text-xs"></i>
                 </button>
             `;
@@ -720,7 +720,7 @@
 
         function createSelectedTag(tagName) {
             const tagElement = document.createElement('span');
-            tagElement.className = 'selected-tag px-2 py-1 bg-health-pink/10 text-health-pink text-xs rounded-md border border-health-pink/20';
+            tagElement.className = 'selected-tag px-1.5 py-0.5 bg-health-pink/10 text-health-pink text-xs rounded-md border border-health-pink/20';
             tagElement.innerHTML = `
                 ${tagName}
                 <button onclick="removeSelectedTag(this)" class="ml-1 text-health-pink/60 hover:text-health-pink">
@@ -759,7 +759,7 @@
                 if (!existingTag) {
                     // Create new tag option
                     const newTagOption = document.createElement('div');
-                    newTagOption.className = 'tag-option px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-sm font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200 selected';
+                    newTagOption.className = 'tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200 selected';
                     newTagOption.setAttribute('data-tag', tagName);
                     newTagOption.textContent = tagName;
                     
