@@ -25,6 +25,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { userDB, User as UserType, UserUtils } from '../lib/userDatabase'
+import { HEALTH_CALENDAR_DB_VERSION } from '../lib/dbVersion'
 
 // 简单的类型定义 - 避免复杂的语法
 type StoolStatus = 'normal' | 'difficult' | 'constipation' | 'diarrhea'
@@ -78,17 +79,19 @@ type MyRecordDatabase = {
   deleteRecord(id: string): Promise<void>
 }
 
+// 全局数据库版本号
+const DB_VERSION = 5
+
 // StoolDB 实现类
 class StoolDB implements StoolDatabase {
   private dbName = 'HealthCalendarDB'
-  private version = 5  // 增加版本号以支持新的记录表（与 MyRecordDB 保持一致）
   private db: IDBDatabase | null = null
 
   async ensureInitialized(): Promise<void> {
     if (this.db) return
 
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.version)
+      const request = indexedDB.open(this.dbName, DB_VERSION)
 
       request.onerror = () => {
         console.error('IndexedDB error:', request.error)
@@ -256,14 +259,13 @@ const stoolDB = new StoolDB()
 // MyRecordDB 实现类
 class MyRecordDB implements MyRecordDatabase {
   private dbName = 'HealthCalendarDB'  // 使用与用户数据相同的数据库
-  private version = 5  // 增加版本号以支持新的记录表
   private db: IDBDatabase | null = null
 
   async ensureInitialized(): Promise<void> {
     if (this.db) return
 
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.version)
+      const request = indexedDB.open(this.dbName, DB_VERSION)
 
       request.onerror = () => {
         console.error('MyRecordDB IndexedDB error:', request.error)

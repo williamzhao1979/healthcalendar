@@ -24,6 +24,7 @@ import {
   Droplets
 } from 'lucide-react'
 import { userDB, User as UserType } from '../../lib/userDatabase'
+import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
 
 interface StoolRecord {
   id: string
@@ -47,11 +48,9 @@ interface StoolDatabase {
   getRecord(id: string): Promise<StoolRecord | null>
   getUserRecords(userId: string): Promise<StoolRecord[]>
   deleteRecord(id: string): Promise<void>
-}
-
-class StoolDB implements StoolDatabase {
+}class StoolDB implements StoolDatabase {
   private dbName = 'HealthCalendarDB'  // 使用与用户数据相同的数据库
-  private version = 4  // 增加版本号以支持 createdAt 和 updatedAt 字段
+  private version = HEALTH_CALENDAR_DB_VERSION  // 使用全局版本号
   private db: IDBDatabase | null = null
 
   async ensureInitialized(): Promise<void> {
