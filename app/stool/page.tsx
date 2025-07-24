@@ -25,10 +25,9 @@ import {
 } from 'lucide-react'
 import { userDB, User as UserType } from '../../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
+import { BaseRecord } from '../../type/baserecord'
 
-interface StoolRecord {
-  id: string
-  userId: string
+interface StoolRecord extends BaseRecord {
   date: string
   status: 'normal' | 'difficult' | 'constipation' | 'diarrhea'
   type: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 'unknown'
@@ -37,8 +36,6 @@ interface StoolRecord {
   notes: string
   tags: string[]
   attachments: string[]
-  createdAt: string
-  updatedAt: string
 }
 
 interface StoolDatabase {
@@ -130,7 +127,8 @@ interface StoolDatabase {
       ...record,
       id,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      delFlag: false // 默认未删除标志
     }
 
     return new Promise((resolve, reject) => {
