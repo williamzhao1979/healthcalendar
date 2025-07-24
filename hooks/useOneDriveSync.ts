@@ -36,7 +36,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     isExporting: false,
   })
 
-  // 检查连接状态 - 增强错误容忍度
+  // 检查连接状态 - 增强持久化认证支持
   const checkConnection = useCallback(async () => {
     try {
       await microsoftAuth.initialize()
@@ -45,16 +45,30 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       const userInfo = microsoftAuth.getCurrentUser()
       
       if (isLoggedIn) {
-        // 尝试静默获取令牌
+        console.log('Found existing authentication, attempting to restore session')
+        
+        // 尝试静默获取令牌以验证会话有效性
         const token = await microsoftAuth.getTokenSilently()
         
-        setState(prev => ({
-          ...prev,
-          isAuthenticated: !!token,
-          userInfo: token ? userInfo : null,
-          error: null,
-        }))
+        if (token) {
+          console.log('Authentication session restored successfully')
+          setState(prev => ({
+            ...prev,
+            isAuthenticated: true,
+            userInfo: userInfo,
+            error: null,
+          }))
+        } else {
+          console.log('Authentication session expired, will require re-login')
+          setState(prev => ({
+            ...prev,
+            isAuthenticated: false,
+            userInfo: null,
+            error: null,
+          }))
+        }
       } else {
+        console.log('No existing authentication found')
         setState(prev => ({
           ...prev,
           isAuthenticated: false,
@@ -256,17 +270,36 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     setState(prev => ({ ...prev, error: null }))
   }, [])
 
-  // 组件挂载时进行轻量级检查，不调用可能有问题的初始化
+  // 组件挂载时进行认证状态检查和恢复
   useEffect(() => {
-    // 只在浏览器环境中进行基本检查
-    if (typeof window !== 'undefined') {
-      // 检查基本环境，但不强制初始化MSAL
-      const hasBasicSupport = !!(window.localStorage && window.indexedDB)
-      if (!hasBasicSupport) {
-        console.warn('浏览器缺少基本功能支持，OneDrive同步可能不可用')
+    const initializeAuth = async () => {
+      // 只在浏览器环境中进行检查
+      if (typeof window !== 'undefined') {
+        try {
+          // 检查基本环境，但不强制初始化MSAL
+          const hasBasicSupport = !!(window.localStorage && window.indexedDB)
+          if (!hasBasicSupport) {
+            console.warn('浏览器缺少基本功能支持，OneDrive同步可能不可用')
+            return
+          }
+
+          // 检查是否有保存的认证状态
+          const savedAuthState = localStorage.getItem('healthcalendar_auth_state')
+          if (savedAuthState) {
+            console.log('Found saved auth state, attempting to restore connection')
+            // 延迟执行连接检查，避免阻塞UI
+            setTimeout(() => {
+              checkConnection()
+            }, 500)
+          }
+        } catch (error) {
+          console.warn('Failed to initialize auth check:', error)
+        }
       }
     }
-  }, [])
+
+    initializeAuth()
+  }, [checkConnection])
 
   const actions: OneDriveSyncActions = {
     connect,

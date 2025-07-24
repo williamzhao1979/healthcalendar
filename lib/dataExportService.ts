@@ -125,10 +125,34 @@ export class DataExportService {
     }
 
     const userDirPath = `${this.APP_FOLDER_PATH}/users/${userId}`
-    const dataDirPath = `${this.APP_FOLDER_PATH}`
+    const dataDirPath = `${userDirPath}/data`
 
     try {
-       return dataDirPath
+      // 确保应用根目录存在
+      await microsoftAuth.ensureAppFolder()
+
+      // 检查并创建users目录
+      const usersExists = await this.checkFolderExists(`${this.APP_FOLDER_PATH}/users`)
+      if (!usersExists) {
+        await this.createFolder(this.APP_FOLDER_PATH, 'users')
+        console.log('Created users directory')
+      }
+
+      // 检查并创建用户目录
+      const userExists = await this.checkFolderExists(userDirPath)
+      if (!userExists) {
+        await this.createFolder(`${this.APP_FOLDER_PATH}/users`, userId)
+        console.log(`Created user directory for: ${userId}`)
+      }
+
+      // 检查并创建data目录
+      const dataExists = await this.checkFolderExists(dataDirPath)
+      if (!dataExists) {
+        await this.createFolder(userDirPath, 'data')
+        console.log('Created data directory')
+      }
+
+      return dataDirPath
     } catch (error) {
       console.error('Failed to ensure user directory:', error)
       throw error
