@@ -22,9 +22,13 @@ import {
   User,
   Camera,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react'
 import { userDB, User as UserType, UserUtils } from '../lib/userDatabase'
+import { HEALTH_CALENDAR_DB_VERSION } from '../lib/dbVersion'
+import { BaseRecord } from '../type/baserecord'
+import { useOneDriveSync, formatSyncTime } from '../hooks/useOneDriveSync'
 
 // 简单的类型定义 - 避免复杂的语法
 type StoolStatus = 'normal' | 'difficult' | 'constipation' | 'diarrhea'
@@ -32,9 +36,7 @@ type StoolType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 'unknown'
 type StoolVolume = 'small' | 'medium' | 'large'
 type StoolColor = 'brown' | 'dark' | 'light' | 'yellow' | 'green' | 'black' | 'red'
 
-type StoolRecord = {
-  id: string
-  userId: string
+type StoolRecord = BaseRecord & {
   date: string
   status: StoolStatus
   type: StoolType
@@ -43,8 +45,14 @@ type StoolRecord = {
   notes: string
   tags: string[]
   attachments: string[]
-  createdAt: string
-  updatedAt: string
+}
+
+// MyRecord 类型定义
+type MyRecord = BaseRecord & {
+  dateTime: string
+  content: string
+  tags: string[]
+  attachments: string[]
 }
 
 type StoolDatabase = {
@@ -54,19 +62,33 @@ type StoolDatabase = {
   getRecord(id: string): Promise<StoolRecord | null>
   getUserRecords(userId: string): Promise<StoolRecord[]>
   deleteRecord(id: string): Promise<void>
+  softDeleteRecord(id: string): Promise<void>
 }
+
+// MyRecord 数据库接口
+type MyRecordDatabase = {
+  ensureInitialized(): Promise<void>
+  saveRecord(record: Omit<MyRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string>
+  updateRecord(id: string, record: Partial<MyRecord>): Promise<void>
+  getRecord(id: string): Promise<MyRecord | null>
+  getUserRecords(userId: string): Promise<MyRecord[]>
+  deleteRecord(id: string): Promise<void>
+  softDeleteRecord(id: string): Promise<void>
+}
+
+// 全局数据库版本号
+const DB_VERSION = 5
 
 // StoolDB 实现类
 class StoolDB implements StoolDatabase {
   private dbName = 'HealthCalendarDB'
-  private version = 4  // 增加版本号以支持 createdAt 和 updatedAt 字段
   private db: IDBDatabase | null = null
 
   async ensureInitialized(): Promise<void> {
     if (this.db) return
 
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, this.version)
+      const request = indexedDB.open(this.dbName, DB_VERSION)
 
       request.onerror = () => {
         console.error('IndexedDB error:', request.error)
@@ -97,6 +119,14 @@ class StoolDB implements StoolDatabase {
           store.createIndex('userId', 'userId', { unique: false })
           store.createIndex('date', 'date', { unique: false })
           console.log('Created stoolRecords object store')
+        }
+
+        // 版本 5：添加 myRecords 表
+        if (!db.objectStoreNames.contains('myRecords')) {
+          const store = db.createObjectStore('myRecords', { keyPath: 'id' })
+          store.createIndex('userId', 'userId', { unique: false })
+          store.createIndex('dateTime', 'dateTime', { unique: false })
+          console.log('Created myRecords object store')
         }
 
         // 版本 4：添加 createdAt 和 updatedAt 字段迁移
@@ -137,7 +167,11 @@ class StoolDB implements StoolDatabase {
       const index = store.index('userId')
       const request = index.getAll(userId)
 
-      request.onsuccess = () => resolve(request.result)
+      request.onsuccess = () => {
+        // 过滤掉已删除的记录 (delFlag = true)
+        const records = request.result.filter((record: StoolRecord) => !record.delFlag)
+        resolve(records)
+      }
       request.onerror = () => reject(request.error)
     })
   }
@@ -163,6 +197,7 @@ class StoolDB implements StoolDatabase {
     const fullRecord: StoolRecord = {
       ...record,
       id,
+      delFlag: false, // 初始值为 false
       createdAt: now,
       updatedAt: now
     }
@@ -219,9 +254,244 @@ class StoolDB implements StoolDatabase {
       request.onerror = () => reject(request.error)
     })
   }
+
+  async softDeleteRecord(id: string): Promise<void> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['stoolRecords'], 'readwrite')
+      const store = transaction.objectStore('stoolRecords')
+      const getRequest = store.get(id)
+
+      getRequest.onsuccess = () => {
+        const record = getRequest.result
+        if (!record) {
+          reject(new Error('Record not found'))
+          return
+        }
+
+        // 设置删除标志并更新时间戳
+        const updatedRecord = {
+          ...record,
+          delFlag: true,
+          updatedAt: new Date().toISOString()
+        }
+
+        const putRequest = store.put(updatedRecord)
+        putRequest.onsuccess = () => resolve()
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
 }
 
 const stoolDB = new StoolDB()
+
+// MyRecordDB 实现类
+class MyRecordDB implements MyRecordDatabase {
+  private dbName = 'HealthCalendarDB'  // 使用与用户数据相同的数据库
+  private db: IDBDatabase | null = null
+
+  async ensureInitialized(): Promise<void> {
+    if (this.db) return
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, DB_VERSION)
+
+      request.onerror = () => {
+        console.error('MyRecordDB IndexedDB error:', request.error)
+        reject(request.error)
+      }
+      
+      request.onsuccess = () => {
+        this.db = request.result
+        console.log('MyRecordDB initialized successfully')
+        resolve()
+      }
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        const transaction = (event.target as IDBOpenDBRequest).transaction!
+        const oldVersion = event.oldVersion
+        console.log('MyRecordDB upgrade needed, current stores:', Array.from(db.objectStoreNames))
+        
+        // 确保用户存储存在（与 userDatabase 兼容）
+        if (!db.objectStoreNames.contains('users')) {
+          const userStore = db.createObjectStore('users', { keyPath: 'id' })
+          userStore.createIndex('name', 'name', { unique: false })
+          userStore.createIndex('isActive', 'isActive', { unique: false })
+          console.log('Created users object store in MyRecordDB')
+        }
+        
+        // 确保排便记录存储存在（与 stoolDB 兼容）
+        if (!db.objectStoreNames.contains('stoolRecords')) {
+          const stoolStore = db.createObjectStore('stoolRecords', { keyPath: 'id' })
+          stoolStore.createIndex('userId', 'userId', { unique: false })
+          stoolStore.createIndex('date', 'date', { unique: false })
+          console.log('Created stoolRecords object store in MyRecordDB')
+        }
+        
+        // 创建我的记录存储
+        if (!db.objectStoreNames.contains('myRecords')) {
+          const store = db.createObjectStore('myRecords', { keyPath: 'id' })
+          store.createIndex('userId', 'userId', { unique: false })
+          store.createIndex('dateTime', 'dateTime', { unique: false })
+          console.log('Created myRecords object store')
+        }
+      }
+
+      request.onblocked = () => {
+        console.warn('MyRecordDB IndexedDB upgrade blocked. Please close other tabs with this app.')
+        reject(new Error('Database upgrade blocked'))
+      }
+    })
+  }
+
+  async saveRecord(record: Omit<MyRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    await this.ensureInitialized()
+    
+    const id = Date.now().toString()
+    const now = new Date().toISOString()
+    const fullRecord: MyRecord = {
+      ...record,
+      id,
+      delFlag: false, // 初始值为 false
+      createdAt: now,
+      updatedAt: now
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readwrite')
+      const store = transaction.objectStore('myRecords')
+      const request = store.add(fullRecord)
+
+      request.onsuccess = () => resolve(id)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async updateRecord(id: string, updates: Partial<MyRecord>): Promise<void> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readwrite')
+      const store = transaction.objectStore('myRecords')
+      const getRequest = store.get(id)
+
+      getRequest.onsuccess = () => {
+        const record = getRequest.result
+        if (!record) {
+          reject(new Error('Record not found'))
+          return
+        }
+
+        const updatedRecord = {
+          ...record,
+          ...updates,
+          updatedAt: new Date().toISOString()
+        }
+
+        const putRequest = store.put(updatedRecord)
+        putRequest.onsuccess = () => resolve()
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+
+  async getRecord(id: string): Promise<MyRecord | null> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readonly')
+      const store = transaction.objectStore('myRecords')
+      const request = store.get(id)
+
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async getUserRecords(userId: string): Promise<MyRecord[]> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readonly')
+      const store = transaction.objectStore('myRecords')
+      const index = store.index('userId')
+      const request = index.getAll(userId)
+
+      request.onsuccess = () => {
+        // 过滤掉已删除的记录 (delFlag = true)
+        const records = request.result.filter((record: MyRecord) => !record.delFlag)
+        resolve(records)
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async deleteRecord(id: string): Promise<void> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readwrite')
+      const store = transaction.objectStore('myRecords')
+      const request = store.delete(id)
+
+      request.onsuccess = () => resolve()
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  async softDeleteRecord(id: string): Promise<void> {
+    await this.ensureInitialized()
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['myRecords'], 'readwrite')
+      const store = transaction.objectStore('myRecords')
+      const getRequest = store.get(id)
+
+      getRequest.onsuccess = () => {
+        const record = getRequest.result
+        if (!record) {
+          reject(new Error('Record not found'))
+          return
+        }
+
+        // 设置删除标志并更新时间戳
+        const updatedRecord = {
+          ...record,
+          delFlag: true,
+          updatedAt: new Date().toISOString()
+        }
+
+        const putRequest = store.put(updatedRecord)
+        putRequest.onsuccess = () => resolve()
+        putRequest.onerror = () => reject(putRequest.error)
+      }
+
+      getRequest.onerror = () => reject(getRequest.error)
+    })
+  }
+}
+
+const myRecordDB = new MyRecordDB()
+
+// 通用记录类型（用于显示）
+type DisplayRecord = {
+  id: string
+  type: 'meal' | 'stool' | 'myrecord' | 'personal' | 'physical'
+  date: string
+  originalDate?: string
+  title: string
+  description: string
+  tags: string[]
+  record?: any
+  isUpdated?: boolean
+}
 
 interface HealthCalendarProps {}
 
@@ -459,9 +729,40 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // 添加 stoolRecords 状态
   const [stoolRecords, setStoolRecords] = useState<StoolRecord[]>([])
   
+  // 添加 myRecords 状态
+  const [myRecords, setMyRecords] = useState<MyRecord[]>([])
+  
   // 编辑用户相关状态
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
+
+  // OneDrive同步状态 - 使用错误边界保护
+  const [oneDriveState, oneDriveActions] = (() => {
+    try {
+      return useOneDriveSync()
+    } catch (error) {
+      console.error('OneDrive同步初始化失败:', error)
+      // 返回默认状态，不阻塞主应用
+      return [{
+        isAuthenticated: false,
+        isConnecting: false,
+        lastSyncTime: null,
+        syncStatus: 'idle' as const,
+        error: null,
+        userInfo: null,
+        exportResult: null,
+        isExporting: false,
+      }, {
+        connect: async () => console.warn('OneDrive功能不可用'),
+        disconnect: async () => {},
+        checkConnection: async () => {},
+        startSync: async () => {},
+        exportData: async () => {},
+        exportTable: async () => {},
+        clearError: () => {},
+      }]
+    }
+  })()
 
   useEffect(() => {
     // 初始化用户数据
@@ -577,10 +878,32 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
   }
 
+  // 添加获取我的记录的函数
+  const loadMyRecords = async () => {
+    if (!currentUser) {
+      console.log('loadMyRecords: 没有当前用户')
+      return
+    }
+    
+    try {
+      console.log('loadMyRecords: 开始加载数据，用户ID:', currentUser.id)
+      await myRecordDB.ensureInitialized()
+      const records = await myRecordDB.getUserRecords(currentUser.id)
+      console.log('loadMyRecords: 获取到记录数:', records.length)
+      console.log('loadMyRecords: 记录详情:', records)
+      // 按日期倒序排列
+      records.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+      setMyRecords(records)
+    } catch (error) {
+      console.error('获取我的记录失败:', error)
+    }
+  }
+
   // 当用户变化时重新加载数据
   useEffect(() => {
     if (currentUser) {
       loadStoolRecords()
+      loadMyRecords()
       // 添加测试数据（仅在开发环境中）
       addTestDataIfNeeded()
     }
@@ -608,7 +931,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
             color: 'brown' as const,
             notes: '早上正常排便',
             tags: ['健康状态良好'],
-            attachments: []
+            attachments: [],
+            delFlag: false
           },
           {
             userId: currentUser.id,
@@ -619,7 +943,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
             color: 'light' as const,
             notes: '午后有点软便',
             tags: ['可能吃了过多水果'],
-            attachments: []
+            attachments: [],
+            delFlag: false
           },
           {
             userId: currentUser.id,
@@ -630,7 +955,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
             color: 'brown' as const,
             notes: '正常排便，状态良好',
             tags: [],
-            attachments: []
+            attachments: [],
+            delFlag: false
           }
         ]
         
@@ -675,7 +1001,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         break
       case 'myrecord':
         console.log('选择了我的记录')
-        window.location.href = 'myrecord_page.html'
+        router.push('/myrecord')
         break
     }
   }
@@ -688,6 +1014,35 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const editStoolRecord = (recordId: string) => {
     console.log('编辑排便记录:', recordId)
     router.push(`/stool?edit=${recordId}`)
+  }
+
+  const editMyRecord = (recordId: string) => {
+    console.log('编辑我的记录:', recordId)
+    router.push(`/myrecord?edit=${recordId}`)
+  }
+
+  const deleteStoolRecord = async (recordId: string) => {
+    try {
+      console.log('删除排便记录:', recordId)
+      await stoolDB.softDeleteRecord(recordId)
+      // 重新加载数据
+      await loadStoolRecords()
+      console.log('排便记录已删除')
+    } catch (error) {
+      console.error('删除排便记录失败:', error)
+    }
+  }
+
+  const deleteMyRecord = async (recordId: string) => {
+    try {
+      console.log('删除我的记录:', recordId)
+      await myRecordDB.softDeleteRecord(recordId)
+      // 重新加载数据
+      await loadMyRecords()
+      console.log('我的记录已删除')
+    } catch (error) {
+      console.error('删除我的记录失败:', error)
+    }
   }
 
   // 添加辅助函数
@@ -874,6 +1229,10 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       console.error('更新用户失败:', error)
       alert('更新用户失败，请重试')
     }
+  }
+
+  const syncFromToOneDrive = () => {
+    alert('正在同步数据到OneDrive...')
   }
 
   const exportData = () => {
@@ -1163,7 +1522,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                     {/* 创建混合的记录数据 */}
                     {(() => {
                       // 创建静态记录数据
-                      const staticRecords = [
+                      const staticRecords: DisplayRecord[] = [
                         {
                           id: 'breakfast-1',
                           type: 'meal',
@@ -1207,9 +1566,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                       ]
 
                       // 将排便记录转换为统一格式
-                      const stoolRecordsFormatted = stoolRecords.map(record => ({
+                      const stoolRecordsFormatted: DisplayRecord[] = stoolRecords.map(record => ({
                         id: record.id,
-                        type: 'stool' as const,
+                        type: 'stool',
                         date: record.date,
                         title: '排便记录',
                         description: record.notes || `${getStatusText(record.status)}，${getTypeText(record.type)}`,
@@ -1221,8 +1580,19 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                         record: record
                       }))
 
+                      // 将我的记录转换为统一格式
+                      const myRecordsFormatted: DisplayRecord[] = myRecords.map(record => ({
+                        id: record.id,
+                        type: 'myrecord',
+                        date: record.dateTime,
+                        title: '我的记录',
+                        description: record.content.slice(0, 50) + (record.content.length > 50 ? '...' : ''),
+                        tags: record.tags,
+                        record: record
+                      }))
+
                       // 合并所有记录并按时间排序
-                      const allRecords = [...staticRecords, ...stoolRecordsFormatted]
+                      const allRecords = [...staticRecords, ...stoolRecordsFormatted, ...myRecordsFormatted]
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
                       // 按日期分组
@@ -1246,32 +1616,58 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                           {records.map((record) => (
                             <div key={record.id} className={`timeline-item ${groupIndex > 0 ? 'past-item' : ''}`}>
                               <div className="timeline-time">{formatRecordTime(record.date)}</div>
-                              <div 
-                                className={`record-card rounded-xl p-2.5 shadow-sm ${
-                                  record.type === 'stool' ? 'cursor-pointer hover:shadow-md' : ''
-                                } transition-all`}
-                                onClick={() => record.type === 'stool' && editStoolRecord(record.id)}
-                              >
-                                <div className="flex items-start">
+                              <div className={`record-card rounded-xl p-2.5 shadow-sm transition-all relative`}>
+                                {/* 删除按钮 - 只为可编辑的记录类型显示 */}
+                                {(record.type === 'stool' || record.type === 'myrecord') && (
+                                  <button
+                                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center transition-colors z-10"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (record.type === 'stool') {
+                                        deleteStoolRecord(record.id)
+                                      } else if (record.type === 'myrecord') {
+                                        deleteMyRecord(record.id)
+                                      }
+                                    }}
+                                    title="删除记录"
+                                  >
+                                    <Trash2 className="text-red-500 w-3 h-3" />
+                                  </button>
+                                )}
+                                
+                                <div 
+                                  className={`flex items-start ${
+                                    record.type === 'stool' || record.type === 'myrecord' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
+                                  }`}
+                                  onClick={() => {
+                                    if (record.type === 'stool') {
+                                      editStoolRecord(record.id)
+                                    } else if (record.type === 'myrecord') {
+                                      editMyRecord(record.id)
+                                    }
+                                  }}
+                                >
                                   {/* Icon based on record type */}
                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                                     record.type === 'meal' ? 'bg-orange-100' :
                                     record.type === 'stool' ? 'bg-green-100' :
+                                    record.type === 'myrecord' ? 'bg-blue-100' :
                                     record.type === 'personal' ? 'bg-purple-100' :
                                     record.type === 'physical' ? 'bg-pink-100' : 'bg-gray-100'
                                   }`}>
                                     {record.type === 'meal' && <Utensils className="text-orange-500 w-4 h-4" />}
                                     {record.type === 'stool' && <Sprout className="text-green-500 w-4 h-4" />}
+                                    {record.type === 'myrecord' && <Folder className="text-blue-500 w-4 h-4" />}
                                     {record.type === 'personal' && <Folder className="text-purple-500 w-4 h-4" />}
                                     {record.type === 'physical' && <Heart className="text-pink-500 w-4 h-4" />}
                                   </div>
                                   
-                                  <div className="ml-2 flex-1">
+                                  <div className="ml-2 flex-1 pr-8">
                                     <div className="flex justify-between items-start">
                                       <div className="text-sm font-semibold text-gray-900">
                                         {record.title}
                                       </div>
-                                      {record.type === 'stool' && (
+                                      {(record.type === 'stool' || record.type === 'myrecord') && (
                                         <div className="text-xs text-gray-400">点击编辑</div>
                                       )}
                                     </div>
@@ -1286,7 +1682,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                                             className={`px-1.5 py-0.5 text-xs rounded-md ${
                                               record.type === 'stool' && tagIndex === 0 ? getStatusColor((record as any).record?.status) :
                                               record.type === 'meal' && tagIndex === 0 ? 'bg-orange-100 text-orange-600' :
-                                              record.type === 'personal' ? 'bg-blue-100 text-blue-600' :
+                                              record.type === 'myrecord' ? 'bg-blue-100 text-blue-600' :
+                                              record.type === 'personal' ? 'bg-purple-100 text-purple-600' :
                                               record.type === 'physical' ? 'bg-green-100 text-green-600' :
                                               'bg-gray-100 text-gray-600'
                                             }`}
@@ -1327,9 +1724,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                     {/* 创建按 updatedAt 排序的记录数据 */}
                     {(() => {
                       // 将排便记录转换为统一格式，按 updatedAt 排序
-                      const stoolRecordsFormatted = stoolRecords.map(record => ({
+                      const stoolRecordsFormatted: DisplayRecord[] = stoolRecords.map(record => ({
                         id: record.id,
-                        type: 'stool' as const,
+                        type: 'stool',
                         date: record.updatedAt, // 使用 updatedAt 而不是 date
                         originalDate: record.date, // 保留原始日期用于显示
                         title: '排便记录',
@@ -1343,8 +1740,21 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                         isUpdated: record.updatedAt !== record.createdAt // 判断是否是更新的记录
                       }))
 
+                      // 将我的记录转换为统一格式，按 updatedAt 排序
+                      const myRecordsFormattedByUpdate: DisplayRecord[] = myRecords.map(record => ({
+                        id: record.id,
+                        type: 'myrecord',
+                        date: record.updatedAt,
+                        originalDate: record.dateTime, // 保留原始日期时间用于显示
+                        title: '我的记录',
+                        description: record.content.slice(0, 50) + (record.content.length > 50 ? '...' : ''),
+                        tags: record.tags,
+                        record: record,
+                        isUpdated: record.updatedAt !== record.createdAt
+                      }))
+
                       // 显示所有记录，按 updatedAt 时间排序（最新的在前）
-                      const updatedRecords = stoolRecordsFormatted
+                      const updatedRecords = [...stoolRecordsFormatted, ...myRecordsFormattedByUpdate]
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
                       if (updatedRecords.length === 0) {
@@ -1380,21 +1790,45 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                           {records.map((record) => (
                             <div key={record.id} className={`timeline-item ${groupIndex > 0 ? 'past-item' : ''}`}>
                               <div className="timeline-time">{formatRecordTime(record.date)}</div>
-                              <div 
-                                className={`record-card rounded-xl p-2.5 shadow-sm ${
-                                  record.type === 'stool' ? 'cursor-pointer hover:shadow-md' : ''
-                                } transition-all`}
-                                onClick={() => record.type === 'stool' && editStoolRecord(record.id)}
-                              >
-                                <div className="flex items-start">
+                              <div className={`record-card rounded-xl p-2.5 shadow-sm transition-all relative`}>
+                                {/* 删除按钮 */}
+                                <button
+                                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center transition-colors z-10"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (record.type === 'stool') {
+                                      deleteStoolRecord(record.id)
+                                    } else if (record.type === 'myrecord') {
+                                      deleteMyRecord(record.id)
+                                    }
+                                  }}
+                                  title="删除记录"
+                                >
+                                  <Trash2 className="text-red-500 w-3 h-3" />
+                                </button>
+                                
+                                <div 
+                                  className={`flex items-start ${
+                                    record.type === 'stool' || record.type === 'myrecord' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
+                                  }`}
+                                  onClick={() => {
+                                    if (record.type === 'stool') {
+                                      editStoolRecord(record.id)
+                                    } else if (record.type === 'myrecord') {
+                                      editMyRecord(record.id)
+                                    }
+                                  }}
+                                >
                                   {/* Icon based on record type */}
                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                    record.type === 'stool' ? 'bg-green-100' : 'bg-gray-100'
+                                    record.type === 'stool' ? 'bg-green-100' : 
+                                    record.type === 'myrecord' ? 'bg-blue-100' : 'bg-gray-100'
                                   }`}>
                                     {record.type === 'stool' && <Sprout className="text-green-500 w-4 h-4" />}
+                                    {record.type === 'myrecord' && <Folder className="text-blue-500 w-4 h-4" />}
                                   </div>
                                   
-                                  <div className="ml-2 flex-1">
+                                  <div className="ml-2 flex-1 pr-8">
                                     <div className="flex justify-between items-start">
                                       <div className="text-sm font-semibold text-gray-900 flex items-center">
                                         {record.title}
@@ -1413,7 +1847,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                                     </div>
                                     {/* 显示原始记录时间和更新时间 */}
                                     <div className="text-xs text-gray-500 mt-1">
-                                      记录时间: {formatRecordTime(record.originalDate)} | 更新时间: {formatRecordTime(record.date)}
+                                      记录时间: {record.originalDate ? formatRecordTime(record.originalDate) : formatRecordTime(record.date)} | 更新时间: {formatRecordTime(record.date)}
                                     </div>
                                     {record.tags.length > 0 && (
                                       <div className="flex items-center space-x-1.5 mt-1.5 flex-wrap gap-1">
@@ -1446,6 +1880,130 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
               {activeTab === 'settings' && (
                 <div className="tab-content">
                   <div className="space-y-4">
+                    {/* Data Management */}
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                      <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
+                        <Database className="text-health-primary mr-2" />
+                        数据管理
+                      </h4>
+
+                      <div className="space-y-3">
+                        {/* <button onClick={syncFromToOneDrive} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center space-x-3">
+                            <Download className="text-blue-500" />
+                            <div className="text-left">
+                              <div className="text-sm font-medium text-gray-900">OneDrive同期</div>
+                              <div className="text-xs text-gray-500">OneDrive同期</div>
+                            </div>
+                          </div>
+                          <ChevronRight className="text-gray-400" />
+                        </button> */}
+                        {/* OneDrive同步 */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 flex items-center">
+                              OneDrive同步
+                              {oneDriveState.isAuthenticated && (
+                                <CheckCircle className="w-3 h-3 text-green-500 ml-1" />
+                              )}
+                              {oneDriveState.error && (
+                                <AlertCircle className="w-3 h-3 text-red-500 ml-1" />
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {oneDriveState.isAuthenticated 
+                                ? `已连接 · 最后同步: ${formatSyncTime(oneDriveState.lastSyncTime)}`
+                                : '自动备份到OneDrive云端'
+                              }
+                            </div>
+                            {oneDriveState.userInfo && (
+                              <div className="text-xs text-health-primary mt-0.5">
+                                {oneDriveState.userInfo.username}
+                              </div>
+                            )}
+                            {oneDriveState.error && (
+                              <div className="text-xs text-red-500 mt-0.5">
+                                {oneDriveState.error}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {oneDriveState.isAuthenticated && (
+                              <button
+                                onClick={() => {
+                                  if (currentUser) {
+                                    oneDriveActions.exportData(currentUser.id)
+                                  }
+                                }}
+                                disabled={oneDriveState.syncStatus === 'syncing' || oneDriveState.isConnecting || oneDriveState.isExporting || !currentUser}
+                                className="px-2 py-1 text-xs text-health-primary hover:bg-health-primary/10 rounded-md transition-colors disabled:opacity-50"
+                              >
+                                {oneDriveState.isExporting ? '导出中...' : oneDriveState.syncStatus === 'syncing' ? '同步中...' : '导出数据'}
+                              </button>
+                            )}
+                            {oneDriveState.isAuthenticated && (
+                              <button
+                                onClick={oneDriveActions.startSync}
+                                disabled={oneDriveState.syncStatus === 'syncing' || oneDriveState.isConnecting || oneDriveState.isExporting}
+                                className="px-2 py-1 text-xs text-health-primary hover:bg-health-primary/10 rounded-md transition-colors disabled:opacity-50"
+                              >
+                                {oneDriveState.syncStatus === 'syncing' ? '同步中...' : '立即同步'}
+                              </button>
+                            )}
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                className="sr-only peer" 
+                                checked={oneDriveState.isAuthenticated}
+                                onChange={async (e) => {
+                                  if (e.target.checked) {
+                                    await oneDriveActions.connect()
+                                  } else {
+                                    await oneDriveActions.disconnect()
+                                  }
+                                }}
+                                disabled={oneDriveState.isConnecting}
+                              />
+                              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary peer-disabled:opacity-50"></div>
+                            </label>
+                          </div>
+                        </div>
+
+                        <button onClick={exportData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center space-x-3">
+                            <Download className="text-blue-500" />
+                            <div className="text-left">
+                              <div className="text-sm font-medium text-gray-900">导出数据</div>
+                              <div className="text-xs text-gray-500">导出所有健康记录</div>
+                            </div>
+                          </div>
+                          <ChevronRight className="text-gray-400" />
+                        </button>
+
+                        <button onClick={importData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center space-x-3">
+                            <Upload className="text-green-500" />
+                            <div className="text-left">
+                              <div className="text-sm font-medium text-gray-900">导入数据</div>
+                              <div className="text-xs text-gray-500">从文件导入健康数据</div>
+                            </div>
+                          </div>
+                          <ChevronRight className="text-gray-400" />
+                        </button>
+
+                        {/* <button onClick={clearData} className="w-full flex items-center justify-between p-3 bg-red-50 rounded-xl hover:bg-red-100 transition-colors">
+                          <div className="flex items-center space-x-3">
+                            <Trash2 className="text-red-500" />
+                            <div className="text-left">
+                              <div className="text-sm font-medium text-red-700">清除数据</div>
+                              <div className="text-xs text-red-500">删除所有健康记录</div>
+                            </div>
+                          </div>
+                          <ChevronRight className="text-red-400" />
+                        </button> */}
+                      </div>
+                    </div>
+                  
                     {/* User Management Section */}
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                       <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
@@ -1587,47 +2145,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                       </div>
                     </div>
 
-                    {/* Data Management */}
-                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-                      <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
-                        <Database className="text-health-primary mr-2" />
-                        数据管理
-                      </h4>
-                      <div className="space-y-3">
-                        <button onClick={exportData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                          <div className="flex items-center space-x-3">
-                            <Download className="text-blue-500" />
-                            <div className="text-left">
-                              <div className="text-sm font-medium text-gray-900">导出数据</div>
-                              <div className="text-xs text-gray-500">导出所有健康记录</div>
-                            </div>
-                          </div>
-                          <ChevronRight className="text-gray-400" />
-                        </button>
 
-                        <button onClick={importData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                          <div className="flex items-center space-x-3">
-                            <Upload className="text-green-500" />
-                            <div className="text-left">
-                              <div className="text-sm font-medium text-gray-900">导入数据</div>
-                              <div className="text-xs text-gray-500">从文件导入健康数据</div>
-                            </div>
-                          </div>
-                          <ChevronRight className="text-gray-400" />
-                        </button>
-
-                        <button onClick={clearData} className="w-full flex items-center justify-between p-3 bg-red-50 rounded-xl hover:bg-red-100 transition-colors">
-                          <div className="flex items-center space-x-3">
-                            <Trash2 className="text-red-500" />
-                            <div className="text-left">
-                              <div className="text-sm font-medium text-red-700">清除数据</div>
-                              <div className="text-xs text-red-500">删除所有健康记录</div>
-                            </div>
-                          </div>
-                          <ChevronRight className="text-red-400" />
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}

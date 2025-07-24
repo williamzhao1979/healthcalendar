@@ -5,11 +5,16 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+    "dev:https": "node server-https.js",
+    "certs": "bash generate-certs.sh",
+    "certs:win": "generate-certs.bat",
     "lint": "next lint",
     "start": "next start"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.16.0",
     "@hookform/resolvers": "^3.9.1",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 const navItems = [
-  { href: "/", label: "首页" },
+  { href: "/devtool", label: "首页" },
   { href: "/about", label: "关于我们" },
   { href: "/services", label: "服务" },
   { href: "/products", label: "产品" },

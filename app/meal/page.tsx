@@ -5,10 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ChevronLeft,
   Calendar,
-  Sprout,
-  BarChart3,
+  Utensils,
   Weight,
-  Palette,
   Edit3,
   Tags,
   Paperclip,
@@ -19,33 +17,36 @@ import {
   Trash2,
   FileImage,
   File,
-  Clock,
-  AlertTriangle,
-  Droplets
+  Sun,
+  Moon,
+  ArrowLeft
 } from 'lucide-react'
 import { userDB, User as UserType } from '../../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
-import { BaseRecord } from '../../type/baserecord'
 
-interface StoolRecord extends BaseRecord {
+interface MealRecord {
+  id: string
+  userId: string
   date: string
-  status: 'normal' | 'difficult' | 'constipation' | 'diarrhea'
-  type: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 'unknown'
-  volume: 'small' | 'medium' | 'large'
-  color: 'brown' | 'dark' | 'light' | 'yellow' | 'green' | 'black' | 'red'
+  mealType: 'breakfast' | 'lunch' | 'dinner'
+  amount: 'very_little' | 'little' | 'moderate' | 'much'
   notes: string
   tags: string[]
   attachments: string[]
+  createdAt: string
+  updatedAt: string
 }
 
-interface StoolDatabase {
+interface MealDatabase {
   ensureInitialized(): Promise<void>
-  saveRecord(record: Omit<StoolRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string>
-  updateRecord(id: string, record: Partial<StoolRecord>): Promise<void>
-  getRecord(id: string): Promise<StoolRecord | null>
-  getUserRecords(userId: string): Promise<StoolRecord[]>
+  saveRecord(record: Omit<MealRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string>
+  updateRecord(id: string, record: Partial<MealRecord>): Promise<void>
+  getRecord(id: string): Promise<MealRecord | null>
+  getUserRecords(userId: string): Promise<MealRecord[]>
   deleteRecord(id: string): Promise<void>
-}class StoolDB implements StoolDatabase {
+}
+
+class MealDB implements MealDatabase {
   private dbName = 'HealthCalendarDB'  // 使用与用户数据相同的数据库
   private version = HEALTH_CALENDAR_DB_VERSION  // 使用全局版本号
   private db: IDBDatabase | null = null
@@ -57,13 +58,13 @@ interface StoolDatabase {
       const request = indexedDB.open(this.dbName, this.version)
 
       request.onerror = () => {
-        console.error('IndexedDB error:', request.error)
+        console.error('MealDB IndexedDB error:', request.error)
         reject(request.error)
       }
       
       request.onsuccess = () => {
         this.db = request.result
-        console.log('StoolDB initialized successfully')
+        console.log('MealDB initialized successfully')
         resolve()
       }
 
@@ -71,7 +72,7 @@ interface StoolDatabase {
         const db = (event.target as IDBOpenDBRequest).result
         const transaction = (event.target as IDBOpenDBRequest).transaction!
         const oldVersion = event.oldVersion
-        console.log('StoolDB upgrade needed, current stores:', Array.from(db.objectStoreNames))
+        console.log('MealDB upgrade needed, current stores:', Array.from(db.objectStoreNames))
         
         // 确保用户存储存在（与 userDatabase 兼容）
         if (!db.objectStoreNames.contains('users')) {
@@ -81,22 +82,22 @@ interface StoolDatabase {
           console.log('Created users object store')
         }
         
-        // 创建排便记录存储
-        if (!db.objectStoreNames.contains('stoolRecords')) {
-          const store = db.createObjectStore('stoolRecords', { keyPath: 'id' })
+        // 创建饮食记录存储
+        if (!db.objectStoreNames.contains('mealRecords')) {
+          const store = db.createObjectStore('mealRecords', { keyPath: 'id' })
           store.createIndex('userId', 'userId', { unique: false })
           store.createIndex('date', 'date', { unique: false })
-          console.log('Created stoolRecords object store')
+          console.log('Created mealRecords object store')
         }
 
         // 版本 4：添加 createdAt 和 updatedAt 字段迁移
-        if (oldVersion < 4 && db.objectStoreNames.contains('stoolRecords')) {
-          const stoolRecordsStore = transaction.objectStore('stoolRecords')
+        if (oldVersion < 4 && db.objectStoreNames.contains('mealRecords')) {
+          const mealRecordsStore = transaction.objectStore('mealRecords')
           
-          // 迁移排便记录数据
-          const stoolRequest = stoolRecordsStore.getAll()
-          stoolRequest.onsuccess = () => {
-            const records = stoolRequest.result
+          // 迁移饮食记录数据
+          const mealRequest = mealRecordsStore.getAll()
+          mealRequest.onsuccess = () => {
+            const records = mealRequest.result
             records.forEach((record: any) => {
               const now = new Date().toISOString()
               if (!record.createdAt) {
@@ -105,35 +106,34 @@ interface StoolDatabase {
               if (!record.updatedAt) {
                 record.updatedAt = record.date || now
               }
-              stoolRecordsStore.put(record)
+              mealRecordsStore.put(record)
             })
           }
         }
       }
 
       request.onblocked = () => {
-        console.warn('IndexedDB upgrade blocked. Please close other tabs with this app.')
+        console.warn('MealDB IndexedDB upgrade blocked. Please close other tabs with this app.')
         reject(new Error('Database upgrade blocked'))
       }
     })
   }
 
-  async saveRecord(record: Omit<StoolRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  async saveRecord(record: Omit<MealRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     await this.ensureInitialized()
     
     const id = Date.now().toString()
     const now = new Date().toISOString()
-    const fullRecord: StoolRecord = {
+    const fullRecord: MealRecord = {
       ...record,
       id,
       createdAt: now,
-      updatedAt: now,
-      delFlag: false // 默认未删除标志
+      updatedAt: now
     }
 
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['stoolRecords'], 'readwrite')
-      const store = transaction.objectStore('stoolRecords')
+      const transaction = this.db!.transaction(['mealRecords'], 'readwrite')
+      const store = transaction.objectStore('mealRecords')
       const request = store.add(fullRecord)
 
       request.onsuccess = () => resolve(id)
@@ -141,12 +141,12 @@ interface StoolDatabase {
     })
   }
 
-  async updateRecord(id: string, updates: Partial<StoolRecord>): Promise<void> {
+  async updateRecord(id: string, updates: Partial<MealRecord>): Promise<void> {
     await this.ensureInitialized()
 
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['stoolRecords'], 'readwrite')
-      const store = transaction.objectStore('stoolRecords')
+      const transaction = this.db!.transaction(['mealRecords'], 'readwrite')
+      const store = transaction.objectStore('mealRecords')
       const getRequest = store.get(id)
 
       getRequest.onsuccess = () => {
@@ -171,12 +171,12 @@ interface StoolDatabase {
     })
   }
 
-  async getRecord(id: string): Promise<StoolRecord | null> {
+  async getRecord(id: string): Promise<MealRecord | null> {
     await this.ensureInitialized()
 
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['stoolRecords'], 'readonly')
-      const store = transaction.objectStore('stoolRecords')
+      const transaction = this.db!.transaction(['mealRecords'], 'readonly')
+      const store = transaction.objectStore('mealRecords')
       const request = store.get(id)
 
       request.onsuccess = () => resolve(request.result || null)
@@ -184,12 +184,12 @@ interface StoolDatabase {
     })
   }
 
-  async getUserRecords(userId: string): Promise<StoolRecord[]> {
+  async getUserRecords(userId: string): Promise<MealRecord[]> {
     await this.ensureInitialized()
 
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['stoolRecords'], 'readonly')
-      const store = transaction.objectStore('stoolRecords')
+      const transaction = this.db!.transaction(['mealRecords'], 'readonly')
+      const store = transaction.objectStore('mealRecords')
       const index = store.index('userId')
       const request = index.getAll(userId)
 
@@ -202,8 +202,8 @@ interface StoolDatabase {
     await this.ensureInitialized()
 
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction(['stoolRecords'], 'readwrite')
-      const store = transaction.objectStore('stoolRecords')
+      const transaction = this.db!.transaction(['mealRecords'], 'readwrite')
+      const store = transaction.objectStore('mealRecords')
       const request = store.delete(id)
 
       request.onsuccess = () => resolve()
@@ -212,7 +212,7 @@ interface StoolDatabase {
   }
 }
 
-const stoolDB = new StoolDB()
+const mealDB = new MealDB()
 
 // 用户切换组件
 const UserSwitcher: React.FC<{
@@ -277,7 +277,7 @@ const UserSwitcher: React.FC<{
   )
 }
 
-function StoolPageContent() {
+function MealPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editId = searchParams.get('edit')
@@ -289,12 +289,10 @@ function StoolPageContent() {
 
   // 表单状态
   const [date, setDate] = useState('')
-  const [status, setStatus] = useState<'normal' | 'difficult' | 'constipation' | 'diarrhea'>('normal')
-  const [type, setType] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 'unknown'>(4)
-  const [volume, setVolume] = useState<'small' | 'medium' | 'large'>('medium')
-  const [color, setColor] = useState<'brown' | 'dark' | 'light' | 'yellow' | 'green' | 'black' | 'red'>('brown')
+  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner'>('breakfast')
+  const [amount, setAmount] = useState<'very_little' | 'little' | 'moderate' | 'much'>('moderate')
   const [notes, setNotes] = useState('')
-  const [tags, setTags] = useState<string[]>(['正常'])
+  const [tags, setTags] = useState<string[]>(['健康', '美味'])
   const [attachments, setAttachments] = useState<string[]>([])
 
   // UI状态
@@ -304,7 +302,7 @@ function StoolPageContent() {
   const [showFullImageModal, setShowFullImageModal] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string>('')
 
-  const presetTags = ['正常', '顺畅', '规律', '健康', '困难', '疼痛', '有粘液', '有血丝', '有未消化食物', '有油脂']
+  const presetTags = ['健康', '美味', '营养', '清淡', '鱼肉', '酒精饮品', '油炸类', '肉类', '素食', '辛辣']
 
   useEffect(() => {
     initializeData()
@@ -333,7 +331,7 @@ function StoolPageContent() {
     try {
       setIsLoading(true)
       await userDB.ensureInitialized()
-      await stoolDB.ensureInitialized()
+      await mealDB.ensureInitialized()
 
       const allUsers = await userDB.getAllUsers()
       const activeUser = await userDB.getActiveUser()
@@ -348,13 +346,11 @@ function StoolPageContent() {
 
       // 如果是编辑模式，加载记录数据
       if (isEditMode && editId) {
-        const record = await stoolDB.getRecord(editId)
+        const record = await mealDB.getRecord(editId)
         if (record) {
           setDate(record.date)
-          setStatus(record.status)
-          setType(record.type)
-          setVolume(record.volume)
-          setColor(record.color)
+          setMealType(record.mealType)
+          setAmount(record.amount)
           setNotes(record.notes)
           setTags(record.tags)
           setAttachments(record.attachments)
@@ -384,20 +380,18 @@ function StoolPageContent() {
       const recordData = {
         userId: currentUser.id,
         date,
-        status,
-        type,
-        volume,
-        color,
+        mealType,
+        amount,
         notes,
         tags,
         attachments
       }
 
       if (isEditMode && editId) {
-        await stoolDB.updateRecord(editId, recordData)
+        await mealDB.updateRecord(editId, recordData)
         alert('记录更新成功！')
       } else {
-        await stoolDB.saveRecord(recordData)
+        await mealDB.saveRecord(recordData)
         alert('记录保存成功！')
       }
 
@@ -486,38 +480,17 @@ function StoolPageContent() {
     setShowFullImageModal(true)
   }
 
-  const statusOptions = [
-    { id: 'normal', label: '正常', desc: '顺畅排便', icon: Check, color: 'green' },
-    { id: 'difficult', label: '困难', desc: '需要用力', icon: AlertTriangle, color: 'yellow' },
-    { id: 'constipation', label: '便秘', desc: '排便困难', icon: Clock, color: 'orange' },
-    { id: 'diarrhea', label: '腹泻', desc: '稀软不成形', icon: Droplets, color: 'red' }
+  const mealTypeOptions = [
+    { id: 'breakfast', label: '早餐', desc: '06:00-10:00', icon: Sun, color: 'orange' },
+    { id: 'lunch', label: '午餐', desc: '11:00-14:00', icon: Sun, color: 'yellow' },
+    { id: 'dinner', label: '晚餐', desc: '17:00-20:00', icon: Moon, color: 'purple' }
   ]
 
-  const stoolTypes = [
-    { id: 1, label: '类型1 - 硬球状', desc: '分离硬球，严重便秘', emoji: '🔴', color: 'red' },
-    { id: 2, label: '类型2 - 块状', desc: '香肠状但凹凸不平', emoji: '🥖', color: 'orange' },
-    { id: 3, label: '类型3 - 有裂痕', desc: '香肠状，表面有裂痕', emoji: '🌭', color: 'yellow' },
-    { id: 4, label: '类型4 - 理想型', desc: '光滑柔软，最理想', emoji: '🍌', color: 'green' },
-    { id: 5, label: '类型5 - 软团块', desc: '柔软团块，边缘清晰', emoji: '🥔', color: 'blue' },
-    { id: 6, label: '类型6 - 糊状', desc: '糊状便，边缘蓬松', emoji: '🍯', color: 'purple' },
-    { id: 7, label: '类型7 - 水状', desc: '完全液体，严重腹泻', emoji: '💧', color: 'red' },
-    { id: 'unknown', label: '不确定', desc: '无法准确判断类型', emoji: '❓', color: 'gray' }
-  ]
-
-  const volumeOptions = [
-    { id: 'small', label: '少量', desc: '较少' },
-    { id: 'medium', label: '适中', desc: '正常量' },
-    { id: 'large', label: '大量', desc: '较多' }
-  ]
-
-  const colorOptions = [
-    { id: 'brown', label: '正常棕色', color: 'bg-amber-600' },
-    { id: 'dark', label: '深棕色', color: 'bg-amber-900' },
-    { id: 'light', label: '浅棕色', color: 'bg-amber-300' },
-    { id: 'yellow', label: '黄色', color: 'bg-yellow-400' },
-    { id: 'green', label: '绿色', color: 'bg-green-500' },
-    { id: 'black', label: '黑色', color: 'bg-gray-800' },
-    { id: 'red', label: '带血红色', color: 'bg-red-500' }
+  const amountOptions = [
+    { id: 'very_little', label: '很少', desc: '25%' },
+    { id: 'little', label: '偏少', desc: '50%' },
+    { id: 'moderate', label: '适中', desc: '75%' },
+    { id: 'much', label: '偏多', desc: '100%' }
   ]
 
   if (isLoading) {
@@ -548,9 +521,9 @@ function StoolPageContent() {
               </button>
               <div>
                 <h1 className="text-base font-bold text-gray-800">
-                  {isEditMode ? '编辑排便记录' : '排便记录'}
+                  {isEditMode ? '编辑饮食记录' : '一日三餐记录'}
                 </h1>
-                <p className="text-xs text-gray-600">记录您的排便健康状况</p>
+                <p className="text-xs text-gray-600">记录您的饮食详情</p>
               </div>
             </div>
 
@@ -586,43 +559,41 @@ function StoolPageContent() {
 
             <hr className="border-gray-200 mb-3" />
 
-            {/* Bowel Movement Status */}
+            {/* Meal Type Selection */}
             <div className="mb-3">
               <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                <Sprout className="text-health-primary mr-1.5 w-4 h-4" />
-                排便状态
+                <Utensils className="text-health-primary mr-1.5 w-4 h-4" />
+                餐次类型
               </h3>
-              <div className="grid grid-cols-4 gap-2">
-                {statusOptions.map((option) => (
+              <div className="grid grid-cols-3 gap-2">
+                {mealTypeOptions.map((option) => (
                   <button
                     key={option.id}
-                    onClick={() => setStatus(option.id as any)}
+                    onClick={() => setMealType(option.id as any)}
                     className={`p-3 rounded-xl border text-center transition-all ${
-                      status === option.id
+                      mealType === option.id
                         ? 'bg-gradient-to-br from-green-500 to-emerald-400 text-white border-green-500 shadow-lg shadow-green-500/30 transform scale-105'
                         : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                     }`}
                   >
                     <div className={`w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center ${
-                      status === option.id 
+                      mealType === option.id 
                         ? 'bg-white/20' 
-                        : option.color === 'green' ? 'bg-green-100' :
-                          option.color === 'yellow' ? 'bg-yellow-100' :
-                          option.color === 'orange' ? 'bg-orange-100' : 'bg-red-100'
+                        : option.color === 'orange' ? 'bg-orange-100' :
+                          option.color === 'yellow' ? 'bg-yellow-100' : 'bg-purple-100'
                     }`}>
                       <option.icon className={`w-4 h-4 ${
-                        status === option.id 
+                        mealType === option.id 
                           ? 'text-white' 
-                          : option.color === 'green' ? 'text-green-500' :
-                            option.color === 'yellow' ? 'text-yellow-500' :
-                            option.color === 'orange' ? 'text-orange-500' : 'text-red-500'
+                          : option.color === 'orange' ? 'text-orange-500' :
+                            option.color === 'yellow' ? 'text-yellow-500' : 'text-purple-500'
                       }`} />
                     </div>
                     <div className={`text-sm font-semibold ${
-                      status === option.id ? 'text-white' : 'text-gray-800'
+                      mealType === option.id ? 'text-white' : 'text-gray-800'
                     }`}>{option.label}</div>
                     <div className={`text-xs mt-0.5 ${
-                      status === option.id ? 'text-white/90' : 'text-gray-500'
+                      mealType === option.id ? 'text-white/90' : 'text-gray-500'
                     }`}>{option.desc}</div>
                   </button>
                 ))}
@@ -631,84 +602,28 @@ function StoolPageContent() {
 
             <hr className="border-gray-200 mb-3" />
 
-            {/* Bristol Stool Chart */}
-            <div className="mb-3">
-              <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                <BarChart3 className="text-health-primary mr-1.5 w-4 h-4" />
-                大便形状 (布里斯托尔分类)
-              </h3>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                {stoolTypes.map((stoolType) => (
-                  <button
-                    key={stoolType.id}
-                    onClick={() => setType(stoolType.id as any)}
-                    className={`p-2 rounded-lg border text-center transition-all ${
-                      type === stoolType.id
-                        ? 'bg-gradient-to-br from-green-500 to-emerald-400 border-green-500 shadow-lg shadow-green-500/30'
-                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className={`w-6 h-6 rounded-lg mx-auto mb-1 flex items-center justify-center ${
-                      type === stoolType.id ? 'bg-white/20' :
-                      stoolType.color === 'green' ? 'bg-green-100' :
-                      stoolType.color === 'red' ? 'bg-red-100' :
-                      stoolType.color === 'orange' ? 'bg-orange-100' :
-                      stoolType.color === 'yellow' ? 'bg-yellow-100' :
-                      stoolType.color === 'blue' ? 'bg-blue-100' :
-                      stoolType.color === 'purple' ? 'bg-purple-100' : 'bg-gray-100'
-                    }`}>
-                      <span className="text-sm">{stoolType.emoji}</span>
-                    </div>
-                    <div className={`text-xs font-semibold ${
-                      type === stoolType.id ? 'text-white' : 'text-gray-800'
-                    }`}>{stoolType.label}</div>
-                    <div className={`text-xs mt-0.5 ${
-                      type === stoolType.id ? 'text-white/90' : 'text-gray-500'
-                    }`}>{stoolType.desc}</div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Bristol Chart Reference */}
-              <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
-                <div className="flex items-center space-x-1.5 mb-1">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                    <div className="w-1 h-1 bg-white rounded-full"></div>
-                  </div>
-                  <span className="text-xs font-medium text-blue-700">布里斯托尔大便分类参考</span>
-                </div>
-                <div className="text-xs text-blue-600 space-y-0.5">
-                  <div><strong>类型 1-2：</strong> 便秘（硬便，排便困难）</div>
-                  <div><strong>类型 3-4：</strong> 正常（理想的大便形状）</div>
-                  <div><strong>类型 5-7：</strong> 腹泻倾向（偏软或液体状）</div>
-                </div>
-              </div>
-            </div>
-
-            <hr className="border-gray-200 mb-3" />
-
-            {/* Bowel Movement Volume */}
+            {/* Food Amount Selection */}
             <div className="mb-3">
               <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
                 <Weight className="text-health-primary mr-1.5 w-4 h-4" />
-                排便量
+                食量选择
               </h3>
-              <div className="grid grid-cols-3 gap-2">
-                {volumeOptions.map((option) => (
+              <div className="grid grid-cols-4 gap-2">
+                {amountOptions.map((option) => (
                   <button
                     key={option.id}
-                    onClick={() => setVolume(option.id as any)}
+                    onClick={() => setAmount(option.id as any)}
                     className={`p-2.5 rounded-lg border text-center transition-all ${
-                      volume === option.id
+                      amount === option.id
                         ? 'bg-gradient-to-br from-green-500 to-emerald-400 border-green-500 shadow-lg shadow-green-500/30'
                         : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                     }`}
                   >
                     <div className={`text-sm font-semibold ${
-                      volume === option.id ? 'text-white' : 'text-gray-800'
+                      amount === option.id ? 'text-white' : 'text-gray-800'
                     }`}>{option.label}</div>
                     <div className={`text-xs mt-0.5 ${
-                      volume === option.id ? 'text-white/90' : 'text-gray-500'
+                      amount === option.id ? 'text-white/90' : 'text-gray-500'
                     }`}>{option.desc}</div>
                   </button>
                 ))}
@@ -717,46 +632,14 @@ function StoolPageContent() {
 
             <hr className="border-gray-200 mb-3" />
 
-            {/* Color Selection */}
-            <div className="mb-3">
-              <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                <Palette className="text-health-primary mr-1.5 w-4 h-4" />
-                颜色
-              </h3>
-              <div className="grid grid-cols-4 gap-1.5">
-                {colorOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => setColor(option.id as any)}
-                    className={`p-1.5 rounded-lg border text-center transition-all ${
-                      color === option.id
-                        ? 'bg-gradient-to-br from-green-500 to-emerald-400 border-green-500 shadow-lg shadow-green-500/30'
-                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className={`w-4 h-4 rounded-full mx-auto mb-1 flex items-center justify-center ${
-                      color === option.id ? 'bg-white/20' : 'bg-amber-100'
-                    }`}>
-                      <div className={`w-2.5 h-2.5 rounded-full ${option.color}`}></div>
-                    </div>
-                    <div className={`text-xs font-semibold ${
-                      color === option.id ? 'text-white' : 'text-gray-800'
-                    }`}>{option.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <hr className="border-gray-200 mb-3" />
-
-            {/* Bowel Description */}
+            {/* Food Description */}
             <div className="mb-3">
               <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
                 <Edit3 className="text-health-primary mr-1.5 w-4 h-4" />
-                排便备注
+                饮食备注
               </h3>
               <textarea
-                placeholder="请描述排便过程，如：是否顺畅、有无腹痛、排便时间长短、感受等..."
+                placeholder="请描述您的饮食内容，如：全麦面包 + 鸡蛋 + 牛奶，口感如何，心情怎样..."
                 rows={2}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -1082,7 +965,7 @@ function StoolPageContent() {
   )
 }
 
-function StoolPageFallback() {
+function MealPageFallback() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="text-gray-600">Loading...</div>
@@ -1090,10 +973,10 @@ function StoolPageFallback() {
   )
 }
 
-export default function StoolPage() {
+export default function MealPage() {
   return (
-    <Suspense fallback={<StoolPageFallback />}>
-      <StoolPageContent />
+    <Suspense fallback={<MealPageFallback />}>
+      <MealPageContent />
     </Suspense>
   )
 }
