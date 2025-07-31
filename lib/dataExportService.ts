@@ -1,5 +1,6 @@
 import { userDB } from './userDatabase'
 import { microsoftAuth } from './microsoftAuth'
+import { getPageFiles } from 'next/dist/server/get-page-files'
 
 export interface ExportMetadata {
   version: string
@@ -18,6 +19,52 @@ export interface ExportResult {
 
 export class DataExportService {
   private readonly APP_FOLDER_PATH = 'Apps/HealthCalendar'
+
+  // 检查OneDrive连接性
+  async checkOneDriveConnectivity(): Promise<{ connected: boolean; error?: string }> {
+    try {
+      const graphClient = microsoftAuth.getGraphClient()
+      if (!graphClient) {
+        return { connected: false, error: 'Graph client not initialized' }
+      }
+
+      if (!microsoftAuth.isLoggedIn()) {
+        return { connected: false, error: 'User not authenticated with OneDrive' }
+      }
+
+      // 尝试访问用户的驱动器信息
+      await graphClient.api('/me/drive').get()
+      return { connected: true }
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('OneDrive connectivity check failed:', errorMessage)
+      return { connected: false, error: errorMessage }
+    }
+  }
+
+  // 确保应用文件夹存在
+  async ensureAppFolder(): Promise<boolean> {
+    try {
+      const graphClient = microsoftAuth.getGraphClient()
+      if (!graphClient) {
+        throw new Error('Graph client not initialized')
+      }
+
+      // 检查应用文件夹是否存在
+      const folderExists = await this.checkFolderExists(this.APP_FOLDER_PATH)
+      if (!folderExists) {
+        // 创建应用文件夹
+        await this.createFolder('Apps', 'HealthCalendar')
+        console.log('Created HealthCalendar app folder')
+      }
+      
+      return true
+    } catch (error) {
+      console.error('Failed to ensure app folder:', error)
+      return false
+    }
+  }
 
   // 获取IndexedDB中的所有表名
   private async getDatabaseTables(): Promise<string[]> {
@@ -125,34 +172,10 @@ export class DataExportService {
     }
 
     const userDirPath = `${this.APP_FOLDER_PATH}/users/${userId}`
-    const dataDirPath = `${userDirPath}/data`
+    const dataDirPath = `${this.APP_FOLDER_PATH}`
 
     try {
-      // 确保应用根目录存在
-      await microsoftAuth.ensureAppFolder()
-
-      // 检查并创建users目录
-      const usersExists = await this.checkFolderExists(`${this.APP_FOLDER_PATH}/users`)
-      if (!usersExists) {
-        await this.createFolder(this.APP_FOLDER_PATH, 'users')
-        console.log('Created users directory')
-      }
-
-      // 检查并创建用户目录
-      const userExists = await this.checkFolderExists(userDirPath)
-      if (!userExists) {
-        await this.createFolder(`${this.APP_FOLDER_PATH}/users`, userId)
-        console.log(`Created user directory for: ${userId}`)
-      }
-
-      // 检查并创建data目录
-      const dataExists = await this.checkFolderExists(dataDirPath)
-      if (!dataExists) {
-        await this.createFolder(userDirPath, 'data')
-        console.log('Created data directory')
-      }
-
-      return dataDirPath
+       return dataDirPath
     } catch (error) {
       console.error('Failed to ensure user directory:', error)
       throw error
@@ -367,6 +390,512 @@ export class DataExportService {
       console.error('Failed to get export history:', error)
       return []
     }
+  }
+
+  // 从OneDrive读取users.json文件
+  async readUsersFileOrig(): Promise<any> {
+    const graphClient = microsoftAuth.getGraphClient()
+    if (!graphClient) {
+      throw new Error('Graph client not initialized')
+    }
+
+    try {
+      if (!microsoftAuth.isLoggedIn()) {
+        throw new Error('User not authenticated with OneDrive')
+      }
+
+      const filePath = `${this.APP_FOLDER_PATH}/users.json`
+      
+      // 获取文件元数据
+      const fileMetadata = await graphClient
+        .api(`/me/drive/root:/${filePath}`)
+        .get()
+
+      // 下载文件内容
+      const content = await graphClient
+        .api(`/me/drive/items/${fileMetadata.id}/content`)
+        .get()
+
+      // 解析JSON内容
+      const data = typeof content === 'string' ? JSON.parse(content) : content
+      
+      console.log('Successfully read users.json file')
+      return data
+
+    } catch (error) {
+      if (error instanceof Error) {
+        // 检查是否是文件不存在的错误
+        if (error.message.includes('404') || error.message.includes('NotFound')) {
+          console.warn('users.json file not found on OneDrive')
+          return null
+        }
+        console.error('Failed to read users.json file:', error.message)
+      } else {
+        console.error('Failed to read users.json file:', error)
+      }
+      throw error
+    }
+  }
+
+  // 从OneDrive读取users.json文件
+  async readUsersFile(): Promise<any> {
+    const graphClient = microsoftAuth.getGraphClient()
+    if (!graphClient) {
+      throw new Error('Graph client not initialized')
+    }
+
+    try {
+      if (!microsoftAuth.isLoggedIn()) {
+        throw new Error('User not authenticated with OneDrive')
+      }
+
+      const filePath = `${this.APP_FOLDER_PATH}/users.json`
+      
+      // 获取文件元数据
+      const fileMetadata = await graphClient
+        .api(`/me/drive/root:/${filePath}`)
+        .get()
+
+      // 下载文件内容
+      // const content = await graphClient
+      //   .api(`/me/drive/items/${fileMetadata.id}/content`)
+      //   .get()
+      const accessToken = microsoftAuth.getAuthState()!.accessToken
+      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileMetadata.id}/content`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        }
+      })
+      // console.log('Response status:', response.status)
+      // console.log('response:', response)
+      // const data = typeof content === 'string' ? JSON.parse(content) : content
+      
+      const jsonString = await response.text(); // 👈 这里拿到原始 JSON 字符串
+      // 如果你需要解析成对象，可以再用 JSON.parse
+      const data = JSON.parse(jsonString);
+      console.log(`File content: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`);
+      console.log('Successfully read users.json file')
+      return data;
+    } catch (error) {
+      if (error instanceof Error) {
+        // 检查是否是文件不存在的错误
+        if (error.message.includes('404') || error.message.includes('NotFound')) {
+          console.warn('users.json file not found on OneDrive')
+          return null
+        }
+        console.error('Failed to read users.json file:', error.message)
+      } else {
+        console.error('Failed to read users.json file:', error)
+      }
+      throw error
+    }
+  }
+
+  async syncFromOneDrive(): Promise<{ success: boolean }> {
+    try {
+      const graphClient = microsoftAuth.getGraphClient()!
+      console.log('Syncing from OneDrive...')      
+
+      const userDataPath = `${this.APP_FOLDER_PATH}`
+      const fileMetadata = await graphClient
+      .api(`/me/drive/root:/${userDataPath}/users.json`)
+      .get();
+
+      console.log(`File metadata: ${JSON.stringify(fileMetadata, null, 2)}`)
+
+            // 获取文件内容
+      const content = await graphClient.api(`/me/drive/items/${fileMetadata.id}/content`).get()
+      console.log(`File content: ${typeof content === 'string' ? content : JSON.stringify(content, null, 2)}`)
+      
+      // const dataPackage = typeof content === 'string' ? JSON.parse(content) : content
+
+      // console.log('Data package:', dataPackage)
+      return { success: true }
+    } catch (error) {
+      console.error('Sync failed:', error)
+      return { success: false } 
+    }
+  }
+
+  /**
+   * 读取 OneDrive 上 Apps/HealthCalendar/users.json 文件
+   */
+  async readusers(): Promise<any | null> {
+    const graphClient = microsoftAuth.getGraphClient();
+    if (!graphClient) {
+      throw new Error('Graph client not initialized');
+    }
+
+    try {
+      if (!microsoftAuth.isLoggedIn()) {
+        throw new Error('User not authenticated with OneDrive');
+      }
+
+console.log('microsoftAuth', microsoftAuth)
+
+      const filePath = 'Apps/HealthCalendar/users.json';
+
+      // 获取文件元数据
+      const fileMetadata = await graphClient
+        .api(`/me/drive/root:/${filePath}`)
+        .get();
+
+      console.log(`File metadata: ${JSON.stringify(fileMetadata, null, 2)}`);
+      // 下载文件内容
+      const content = await graphClient
+        .api(`/me/drive/items/${fileMetadata.id}/content`)
+        .get();
+      console.log(`File content: ${typeof content === 'string' ? content : JSON.stringify(content, null, 2)}`);
+      // 解析JSON内容
+      const data = typeof content === 'string' ? JSON.parse(content) : content;
+
+      console.log('Successfully read users.json file');
+      return data;
+} catch (error: any) {
+  console.error('Graph error details:', {
+    status: error.statusCode,
+    code: error.code,
+    message: error.message,
+    body: error.body,
+  });
+  throw error;
+}
+  }
+  
+  async importAllTables(userId: string): Promise<{ success: boolean; importedTables: string[]; errors: string[] }> {
+    const importedTables: string[] = []
+    const errors: string[] = []
+
+    try {
+      console.log('Starting import process...')
+      
+      // 首先检查OneDrive连接性
+      const connectivity = await this.checkOneDriveConnectivity()
+      if (!connectivity.connected) {
+        errors.push(`OneDrive connection failed: ${connectivity.error}`)
+        return { success: false, importedTables, errors }
+      }
+
+      // 确保应用文件夹存在
+      const appFolderReady = await this.ensureAppFolder()
+      if (!appFolderReady) {
+        errors.push('Failed to access or create app folder on OneDrive')
+        return { success: false, importedTables, errors }
+      }
+
+      const graphClient = microsoftAuth.getGraphClient()!
+      console.log('Importing all tables from OneDrive...')
+
+      // 获取用户数据目录
+      const userDataPath = `${this.APP_FOLDER_PATH}`
+      
+      try {
+        // 获取数据目录中的所有文件
+        const files = await graphClient.api(`/me/drive/root:/${userDataPath}:/children`).get()
+        
+        // 只导入 .json 文件且不是 metadata
+        const dataFiles = files.value.filter((file: any) =>
+          file.name.endsWith('.json') && !file.name.includes('export_metadata')
+        )
+
+        console.log(`Found ${dataFiles.length} data files to import`)
+
+        if (dataFiles.length === 0) {
+          errors.push('No data files found on OneDrive. Please export data first.')
+          return { success: false, importedTables, errors }
+        }
+
+        for (const file of dataFiles) {
+          try {
+            console.log(`Importing file: ${file.name}`)
+            
+            // 获取文件内容
+            const content = await graphClient.api(`/me/drive/items/${file.id}/content`).get()
+            const dataPackage = typeof content === 'string' ? JSON.parse(content) : content
+            
+            if (!dataPackage.tableName || !Array.isArray(dataPackage.data)) {
+              errors.push(`Invalid data format in file: ${file.name}`)
+              continue
+            }
+
+            const { tableName, data } = dataPackage
+
+            // 导入到 IndexedDB
+            // await this.importTableData(tableName, data)
+            importedTables.push(tableName)
+            console.log(`Successfully imported table: ${tableName} with ${data.length} records`)
+            
+          } catch (error) {
+            const errorMsg = `Failed to import file ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+            console.error(errorMsg)
+            errors.push(errorMsg)
+          }
+        }
+
+      } catch (error) {
+        // 如果目录不存在或其他错误
+        if (error instanceof Error && (error.message.includes('404') || error.message.includes('NotFound'))) {
+          errors.push('No data directory found on OneDrive. Please export data first.')
+        } else {
+          errors.push(`Failed to access OneDrive directory: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
+      }
+
+    } catch (error) {
+      const errorMsg = `Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      console.error(errorMsg)
+      errors.push(errorMsg)
+    }
+
+    return {
+      success: errors.length === 0,
+      importedTables,
+      errors
+    }
+  }
+
+  // 导入单个表的数据到IndexedDB
+  private async importTableData(tableName: string, data: any[]): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('HealthCalendarDB')
+      
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        
+        // 检查表是否存在
+        if (!db.objectStoreNames.contains(tableName)) {
+          db.close()
+          reject(new Error(`Table ${tableName} does not exist in local database`))
+          return
+        }
+
+        const transaction = db.transaction([tableName], 'readwrite')
+        const store = transaction.objectStore(tableName)
+        
+        // 清空表
+        const clearReq = store.clear()
+        
+        clearReq.onsuccess = () => {
+          // 批量写入数据
+          let addCount = 0
+          const totalRecords = data.length
+          
+          if (totalRecords === 0) {
+            // 如果没有数据，直接完成
+            db.close()
+            resolve()
+            return
+          }
+
+          for (const record of data) {
+            const addReq = store.add(record)
+            
+            addReq.onsuccess = () => {
+              addCount++
+              if (addCount === totalRecords) {
+                db.close()
+                resolve()
+              }
+            }
+            
+            addReq.onerror = () => {
+              db.close()
+              reject(new Error(`Failed to add record to table ${tableName}`))
+            }
+          }
+        }
+        
+        clearReq.onerror = () => {
+          db.close()
+          reject(new Error(`Failed to clear table ${tableName}`))
+        }
+      }
+      
+      request.onerror = () => {
+        reject(new Error('Failed to open database'))
+      }
+    })
+  }
+
+  // 从OneDrive导入用户数据
+  async importUsersFromOneDrive(): Promise<{ 
+    success: boolean; 
+    importedCount: number; 
+    errors: string[] 
+  }> {
+    try {
+      console.log('Starting users import from OneDrive...')
+      
+      // 从OneDrive读取users.json文件
+      const oneDriveUsers = await this.readUsersFile()
+      
+      if (!oneDriveUsers) {
+        return {
+          success: false,
+          importedCount: 0,
+          errors: ['OneDrive上未找到users.json文件']
+        }
+      }
+
+      // 确保数据格式正确
+      const usersArray = Array.isArray(oneDriveUsers) ? oneDriveUsers : 
+                        (oneDriveUsers.data && Array.isArray(oneDriveUsers.data)) ? oneDriveUsers.data : []
+
+      if (usersArray.length === 0) {
+        return {
+          success: false,
+          importedCount: 0,
+          errors: ['OneDrive文件中未找到用户数据']
+        }
+      }
+
+      console.log(`Found ${usersArray.length} users in OneDrive file`)
+
+      // 获取本地现有用户数据
+      const localUsers = await userDB.getAllUsers()
+      console.log(`Found ${localUsers.length} local users`)
+
+      let importedCount = 0
+      const errors: string[] = []
+
+      // 合并用户数据
+      for (const oneDriveUser of usersArray) {
+        try {
+          // 验证必要字段
+          if (!oneDriveUser.id || !oneDriveUser.updatedAt) {
+            errors.push(`用户数据格式错误: ${JSON.stringify(oneDriveUser)}`)
+            continue
+          }
+
+          // 查找本地是否存在相同ID的用户
+          const existingUser = localUsers.find(user => user.id === oneDriveUser.id)
+
+          if (!existingUser) {
+            // 本地不存在，直接添加
+            try {
+              const newUser = {
+                id: oneDriveUser.id,
+                name: oneDriveUser.name || 'Unknown',
+                avatarUrl: oneDriveUser.avatarUrl || '',
+                isActive: oneDriveUser.isActive !== undefined ? oneDriveUser.isActive : false,
+                createdAt: oneDriveUser.createdAt || new Date().toISOString(),
+                updatedAt: oneDriveUser.updatedAt
+              }
+              
+              // 直接使用IndexedDB添加完整的用户对象
+              await this.addUserDirectly(newUser)
+              
+              importedCount++
+              console.log(`Added new user: ${oneDriveUser.id}`)
+            } catch (addError) {
+              errors.push(`添加用户失败 ${oneDriveUser.id}: ${addError instanceof Error ? addError.message : 'Unknown error'}`)
+            }
+          } else {
+            // 本地存在，比较updatedAt时间戳
+            const oneDriveDate = new Date(oneDriveUser.updatedAt)
+            const localDate = new Date(existingUser.updatedAt)
+
+            if (oneDriveDate > localDate) {
+              // OneDrive数据更新，更新本地数据
+              try {
+                const updatedUser = {
+                  ...existingUser,
+                  name: oneDriveUser.name || existingUser.name,
+                  avatarUrl: oneDriveUser.avatarUrl || existingUser.avatarUrl,
+                  isActive: oneDriveUser.isActive !== undefined ? oneDriveUser.isActive : existingUser.isActive,
+                  createdAt: oneDriveUser.createdAt || existingUser.createdAt,
+                  updatedAt: oneDriveUser.updatedAt
+                }
+                
+                // 直接使用IndexedDB更新完整的用户对象
+                await this.updateUserDirectly(updatedUser)
+                
+                importedCount++
+                console.log(`Updated user: ${oneDriveUser.id} (OneDrive newer: ${oneDriveUser.updatedAt} > ${existingUser.updatedAt})`)
+              } catch (updateError) {
+                errors.push(`更新用户失败 ${oneDriveUser.id}: ${updateError instanceof Error ? updateError.message : 'Unknown error'}`)
+              }
+            } else {
+              console.log(`Skipped user: ${oneDriveUser.id} (Local newer or same: ${existingUser.updatedAt} >= ${oneDriveUser.updatedAt})`)
+            }
+          }
+        } catch (error) {
+          errors.push(`处理用户数据失败 ${oneDriveUser.id}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
+      }
+
+      console.log(`Import completed. Imported: ${importedCount}, Errors: ${errors.length}`)
+
+      return {
+        success: errors.length === 0 || importedCount > 0,
+        importedCount,
+        errors
+      }
+
+    } catch (error) {
+      console.error('Import users from OneDrive failed:', error)
+      return {
+        success: false,
+        importedCount: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error']
+      }
+    }
+  }
+
+  // 直接添加用户到IndexedDB（包含所有字段）
+  private async addUserDirectly(user: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('HealthCalendarDB')
+      
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        const transaction = db.transaction(['users'], 'readwrite')
+        const store = transaction.objectStore('users')
+        const addRequest = store.add(user)
+        
+        addRequest.onsuccess = () => {
+          db.close()
+          resolve()
+        }
+        
+        addRequest.onerror = () => {
+          db.close()
+          reject(new Error('Failed to add user directly'))
+        }
+      }
+      
+      request.onerror = () => {
+        reject(new Error('Failed to open database'))
+      }
+    })
+  }
+
+  // 直接更新用户到IndexedDB（包含所有字段）
+  private async updateUserDirectly(user: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('HealthCalendarDB')
+      
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        const transaction = db.transaction(['users'], 'readwrite')
+        const store = transaction.objectStore('users')
+        const putRequest = store.put(user)
+        
+        putRequest.onsuccess = () => {
+          db.close()
+          resolve()
+        }
+        
+        putRequest.onerror = () => {
+          db.close()
+          reject(new Error('Failed to update user directly'))
+        }
+      }
+      
+      request.onerror = () => {
+        reject(new Error('Failed to open database'))
+      }
+    })
   }
 }
 

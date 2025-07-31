@@ -18,9 +18,10 @@ export interface OneDriveSyncActions {
   connect: () => Promise<void>
   disconnect: () => Promise<void>
   checkConnection: () => Promise<void>
-  startSync: () => Promise<void>
+  startSync: (userId: string) => Promise<void>
   exportData: (userId: string) => Promise<void>
   exportTable: (tableName: string, userId: string) => Promise<void>
+  importUsers: () => Promise<void>
   clearError: () => void
 }
 
@@ -157,26 +158,44 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
   }, [])
 
   // 开始同步
-  const startSync = useCallback(async () => {
+  const startSync = useCallback(async (userId: string) => {
     if (!state.isAuthenticated) {
       setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
       return
     }
-
+      // await dataExportService.syncFromOneDrive()
+      // await dataExportService.readusers()
+      // // 这里可以添加更多的同步逻辑，例如导入数据等
+      // return
     setState(prev => ({ ...prev, syncStatus: 'syncing', error: null }))
     
     try {
-      // TODO: 实现实际的同步逻辑
-      // 这里先模拟同步过程
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // 导入所有表数据
+      const result = await dataExportService.importAllTables(userId)
       
-      setState(prev => ({
-        ...prev,
-        syncStatus: 'success',
-        lastSyncTime: new Date(),
-      }))
-      
-      console.log('Sync completed successfully')
+      if (result.success) {
+        setState(prev => ({
+          ...prev,
+          syncStatus: 'success',
+          lastSyncTime: new Date(),
+        }))
+        
+        console.log(`Sync completed successfully. Imported tables: ${result.importedTables.join(', ')}`)
+      } else {
+        // 部分成功或完全失败
+        const errorMessage = result.errors.length > 0 
+          ? result.errors.join('; ') 
+          : '同步过程中出现未知错误'
+          
+        setState(prev => ({
+          ...prev,
+          syncStatus: result.importedTables.length > 0 ? 'success' : 'error',
+          lastSyncTime: result.importedTables.length > 0 ? new Date() : prev.lastSyncTime,
+          error: result.importedTables.length > 0 ? `部分导入成功，错误: ${errorMessage}` : errorMessage,
+        }))
+        
+        console.warn(`Sync completed with errors. Imported: ${result.importedTables.join(', ')}, Errors: ${result.errors.join(', ')}`)
+      }
     } catch (error) {
       console.error('Sync failed:', error)
       setState(prev => ({
@@ -265,6 +284,54 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
   }, [state.isAuthenticated])
 
+  // 导入用户数据
+  const importUsers = useCallback(async () => {
+    if (!state.isAuthenticated) {
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
+      return
+    }
+
+    setState(prev => ({ 
+      ...prev, 
+      syncStatus: 'syncing', 
+      error: null,
+      exportResult: null 
+    }))
+    
+    try {
+      console.log('Starting users import from OneDrive...')
+      const result = await dataExportService.importUsersFromOneDrive()
+      
+      setState(prev => ({
+        ...prev,
+        syncStatus: result.success ? 'success' : 'error',
+        lastSyncTime: new Date(),
+        error: result.success ? null : result.errors.join(', '),
+        exportResult: result.success ? {
+          success: true,
+          exportedFiles: [`已导入 ${result.importedCount} 个用户记录`],
+          errors: result.errors,
+          metadata: {
+            version: '1.0',
+            exportTime: new Date().toISOString(),
+            userId: 'import',
+            appVersion: '1.0',
+            tables: ['users']
+          }
+        } : null
+      }))
+      
+      console.log('Users import completed:', result)
+    } catch (error) {
+      console.error('Users import failed:', error)
+      setState(prev => ({
+        ...prev,
+        syncStatus: 'error',
+        error: error instanceof Error ? error.message : '用户导入失败',
+      }))
+    }
+  }, [state.isAuthenticated])
+
   // 清除错误
   const clearError = useCallback(() => {
     setState(prev => ({ ...prev, error: null }))
@@ -308,6 +375,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     startSync,
     exportData,
     exportTable,
+    importUsers,
     clearError,
   }
 

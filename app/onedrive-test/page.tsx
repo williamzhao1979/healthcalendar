@@ -369,12 +369,22 @@ export default function OneDriveTestPage() {
           ) : (
             <div className="space-y-3">
               <button
-                onClick={oneDriveActions.startSync}
+                onClick={() => oneDriveActions.startSync(testUserId)}
                 disabled={oneDriveState.syncStatus === 'syncing'}
                 className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-xl transition-colors"
               >
                 {oneDriveState.syncStatus === 'syncing' && <RefreshCw className="w-4 h-4 animate-spin" />}
                 <span>{oneDriveState.syncStatus === 'syncing' ? '同步中...' : '开始同步'}</span>
+              </button>
+              
+              <button
+                onClick={oneDriveActions.importUsers}
+                disabled={oneDriveState.syncStatus === 'syncing'}
+                className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white font-medium rounded-xl transition-colors"
+              >
+                {oneDriveState.syncStatus === 'syncing' && <RefreshCw className="w-4 h-4 animate-spin" />}
+                <Database className="w-4 h-4" />
+                <span>{oneDriveState.syncStatus === 'syncing' ? '导入中...' : '从OneDrive导入用户'}</span>
               </button>
               
               <button

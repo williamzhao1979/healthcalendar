@@ -1,6 +1,14 @@
 import { PublicClientApplication, Configuration, AuthenticationResult, SilentRequest, BrowserCacheLocation } from '@azure/msal-browser'
 import { Client } from '@microsoft/microsoft-graph-client'
 
+
+type AuthState = {
+    timestamp: number;
+    accountId: string;
+    username: string;
+    accessToken: string;
+} 
+
 // 检测是否为移动设备
 const isMobile = () => {
   if (typeof window === 'undefined') return false
@@ -402,11 +410,12 @@ export class MicrosoftAuthService {
   // 保存认证状态到本地存储
   private saveAuthState(accessToken: string, account: any): void {
     try {
-      const authState = {
+      const authState:AuthState = {
         timestamp: Date.now(),
         accountId: account.homeAccountId,
         username: account.username,
-        // 不保存实际令牌，只保存会话信息
+        // 不保存实际令牌，只保存会话信息, why?
+        accessToken: accessToken,
       }
       
       localStorage.setItem('healthcalendar_auth_state', JSON.stringify(authState))
@@ -428,6 +437,20 @@ export class MicrosoftAuthService {
   }
 
   // 检查保存的认证状态是否有效
+  getAuthState(): AuthState | null {
+    try {
+      const savedState = localStorage.getItem('healthcalendar_auth_state')
+      if (!savedState) return null
+
+      const authState: AuthState = JSON.parse(savedState)
+
+      return authState
+    } catch (error) {
+      return null
+    }
+  }
+
+  // 检查保存的认证状态是否有效
   private isAuthStateValid(): boolean {
     try {
       const savedState = localStorage.getItem('healthcalendar_auth_state')
@@ -444,6 +467,7 @@ export class MicrosoftAuthService {
       return false
     }
   }
+
 }
 
 // 单例实例
