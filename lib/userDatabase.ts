@@ -17,6 +17,7 @@ class UserDatabase {
 
   // 确保数据库已初始化
   async ensureInitialized(): Promise<void> {
+    console.log('确保数据库已初始化:', this.dbName, '版本:', this.version, '当前状态:', this.isInitialized);
     if (this.isInitialized) return;
     
     try {
@@ -40,7 +41,7 @@ class UserDatabase {
 
       request.onsuccess = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
-        
+        console.log('数据库打开成功:', db.name, '版本:', db.version);
         // 验证对象存储是否存在
         if (!db.objectStoreNames.contains(this.storeName)) {
           // 如果对象存储不存在，关闭当前连接并强制升级
@@ -50,6 +51,7 @@ class UserDatabase {
           upgradeRequest.onupgradeneeded = (upgradeEvent) => {
             const upgradeDB = (upgradeEvent.target as IDBOpenDBRequest).result;
             if (!upgradeDB.objectStoreNames.contains(this.storeName)) {
+              console.log('创建用户存储表:', this.storeName);
               const store = upgradeDB.createObjectStore(this.storeName, { keyPath: 'id' });
               store.createIndex('name', 'name', { unique: false });
               store.createIndex('isActive', 'isActive', { unique: false });

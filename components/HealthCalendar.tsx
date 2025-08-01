@@ -29,6 +29,8 @@ import { userDB, User as UserType, UserUtils } from '../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../lib/dbVersion'
 import { BaseRecord } from '../type/baserecord'
 import { useOneDriveSync, formatSyncTime } from '../hooks/useOneDriveSync'
+import { adminService } from '@/lib/adminService'
+import { set } from 'react-hook-form'
 
 // 简单的类型定义 - 避免复杂的语法
 type StoolStatus = 'normal' | 'difficult' | 'constipation' | 'diarrhea'
@@ -725,7 +727,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const [users, setUsers] = useState<UserType[]>([])
   const [currentUser, setCurrentUser] = useState<UserType | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  
+
+
   // 添加 stoolRecords 状态
   const [stoolRecords, setStoolRecords] = useState<StoolRecord[]>([])
   
@@ -735,6 +738,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // 编辑用户相关状态
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
+  const [oneDriveStateV2, oneDriveActionsV2] = useOneDriveSync()
 
   // OneDrive同步状态 - 使用错误边界保护
   const [oneDriveState, oneDriveActions] = (() => {
@@ -756,7 +760,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         connect: async () => console.warn('OneDrive功能不可用'),
         disconnect: async () => {},
         checkConnection: async () => {},
-        startSync: async () => {},
+        startSync: async (_userId: string) => {},
         exportData: async () => {},
         exportTable: async () => {},
         clearError: () => {},
@@ -804,43 +808,25 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       setIsLoading(true)
       
       // 首先确保数据库完全初始化
-      await userDB.ensureInitialized()
-      await stoolDB.ensureInitialized()
+      console.log('初始化用户数据...')
+      // await userDB.ensureInitialized()
+      // console.log('初始化 stoolDB...')
+      // await stoolDB.ensureInitialized()
       
-      // 初始化默认用户（如果没有用户）
-      const defaultUser = await userDB.initializeDefaultUser()
       // 获取所有用户
-      const allUsers = await userDB.getAllUsers()
+      const allUsers = await adminService.getAllUsers()
+
+      // 初始化默认用户（如果没有用户）
+      // const defaultUser = await userDB.initializeDefaultUser()
+      const defaultUser = await adminService.getDefaultUser()
+
       // 获取当前当前用户
-      const activeUser = await userDB.getActiveUser()
-      
+      // const activeUser = await userDB.getActiveUser()
+        
       setUsers(allUsers)
-      setCurrentUser(activeUser || defaultUser)
+      setCurrentUser(await adminService.getCurrentUser() || defaultUser)
     } catch (error) {
       console.error('初始化用户数据失败:', error)
-      
-      // 如果是数据库访问错误，尝试清理并重试
-      if (error instanceof Error && error.message.includes('object stores')) {
-        console.log('尝试重置数据库并重试...')
-        try {
-          // 删除旧数据库
-          const deleteRequest = indexedDB.deleteDatabase('HealthCalendarDB')
-          deleteRequest.onsuccess = async () => {
-            console.log('数据库已重置，正在重新初始化...')
-            // 重新初始化
-            await userDB.ensureInitialized()
-            await stoolDB.ensureInitialized()
-            const defaultUser = await userDB.initializeDefaultUser()
-            const allUsers = await userDB.getAllUsers()
-            const activeUser = await userDB.getActiveUser()
-            
-            setUsers(allUsers)
-            setCurrentUser(activeUser || defaultUser)
-          }
-        } catch (retryError) {
-          console.error('重试失败:', retryError)
-        }
-      }
     } finally {
       setIsLoading(false)
     }
@@ -848,10 +834,12 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const refreshUsers = async () => {
     try {
-      const allUsers = await userDB.getAllUsers()
-      const activeUser = await userDB.getActiveUser()
-      setUsers(allUsers)
-      setCurrentUser(activeUser)
+      // const allUsers = await userDB.getAllUsers()
+      // const activeUser = await userDB.getActiveUser()
+      // setUsers(allUsers)
+      // setCurrentUser(activeUser)
+      initializeUsers()
+      
     } catch (error) {
       console.error('刷新用户数据失败:', error)
     }
@@ -866,8 +854,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     
     try {
       console.log('loadStoolRecords: 开始加载数据，用户ID:', currentUser.id)
-      await stoolDB.ensureInitialized()
-      const records = await stoolDB.getUserRecords(currentUser.id)
+      // await stoolDB.ensureInitialized()
+      // const records = await stoolDB.getUserRecords(currentUser.id)
+      const records = await adminService.getUserRecords('stoolRecords', currentUser.id)
       console.log('loadStoolRecords: 获取到记录数:', records.length)
       console.log('loadStoolRecords: 记录详情:', records)
       // 按日期倒序排列
@@ -887,8 +876,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     
     try {
       console.log('loadMyRecords: 开始加载数据，用户ID:', currentUser.id)
-      await myRecordDB.ensureInitialized()
-      const records = await myRecordDB.getUserRecords(currentUser.id)
+      // await myRecordDB.ensureInitialized()
+      // const records = await myRecordDB.getUserRecords(currentUser.id)
+      const records = await adminService.getUserRecords('myRecords', currentUser.id)
       console.log('loadMyRecords: 获取到记录数:', records.length)
       console.log('loadMyRecords: 记录详情:', records)
       // 按日期倒序排列
@@ -905,7 +895,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       loadStoolRecords()
       loadMyRecords()
       // 添加测试数据（仅在开发环境中）
-      addTestDataIfNeeded()
+      // addTestDataIfNeeded()
     }
   }, [currentUser])
 
@@ -1035,8 +1025,10 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const deleteMyRecord = async (recordId: string) => {
     try {
+      if (!confirm('确定要删除此记录吗？')) return
       console.log('删除我的记录:', recordId)
-      await myRecordDB.softDeleteRecord(recordId)
+      // await myRecordDB.softDeleteRecord(recordId)
+      await adminService.softDeleteMyRecord(recordId)
       // 重新加载数据
       await loadMyRecords()
       console.log('我的记录已删除')
@@ -1113,7 +1105,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       }
 
       // 检查用户名是否已存在
-      const existingUsers = await userDB.getAllUsers()
+      // const existingUsers = await userDB.getAllUsers()
+      const existingUsers = await adminService.getAllUsers()
       const nameExists = existingUsers.some(user => user.name.toLowerCase() === userName.toLowerCase())
       
       if (nameExists) {
@@ -1122,7 +1115,13 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       }
 
       // 添加新用户
-      const newUser = await userDB.addUser({
+      // const newUser = await userDB.addUser({
+      //   name: userName,
+      //   avatarUrl,
+      //   isActive: false // 新用户默认不激活
+      // })
+
+      const newUser = await adminService.saveUser({
         name: userName,
         avatarUrl,
         isActive: false // 新用户默认不激活
@@ -1142,17 +1141,21 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const switchUser = async (userId: string) => {
     try {
-      await userDB.setActiveUser(userId)
-      await refreshUsers()
-      // 刷新用户后会通过 useEffect 自动重新加载 stool records
+      // await userDB.setActiveUser(userId)
+      await adminService.setCurrentUser(userId)
+      setCurrentUser(users.find(u => u.id === userId) || null)
       console.log('已切换用户:', userId)
+      // 刷新用户后会通过 useEffect 自动重新加载 stool records
+      await refreshUsers()
+
+
     } catch (error) {
       console.error('切换用户失败:', error)
       alert('切换用户失败，请重试')
     }
   }
 
-  const deleteUser = async (userId: string) => {
+  const deleteUserOrig = async (userId: string) => {
     try {
       const user = users.find(u => u.id === userId)
       if (!user) return
@@ -1162,7 +1165,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         return
       }
 
-      if (confirm(`确定要删除用户 "${user.name}" 吗？此操作不可恢复！`)) {
+      if (confirm(`确定要删除用户 "${user.name}" 吗？`)) {
         await userDB.deleteUser(userId)
         
         // 如果删除的是当前当前用户，则激活第一个剩余用户
@@ -1182,6 +1185,32 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
   }
 
+  const deleteUser = async (userId: string) => {
+    try {
+      const user = users.find(u => u.id === userId)
+      if (!user) return
+
+      if (users.length <= 1) {
+        alert('至少需要保留一个用户')
+        return
+      }
+
+      if (confirm(`确定要删除用户 "${user.name}" 吗？`)) {
+
+        await adminService.updateUser(userId, {
+          ...user,
+          delFlag: true
+        })
+        
+        await refreshUsers();
+        console.log('用户已删除:', userId)
+      }
+    } catch (error) {
+      console.error('删除用户失败:', error)
+      alert('删除用户失败，请重试')
+    }
+  }
+
   const editUser = (user: UserType) => {
     setEditingUser(user)
     setIsEditUserModalOpen(true)
@@ -1192,29 +1221,31 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     setEditingUser(null)
   }
 
-  const handleEditUser = async (userName: string, avatarUrl: string) => {
+  const handleEditUser = async (userId: string, userName: string, avatarUrl: string) => {
     if (!editingUser) return
 
     try {
       // 验证用户名
-      if (!UserUtils.isValidUserName(userName)) {
-        alert('用户名长度应在1-20个字符之间')
-        return
-      }
+      // if (!UserUtils.isValidUserName(userName)) {
+      //   alert('用户名长度应在1-20个字符之间')
+      //   return
+      // }
 
       // 检查用户名是否已存在（排除当前编辑的用户）
-      const existingUsers = await userDB.getAllUsers()
-      const nameExists = existingUsers.some(user => 
-        user.name.toLowerCase() === userName.toLowerCase() && user.id !== editingUser.id
-      )
+      // const existingUsers = await userDB.getAllUsers()
+      // const nameExists = existingUsers.some(user => 
+      //   user.name.toLowerCase() === userName.toLowerCase() && user.id !== editingUser.id
+      // )
       
-      if (nameExists) {
-        alert('用户名已存在，请选择其他名称')
-        return
-      }
+      // if (nameExists) {
+      //   alert('用户名已存在，请选择其他名称')
+      //   return
+      // }
 
+      console.log('正在更新用户信息:', editingUser)
       // 更新用户信息
-      await userDB.updateUser(editingUser.id, {
+      await adminService.updateUser(editingUser.id, {
+        ...editingUser,
         name: userName,
         avatarUrl
       })
@@ -1257,6 +1288,17 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       alert('数据已清除！')
     }
   }
+
+const syncData = async () => {
+  try {
+    console.log('开始同步 OneDrive 数据...')
+    oneDriveActionsV2.syncIDBOneDrive();
+    oneDriveActionsV2.syncIDBOneDriveMyRecords();
+    // setUsersOneDrive(JSON.stringify(usersFileOneDrive, null, 2));
+  } catch (err) {
+    console.log('syncData失败: ' + (err as Error).message)
+  }
+}
 
   return (
     <div className="overflow-x-hidden">
@@ -1325,7 +1367,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
                         {/* Other Users */}
                         <div className="max-h-32 overflow-y-auto">
-                          {users.filter(user => !user.isActive).map((user) => (
+                          {users.filter(user => user.id !== currentUser.id).map((user) => (
                             <button
                               key={user.id}
                               onClick={() => {
@@ -1912,7 +1954,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                             </div>
                             <div className="text-xs text-gray-500">
                               {oneDriveState.isAuthenticated 
-                                ? `已连接 · 最后同步: ${formatSyncTime(oneDriveState.lastSyncTime)}`
+                                ? `已连接 · 最后同步: ${formatSyncTime(oneDriveStateV2.lastSyncTime)}`
                                 : '自动备份到OneDrive云端'
                               }
                             </div>
@@ -1928,7 +1970,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                             )}
                           </div>
                           <div className="flex items-center space-x-2">
-                            {oneDriveState.isAuthenticated && (
+                            {/* {oneDriveState.isAuthenticated && (
                               <button
                                 onClick={() => {
                                   if (currentUser) {
@@ -1940,16 +1982,16 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                               >
                                 {oneDriveState.isExporting ? '导出中...' : oneDriveState.syncStatus === 'syncing' ? '同步中...' : '导出数据'}
                               </button>
-                            )}
-                            {oneDriveState.isAuthenticated && (
+                            )} */}
+                            {/* {oneDriveState.isAuthenticated && (
                               <button
-                                onClick={oneDriveActions.startSync}
-                                disabled={oneDriveState.syncStatus === 'syncing' || oneDriveState.isConnecting || oneDriveState.isExporting}
+                                onClick={() => currentUser && oneDriveActions.startSync(currentUser.id)}
+                                disabled={!currentUser || oneDriveState.syncStatus === 'syncing' || oneDriveState.isConnecting || oneDriveState.isExporting}
                                 className="px-2 py-1 text-xs text-health-primary hover:bg-health-primary/10 rounded-md transition-colors disabled:opacity-50"
                               >
                                 {oneDriveState.syncStatus === 'syncing' ? '同步中...' : '立即同步'}
                               </button>
-                            )}
+                            )} */}
                             <label className="relative inline-flex items-center cursor-pointer">
                               <input 
                                 type="checkbox" 
@@ -1968,6 +2010,17 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                             </label>
                           </div>
                         </div>
+
+                        <button onClick={syncData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center space-x-3">
+                            <Download className="text-blue-500" />
+                            <div className="text-left">
+                              <div className="text-sm font-medium text-gray-900">立即同步</div>
+                              <div className="text-xs text-gray-500">立即同步</div>
+                            </div>
+                          </div>
+                          <ChevronRight className="text-gray-400" />
+                        </button>
 
                         <button onClick={exportData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
@@ -2058,7 +2111,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                  {!user.isActive && (
+                                  {!(user.id === currentUser.id) && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
@@ -2069,7 +2122,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                                       切换
                                     </button>
                                   )}
-                                  {user.isActive && (
+                                  {user.id === currentUser.id && (
                                     <span className="px-2 py-1 bg-health-primary/10 text-health-primary text-xs rounded-md">
                                       当前
                                     </span>
@@ -2141,6 +2194,21 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                             <input type="checkbox" className="sr-only peer" />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary"></div>
                           </label>
+                        </div>
+
+                        {/* Admin Panel */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">管理面板</div>
+                            <div className="text-xs text-gray-500">数据库管理工具</div>
+                          </div>
+                          <button
+                            onClick={() => window.open('/admin', '_blank')}
+                            className="px-3 py-1.5 text-xs font-medium text-health-primary hover:text-health-primary/80 bg-health-primary/10 hover:bg-health-primary/20 rounded-lg transition-colors flex items-center gap-1"
+                          >
+                            <Database className="w-3 h-3" />
+                            打开
+                          </button>
                         </div>
                       </div>
                     </div>

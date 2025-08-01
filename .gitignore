@@ -30,3 +30,7 @@ next-env.d.ts
 
 test-database.js
 public/health_calendar copy.html
+
+lib/dataExportService - *
+lib/adminService copy.ts
+CLAUDE.md

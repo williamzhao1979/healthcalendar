@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { userDB, User as UserType } from '../../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
+import { adminService } from '@/lib/adminService'
 
 // 导入数据库类型，避免重复定义
 interface MyRecord {
@@ -419,10 +420,18 @@ function MyRecordPageContent() {
 
   const loadUsers = async () => {
     try {
-      const allUsers = await userDB.getAllUsers()
+      // const allUsers = await userDB.getAllUsers()
+      // setUsers(allUsers)
+      // const activeUser = allUsers.find(user => user.isActive) || allUsers[0]
+      // setCurrentUser(activeUser)
+      // 获取所有用户
+      const allUsers = await adminService.getAllUsers()
+
+      // 初始化默认用户（如果没有用户）
+      const defaultUser = await adminService.getDefaultUser()
+        
       setUsers(allUsers)
-      const activeUser = allUsers.find(user => user.isActive) || allUsers[0]
-      setCurrentUser(activeUser)
+      setCurrentUser(await adminService.getCurrentUser() || defaultUser)
       setLoading(false)
     } catch (error) {
       console.error('Failed to load users:', error)
@@ -439,7 +448,8 @@ function MyRecordPageContent() {
 
   const loadRecordForEdit = async (id: string) => {
     try {
-      const record = await myRecordDB.getRecord(id)
+      // const record = await myRecordDB.getRecord(id)
+      const record = await adminService.getUserRecord('myRecords', currentUser?.id, id)
       if (record) {
         setDateTime(record.dateTime)
         setContent(record.content)
@@ -535,11 +545,13 @@ function MyRecordPageContent() {
       }
 
       if (isEditing && editingId) {
-        await myRecordDB.updateRecord(editingId, recordData)
-        alert('记录已更新！')
+        // await myRecordDB.updateRecord(editingId, recordData)
+        await adminService.updateMyRecord(editingId, recordData)
+        // alert('记录已更新！')
       } else {
-        await myRecordDB.saveRecord(recordData)
-        alert('记录已保存！')
+        // await myRecordDB.saveRecord(recordData)
+        await adminService.saveMyRecord(recordData)
+        // alert('记录已保存！')
       }
 
       // 返回到健康日历页面
