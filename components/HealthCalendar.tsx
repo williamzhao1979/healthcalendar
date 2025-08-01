@@ -738,35 +738,35 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // 编辑用户相关状态
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
-  const [oneDriveStateV2, oneDriveActionsV2] = useOneDriveSync()
+  const [oneDriveState, oneDriveActions] = useOneDriveSync()
 
   // OneDrive同步状态 - 使用错误边界保护
-  const [oneDriveState, oneDriveActions] = (() => {
-    try {
-      return useOneDriveSync()
-    } catch (error) {
-      console.error('OneDrive同步初始化失败:', error)
-      // 返回默认状态，不阻塞主应用
-      return [{
-        isAuthenticated: false,
-        isConnecting: false,
-        lastSyncTime: null,
-        syncStatus: 'idle' as const,
-        error: null,
-        userInfo: null,
-        exportResult: null,
-        isExporting: false,
-      }, {
-        connect: async () => console.warn('OneDrive功能不可用'),
-        disconnect: async () => {},
-        checkConnection: async () => {},
-        startSync: async (_userId: string) => {},
-        exportData: async () => {},
-        exportTable: async () => {},
-        clearError: () => {},
-      }]
-    }
-  })()
+  // const [oneDriveState, oneDriveActions] = (() => {
+  //   try {
+  //     return useOneDriveSync()
+  //   } catch (error) {
+  //     console.error('OneDrive同步初始化失败:', error)
+  //     // 返回默认状态，不阻塞主应用
+  //     return [{
+  //       isAuthenticated: false,
+  //       isConnecting: false,
+  //       lastSyncTime: null,
+  //       syncStatus: 'idle' as const,
+  //       error: null,
+  //       userInfo: null,
+  //       exportResult: null,
+  //       isExporting: false,
+  //     }, {
+  //       connect: async () => console.warn('OneDrive功能不可用'),
+  //       disconnect: async () => {},
+  //       checkConnection: async () => {},
+  //       startSync: async (_userId: string) => {},
+  //       exportData: async () => {},
+  //       exportTable: async () => {},
+  //       clearError: () => {},
+  //     }]
+  //   }
+  // })()
 
   useEffect(() => {
     // 初始化用户数据
@@ -1292,12 +1292,17 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 const syncData = async () => {
   try {
     console.log('开始同步 OneDrive 数据...')
-    oneDriveActionsV2.syncIDBOneDrive();
-    oneDriveActionsV2.syncIDBOneDriveMyRecords();
+    oneDriveActions.syncIDBOneDrive();
+    // oneDriveActions.syncIDBOneDriveMyRecords();
     // setUsersOneDrive(JSON.stringify(usersFileOneDrive, null, 2));
+    initializeUsers();
   } catch (err) {
     console.log('syncData失败: ' + (err as Error).message)
   }
+}
+
+const gotoOneDriveStatus = () => {
+  router.push('/onedrive-test');
 }
 
   return (
@@ -1954,7 +1959,7 @@ const syncData = async () => {
                             </div>
                             <div className="text-xs text-gray-500">
                               {oneDriveState.isAuthenticated 
-                                ? `已连接 · 最后同步: ${formatSyncTime(oneDriveStateV2.lastSyncTime)}`
+                                ? `已连接 · 最后同步: ${formatSyncTime(oneDriveState.lastSyncTime)}`
                                 : '自动备份到OneDrive云端'
                               }
                             </div>
@@ -2000,6 +2005,7 @@ const syncData = async () => {
                                 onChange={async (e) => {
                                   if (e.target.checked) {
                                     await oneDriveActions.connect()
+                                    await oneDriveActions.checkConnection()
                                   } else {
                                     await oneDriveActions.disconnect()
                                   }
@@ -2022,7 +2028,18 @@ const syncData = async () => {
                           <ChevronRight className="text-gray-400" />
                         </button>
 
-                        <button onClick={exportData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                        <button onClick={gotoOneDriveStatus} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center space-x-3">
+                            <Upload className="text-green-500" />
+                            <div className="text-left">
+                              <div className="text-sm font-medium text-gray-900">OneDrive登录状态</div>
+                              <div className="text-xs text-gray-500">OneDrive登录状态确认</div>
+                            </div>
+                          </div>
+                          <ChevronRight className="text-gray-400" />
+                        </button>
+
+                        {/* <button onClick={exportData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
                             <Download className="text-blue-500" />
                             <div className="text-left">
@@ -2031,9 +2048,9 @@ const syncData = async () => {
                             </div>
                           </div>
                           <ChevronRight className="text-gray-400" />
-                        </button>
+                        </button> */}
 
-                        <button onClick={importData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                        {/* <button onClick={importData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
                             <Upload className="text-green-500" />
                             <div className="text-left">
@@ -2042,7 +2059,7 @@ const syncData = async () => {
                             </div>
                           </div>
                           <ChevronRight className="text-gray-400" />
-                        </button>
+                        </button> */}
 
                         {/* <button onClick={clearData} className="w-full flex items-center justify-between p-3 bg-red-50 rounded-xl hover:bg-red-100 transition-colors">
                           <div className="flex items-center space-x-3">

@@ -443,12 +443,19 @@ export class DataExportService {
 
   // 从OneDrive读取users.json文件
   async readUsersFile(): Promise<any> {
-    const graphClient = microsoftAuth.getGraphClient()
-    if (!graphClient) {
-      throw new Error('Graph client not initialized')
-    }
+    //   if (!state.isAuthenticated) {
+    //   console.warn('OneDrive not connected')
+    //   setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
+    //   return
+    // }
 
     try {
+      console.log('Reading users.json file from OneDrive...')
+      const graphClient = microsoftAuth.getGraphClient()!
+      if (!graphClient) {
+        throw new Error('Graph client not initialized')
+      }
+
       if (!microsoftAuth.isLoggedIn()) {
         throw new Error('User not authenticated with OneDrive')
       }
@@ -464,12 +471,26 @@ export class DataExportService {
       // const content = await graphClient
       //   .api(`/me/drive/items/${fileMetadata.id}/content`)
       //   .get()
-      const accessToken = microsoftAuth.getAuthState()!.accessToken
+
+      // const accessToken = microsoftAuth.getAuthState()!.accessToken
+      // const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileMetadata.id}/content`, {
+      //   headers: {
+      //     'Authorization': `Bearer ${accessToken}`,
+      //   }
+      // })
+
+      // 使用更安全的方式获取文件内容
+      const authState = microsoftAuth.getAuthState()
+      if (!authState || !authState.accessToken) {
+        throw new Error('No valid access token available. Please re-authenticate.')
+      }
+      const accessToken = authState.accessToken
       const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileMetadata.id}/content`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         }
       })
+
       // console.log('Response status:', response.status)
       // console.log('response:', response)
       // const data = typeof content === 'string' ? JSON.parse(content) : content
@@ -801,7 +822,7 @@ console.log('microsoftAuth', microsoftAuth)
 
       if (usersArray.length === 0) {
         return {
-          success: false,
+          success: true,
           importedCount: 0,
           errors: ['OneDrive文件中未找到用户数据']
         }
@@ -884,7 +905,8 @@ console.log('microsoftAuth', microsoftAuth)
       console.log(`Import completed. Imported: ${importedCount}, Errors: ${errors.length}`)
 
       return {
-        success: errors.length === 0 || importedCount > 0,
+        // success: errors.length === 0 || importedCount > 0,
+        success: true,
         importedCount,
         errors
       }

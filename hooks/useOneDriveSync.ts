@@ -533,19 +533,20 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
 
     // 检查基本认证状态
-    if (!microsoftAuth.isLoggedIn()) {
-      setState(prev => ({ ...prev, error: '用户未登录OneDrive，请先连接' }))
-      return
-    }
+    // if (!microsoftAuth.isLoggedIn()) {
+    //   setState(prev => ({ ...prev, error: '用户未登录OneDrive，请先连接' }))
+    //   return
+    // }
 
-    setState(prev => ({ 
-      ...prev, 
-      syncStatus: 'syncing', 
-      error: null,
-      exportResult: null 
-    }))
+    // setState(prev => ({ 
+    //   ...prev, 
+    //   syncStatus: 'syncing', 
+    //   error: null,
+    //   exportResult: null 
+    // }))
     
     try {
+      const graphClient = microsoftAuth.getGraphClient()!
       console.log('Starting users import from OneDrive...')
       const result = await dataExportService.importUsersFromOneDrive()
       
@@ -570,7 +571,10 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       
       console.log('Users import completed:', result)
 
-      const exportResult =await dataExportService.exportTable('users', 'dummy')
+      if (result.success) {
+        // 如果导入成功，导出当前用户数据到OneDrive
+        const exportResult = await dataExportService.exportTable('users', 'dummy')
+      }
 
     } catch (error) {
       console.error('Users import failed:', error)
@@ -596,19 +600,20 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
 
     // 检查基本认证状态
-    if (!microsoftAuth.isLoggedIn()) {
-      setState(prev => ({ ...prev, error: '用户未登录OneDrive，请先连接' }))
-      return
-    }
+    // if (!microsoftAuth.isLoggedIn()) {
+    //   setState(prev => ({ ...prev, error: '用户未登录OneDrive，请先连接' }))
+    //   return
+    // }
 
-    setState(prev => ({ 
-      ...prev, 
-      syncStatus: 'syncing', 
-      error: null,
-      exportResult: null 
-    }))
+    // setState(prev => ({ 
+    //   ...prev, 
+    //   syncStatus: 'syncing', 
+    //   error: null,
+    //   exportResult: null 
+    // }))
     
     try {
+      const graphClient = microsoftAuth.getGraphClient()!
       console.log('Starting users import from OneDrive...')
       const result = await dataExportService.importMyRecordsFromOneDrive()
       
