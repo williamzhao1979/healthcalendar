@@ -1013,8 +1013,10 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const deleteStoolRecord = async (recordId: string) => {
     try {
+      if (!confirm('确定要删除此记录吗？')) return
       console.log('删除排便记录:', recordId)
-      await stoolDB.softDeleteRecord(recordId)
+      // await stoolDB.softDeleteRecord(recordId)
+      await adminService.softDeleteStoolRecord(recordId)
       // 重新加载数据
       await loadStoolRecords()
       console.log('排便记录已删除')
@@ -1292,8 +1294,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 const syncData = async () => {
   try {
     console.log('开始同步 OneDrive 数据...')
-    oneDriveActions.syncIDBOneDrive();
+    oneDriveActions.syncIDBOneDriveUsers();
     oneDriveActions.syncIDBOneDriveMyRecords();
+    oneDriveActions.syncIDBOneDriveStoolRecords();
     // setUsersOneDrive(JSON.stringify(usersFileOneDrive, null, 2));
     initializeUsers();
   } catch (err) {
@@ -1557,11 +1560,11 @@ const gotoOneDriveStatus = () => {
               {activeTab === 'recent' && (
                 <div className="tab-content">
                   {/* 调试信息 */}
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mb-3 text-xs">
+                  {/* <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mb-3 text-xs">
                     <div>当前用户: {currentUser?.name || '无'}</div>
                     <div>排便记录数: {stoolRecords.length}</div>
                     <div>加载状态: {isLoading ? '加载中...' : '已完成'}</div>
-                  </div>
+                  </div> */}
                   
                   <div className="timeline-container">
                     <div className="timeline-line"></div>
@@ -1756,14 +1759,14 @@ const gotoOneDriveStatus = () => {
               {activeTab === 'updates' && (
                 <div className="tab-content">
                   {/* 调试信息 */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-3 text-xs">
+                  {/* <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-3 text-xs">
                     <div>当前用户: {currentUser?.name || '无'}</div>
                     <div>排便记录数: {stoolRecords.length}</div>
                     <div>加载状态: {isLoading ? '加载中...' : '已完成'}</div>
                     {stoolRecords.length > 0 && (
                       <div>记录详情: {stoolRecords.map(r => `ID:${r.id.slice(-4)},日期:${r.date.slice(0,10)}`).join(', ')}</div>
                     )}
-                  </div>
+                  </div> */}
                   
                   <div className="timeline-container">
                     <div className="timeline-line"></div>
@@ -2006,6 +2009,7 @@ const gotoOneDriveStatus = () => {
                                   if (e.target.checked) {
                                     await oneDriveActions.connect()
                                     await oneDriveActions.checkConnection()
+                                    await syncData()
                                   } else {
                                     await oneDriveActions.disconnect()
                                   }
@@ -2178,7 +2182,7 @@ const gotoOneDriveStatus = () => {
                       </h4>
                       <div className="space-y-3">
                         {/* Notification Settings */}
-                        <div className="flex items-center justify-between">
+                        {/* <div className="flex items-center justify-between">
                           <div>
                             <div className="text-sm font-medium text-gray-900">推送通知</div>
                             <div className="text-xs text-gray-500">接收记录提醒通知</div>
@@ -2187,10 +2191,10 @@ const gotoOneDriveStatus = () => {
                             <input type="checkbox" className="sr-only peer" defaultChecked />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary"></div>
                           </label>
-                        </div>
+                        </div> */}
 
                         {/* Auto Backup */}
-                        <div className="flex items-center justify-between">
+                        {/* <div className="flex items-center justify-between">
                           <div>
                             <div className="text-sm font-medium text-gray-900">自动备份</div>
                             <div className="text-xs text-gray-500">自动备份健康数据</div>
@@ -2199,7 +2203,7 @@ const gotoOneDriveStatus = () => {
                             <input type="checkbox" className="sr-only peer" defaultChecked />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary"></div>
                           </label>
-                        </div>
+                        </div> */}
 
                         {/* Dark Mode */}
                         <div className="flex items-center justify-between">

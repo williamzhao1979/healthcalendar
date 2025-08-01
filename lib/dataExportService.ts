@@ -1167,6 +1167,192 @@ console.log('microsoftAuth', microsoftAuth)
     })
   }
 
+  // 直接添加用户到IndexedDB（包含所有字段）
+  private async addStoolRecordDirectly(record: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('HealthCalendarDB')
+      
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        const transaction = db.transaction(['stoolRecords'], 'readwrite')
+        const store = transaction.objectStore('stoolRecords')
+        const addRequest = store.add(record)
+        
+        addRequest.onsuccess = () => {
+          // db.close()
+          resolve()
+        }
+        
+        addRequest.onerror = () => {
+          // db.close()
+          console.error('Failed to add MyRecord directly:', addRequest.error)
+          reject(new Error('Failed to add MyRecord directly'))
+        }
+      }
+      
+      request.onerror = () => {
+        console.error('Failed to open database:', request.error)
+        reject(new Error('Failed to open database'))
+      }
+    })
+  }
+
+  // 直接更新用户到IndexedDB（包含所有字段）
+  private async updateStoolRecordDirectly(record: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('HealthCalendarDB')
+      
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        const transaction = db.transaction(['stoolRecords'], 'readwrite')
+        const store = transaction.objectStore('stoolRecords')
+        const putRequest = store.put(record)
+        
+        putRequest.onsuccess = () => {
+          // db.close()
+          // console.log('MyRecord updated successfully:', record.id)
+          resolve()
+        }
+        
+        putRequest.onerror = () => {
+          // db.close()
+          console.error('Failed to update MyRecord directly:', putRequest.error)
+          reject(new Error('Failed to update MyRecord directly'))
+        }
+      }
+      
+      request.onerror = () => {
+        console.error('Failed to open database:', request.error)
+        reject(new Error('Failed to open database'))
+      }
+    })
+  }
+
+  // 从OneDrive导入用户数据
+  async importStoolRecordsFromOneDrive(): Promise<{ 
+    success: boolean; 
+    importedCount: number; 
+    errors: string[] 
+  }> {
+    try {
+      console.log('Starting import StoolRecords from OneDrive...')
+
+      // 从OneDrive读取myRecords.json文件
+      const oneDriveFile = await this.readFile('stoolRecords.json')
+
+      if (!oneDriveFile) {
+        return {
+          success: false,
+          importedCount: 0,
+          errors: ['OneDrive上未找到stoolRecords.json文件']
+        }
+      }
+
+      // 确保数据格式正确
+      const dataArray = (oneDriveFile.data && Array.isArray(oneDriveFile.data)) ? oneDriveFile.data : []
+
+      if (dataArray.length === 0) {
+        return {
+          success: false,
+          importedCount: 0,
+          errors: ['OneDrive文件中未找到用户数据']
+        }
+      }
+
+      console.log(`Found ${dataArray.length} data in OneDrive file`)
+
+      // 获取本地现有用户数据
+      // const localUsers = await userDB.getAllUsers()
+      const localRecords = await adminService.getAllRecordsIDB('stoolRecords')
+      console.log(`Found ${localRecords.length} local recoreds`)
+
+      let importedCount = 0
+      const errors: string[] = []
+
+      // 合并用户数据
+      for (const oneDriveRecord of dataArray) {
+        try {
+          // 验证必要字段
+          // console.log(`Processing record: ${JSON.stringify(oneDriveRecord)}`)
+          console.log(`Processing record: ${oneDriveRecord.id}`)
+          if (!oneDriveRecord.id || !oneDriveRecord.updatedAt) {
+            console.warn(`用户数据格式错误: ${JSON.stringify(oneDriveRecord)}`)
+            errors.push(`用户数据格式错误: ${JSON.stringify(oneDriveRecord)}`)
+            continue
+          }
+
+          // 查找本地是否存在相同ID的用户
+          const existingRecord = localRecords.find(record => record.id === oneDriveRecord.id)
+
+          if (!existingRecord) {
+            console.log(`Processing record: ${oneDriveRecord.id}, existing: ${!!existingRecord}`)
+            // 本地不存在，直接添加
+              const newRecord = {
+                ...oneDriveRecord
+              }
+            try {
+
+              
+              // 直接使用IndexedDB添加完整的用户对象
+              await this.addStoolRecordDirectly(newRecord)
+              
+              importedCount++
+              console.log(`Added new user: ${newRecord.id}`)
+            } catch (addError) {
+              console.error(`添加用户失败 ${newRecord.id}:`, addError)
+              errors.push(`添加失败 ${newRecord.id}: ${addError instanceof Error ? addError.message : 'Unknown error'}`)
+            }
+          } else {
+            // 本地存在，比较updatedAt时间戳
+            console.log(`Processing record: ${oneDriveRecord.id}, existing: ${!!existingRecord}`)
+            const oneDriveDate = new Date(oneDriveRecord.updatedAt)
+            const localDate = new Date(existingRecord.updatedAt)
+
+            if (oneDriveDate > localDate) {
+              // OneDrive数据更新，更新本地数据
+                const updatedRecord = {
+                  ...oneDriveRecord,
+                }
+                
+              try {
+
+                // 直接使用IndexedDB更新完整的用户对象
+                await this.updateStoolRecordDirectly(updatedRecord)
+                
+                importedCount++
+                console.log(`Updated user: ${oneDriveRecord.id} (OneDrive newer: ${oneDriveRecord.updatedAt} > ${existingRecord.updatedAt})`)
+              } catch (updateError) {
+                console.error(`更新用户失败 ${oneDriveRecord.id}:`, updateError)
+                errors.push(`更新用户失败 ${oneDriveRecord.id}: ${updateError instanceof Error ? updateError.message : 'Unknown error'}`)
+              }
+            } else {
+              console.log(`Skipped user: ${oneDriveRecord.id} (Local newer or same: ${existingRecord.updatedAt} >= ${oneDriveRecord.updatedAt})`)
+            }
+          }
+        } catch (error) {
+          console.error(`处理用户数据失败 ${oneDriveRecord.id}:`, error)
+          errors.push(`处理用户数据失败 ${oneDriveRecord.id}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
+      }
+
+      console.log(`Import completed. Imported: ${importedCount}, Errors: ${errors.length}`)
+
+      return {
+        success: errors.length === 0 || importedCount > 0,
+        importedCount,
+        errors
+      }
+
+    } catch (error) {
+      console.error('Import users from OneDrive failed:', error)
+      return {
+        success: false,
+        importedCount: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error']
+      }
+    }
+  }
+
   public mergeRecords = (existing: any[], incoming: any[]): any[] => {
     const merged: { [key: string]: any } = {}
 

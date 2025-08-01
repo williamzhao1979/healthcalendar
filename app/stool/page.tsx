@@ -26,6 +26,7 @@ import {
 import { userDB, User as UserType } from '../../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
 import { BaseRecord } from '../../type/baserecord'
+import { adminService } from '@/lib/adminService'
 
 interface StoolRecord extends BaseRecord {
   date: string
@@ -332,15 +333,17 @@ function StoolPageContent() {
   const initializeData = async () => {
     try {
       setIsLoading(true)
-      await userDB.ensureInitialized()
-      await stoolDB.ensureInitialized()
+      // await userDB.ensureInitialized()
+      // await stoolDB.ensureInitialized()
 
-      const allUsers = await userDB.getAllUsers()
-      const activeUser = await userDB.getActiveUser()
-      
+      // const allUsers = await userDB.getAllUsers()
+      const allUsers = await adminService.getAllUsers()
+      // const activeUser = await userDB.getActiveUser()
+      // 初始化默认用户（如果没有用户）
+      const defaultUser = await adminService.getDefaultUser()
+
       setUsers(allUsers)
-      setCurrentUser(activeUser)
-
+      setCurrentUser(await adminService.getCurrentUser() || defaultUser)
       // 设置默认日期时间
       const now = new Date()
       const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
@@ -348,7 +351,7 @@ function StoolPageContent() {
 
       // 如果是编辑模式，加载记录数据
       if (isEditMode && editId) {
-        const record = await stoolDB.getRecord(editId)
+        const record = await adminService.getUserRecord('stoolRecords', currentUser?.id, editId)
         if (record) {
           setDate(record.date)
           setStatus(record.status)
@@ -394,11 +397,12 @@ function StoolPageContent() {
       }
 
       if (isEditMode && editId) {
-        await stoolDB.updateRecord(editId, recordData)
-        alert('记录更新成功！')
+        await adminService.updateStoolRecord(editId, recordData)
+        // alert('记录更新成功！')
       } else {
-        await stoolDB.saveRecord(recordData)
-        alert('记录保存成功！')
+        // await stoolDB.saveRecord(recordData)
+        await adminService.saveStoolRecord(recordData)
+        // alert('记录保存成功！')
       }
 
       router.push('/health-calendar')

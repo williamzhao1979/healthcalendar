@@ -526,7 +526,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
   }, [checkConnection])
 
   // 导入用户数据
-  const syncIDBOneDrive = useCallback(async () => {
+  const syncIDBOneDriveUsers = useCallback(async () => {
     if (!state.isAuthenticated) {
       setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
       return
@@ -657,6 +657,58 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
   }, [state.isAuthenticated])
 
+    // 导入用户数据
+  const syncIDBOneDriveStoolRecords = useCallback(async () => {
+    if (!state.isAuthenticated) {
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
+      return
+    }
+
+    try {
+      const graphClient = microsoftAuth.getGraphClient()!
+      console.log('Starting users import from OneDrive...')
+      const result = await dataExportService.importStoolRecordsFromOneDrive()
+      
+      setState(prev => ({
+        ...prev,
+        syncStatus: result.success ? 'success' : 'error',
+        lastSyncTime: new Date(),
+        error: result.success ? null : result.errors.join(', '),
+        exportResult: result.success ? {
+          success: true,
+          exportedFiles: [`已导入 ${result.importedCount} 个用户记录`],
+          errors: result.errors,
+          metadata: {
+            version: '1.0',
+            exportTime: new Date().toISOString(),
+            userId: 'import',
+            appVersion: '1.0',
+            tables: ['users']
+          }
+        } : null
+      }))
+      
+      // console.log('Users import completed:', result)
+      if (result.success) {
+        const exportResult = await dataExportService.exportTable('stoolRecords', 'dummy')
+      }
+
+    } catch (error) {
+      console.error('StoolRecords import failed:', error)
+
+      let errorMessage = 'StoolRecords导入失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
+      setState(prev => ({
+        ...prev,
+        syncStatus: 'error',
+        error: errorMessage,
+      }))
+    }
+  }, [state.isAuthenticated])
+
   const actions: OneDriveSyncActions = {
     connect,
     disconnect,
@@ -668,8 +720,9 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     clearError,
     loadFiles,
     loadFileContent,
-    syncIDBOneDrive,
+    syncIDBOneDriveUsers,
     syncIDBOneDriveMyRecords,
+    syncIDBOneDriveStoolRecords,
   }
 
   return [state, actions]
