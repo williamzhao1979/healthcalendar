@@ -720,7 +720,9 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
 
 const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState('recent')
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('activeTab') || 'recent'; // fallback to 'recent' if not set
+  });
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
@@ -739,6 +741,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
+  // const [activeTab, setActiveTab] = useState<'stool' | 'myrecord' | 'personal' | 'physical'>('stool')
 
   // OneDrive同步状态 - 使用错误边界保护
   // const [oneDriveState, oneDriveActions] = (() => {
@@ -1087,6 +1090,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const switchTab = (tabName: string) => {
     setActiveTab(tabName)
+    localStorage.setItem('activeTab', tabName);
   }
 
   // Settings Functions
