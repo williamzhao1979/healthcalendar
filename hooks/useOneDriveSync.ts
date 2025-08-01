@@ -337,6 +337,133 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     setState(prev => ({ ...prev, error: null }))
   }, [])
 
+  // 加载文件列表
+  const loadFiles = useCallback(async () => {
+    if (!state.isAuthenticated) {
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
+      return
+    }
+
+    setState(prev => ({ ...prev, isLoadingFiles: true, error: null }))
+    
+    try {
+      const graphClient = microsoftAuth.getGraphClient()!
+      console.log('Loading files from Apps/HealthCalendar...')
+      
+      // 获取 Apps/HealthCalendar 目录内容
+      const response = await graphClient.api('/me/drive/root:/Apps/HealthCalendar:/children').get()
+      
+      setState(prev => ({
+        ...prev,
+        isLoadingFiles: false,
+        files: response.value || []
+      }))
+      
+      console.log(`Loaded ${response.value?.length || 0} files`)
+      // console.log('Files:', state.files.values)
+    } catch (error) {
+      console.error('Failed to load files:', error)
+      setState(prev => ({
+        ...prev,
+        isLoadingFiles: false,
+        error: error instanceof Error ? error.message : '加载文件列表失败'
+      }))
+    }
+  }, [state.isAuthenticated])
+
+  // 加载文件内容
+  const loadFileContent = useCallback(async (fileId: string, fileName: string, isFolder: boolean = false) => {
+    if (!state.isAuthenticated) {
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
+      return
+    }
+
+    // 如果是文件夹，不尝试加载内容
+    if (isFolder) {
+      setState(prev => ({
+        ...prev,
+        selectedFileContent: `无法显示文件夹内容: ${fileName}\n\n这是一个文件夹，无法显示文本内容。`
+      }))
+      return
+    }
+
+    setState(prev => ({ ...prev, isLoadingFileContent: true, error: null }))
+    
+    try {
+      const graphClient = microsoftAuth.getGraphClient()!
+      console.log(`Loading content for file: ${fileName}`)
+      
+      // 使用更安全的方式获取文件内容
+      const authState = microsoftAuth.getAuthState()
+      if (!authState || !authState.accessToken) {
+        throw new Error('No valid access token available. Please re-authenticate.')
+      }
+      const accessToken = authState.accessToken
+
+      // 直接使用 fetch API 来获取文件内容，这样可以更好地处理二进制文件
+      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileId}/content`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      let fileContent: string
+      const contentType = response.headers.get('content-type') || ''
+      
+      if (contentType.includes('application/json') || fileName.endsWith('.json')) {
+        // JSON 文件
+        const jsonText = await response.text()
+        try {
+          const jsonObj = JSON.parse(jsonText)
+          fileContent = JSON.stringify(jsonObj, null, 2)
+        } catch {
+          fileContent = jsonText // 如果解析失败，显示原始文本
+        }
+      } else if (contentType.includes('text/') || fileName.endsWith('.txt') || fileName.endsWith('.md')) {
+        // 文本文件
+        fileContent = await response.text()
+      } else {
+        // 二进制或其他文件
+        const arrayBuffer = await response.arrayBuffer()
+        const size = arrayBuffer.byteLength
+        fileContent = `二进制文件: ${fileName}\n文件大小: ${(size / 1024).toFixed(2)} KB\n\n无法显示二进制文件内容。`
+      }
+      
+      setState(prev => ({
+        ...prev,
+        isLoadingFileContent: false,
+        selectedFileContent: fileContent
+      }))
+      
+      console.log(`Loaded content for ${fileName}`)
+      // console.log('File content:', fileContent.slice(0, 1000)) // 只打印前1000个字符以避免过多日志
+    } catch (error: any) {
+      console.error('Failed to load file content:', error)
+      
+      let errorMessage = '加载文件内容失败'
+      if (error.message?.includes('404')) {
+        errorMessage = '文件未找到'
+      } else if (error.message?.includes('403')) {
+        errorMessage = '没有权限访问此文件'
+      } else if (error.message?.includes('401')) {
+        errorMessage = '认证已过期，请重新登录'
+      } else if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
+      setState(prev => ({
+        ...prev,
+        isLoadingFileContent: false,
+        selectedFileContent: `加载失败: ${errorMessage}\n\n文件: ${fileName}\n错误详情: ${error.message || '未知错误'}`,
+        error: errorMessage
+      }))
+    }
+  }, [state.isAuthenticated])
+
   // 组件挂载时进行认证状态检查和恢复
   useEffect(() => {
     const initializeAuth = async () => {
@@ -368,6 +495,132 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     initializeAuth()
   }, [checkConnection])
 
+  // 导入用户数据
+  const syncIDBOneDrive = useCallback(async () => {
+    if (!state.isAuthenticated) {
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
+      return
+    }
+
+    // 检查基本认证状态
+    if (!microsoftAuth.isLoggedIn()) {
+      setState(prev => ({ ...prev, error: '用户未登录OneDrive，请先连接' }))
+      return
+    }
+
+    setState(prev => ({ 
+      ...prev, 
+      syncStatus: 'syncing', 
+      error: null,
+      exportResult: null 
+    }))
+    
+    try {
+      console.log('Starting users import from OneDrive...')
+      const result = await dataExportService.importUsersFromOneDrive()
+      
+      setState(prev => ({
+        ...prev,
+        syncStatus: result.success ? 'success' : 'error',
+        lastSyncTime: new Date(),
+        error: result.success ? null : result.errors.join(', '),
+        exportResult: result.success ? {
+          success: true,
+          exportedFiles: [`已导入 ${result.importedCount} 个用户记录`],
+          errors: result.errors,
+          metadata: {
+            version: '1.0',
+            exportTime: new Date().toISOString(),
+            userId: 'import',
+            appVersion: '1.0',
+            tables: ['users']
+          }
+        } : null
+      }))
+      
+      console.log('Users import completed:', result)
+
+      const exportResult =await dataExportService.exportTable('users', 'dummy')
+
+    } catch (error) {
+      console.error('Users import failed:', error)
+      
+      let errorMessage = '用户导入失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
+      setState(prev => ({
+        ...prev,
+        syncStatus: 'error',
+        error: errorMessage,
+      }))
+    }
+  }, [state.isAuthenticated])
+
+    // 导入用户数据
+  const syncIDBOneDriveMyRecords = useCallback(async () => {
+    if (!state.isAuthenticated) {
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
+      return
+    }
+
+    // 检查基本认证状态
+    if (!microsoftAuth.isLoggedIn()) {
+      setState(prev => ({ ...prev, error: '用户未登录OneDrive，请先连接' }))
+      return
+    }
+
+    setState(prev => ({ 
+      ...prev, 
+      syncStatus: 'syncing', 
+      error: null,
+      exportResult: null 
+    }))
+    
+    try {
+      console.log('Starting users import from OneDrive...')
+      const result = await dataExportService.importMyRecordsFromOneDrive()
+      
+      setState(prev => ({
+        ...prev,
+        syncStatus: result.success ? 'success' : 'error',
+        lastSyncTime: new Date(),
+        error: result.success ? null : result.errors.join(', '),
+        exportResult: result.success ? {
+          success: true,
+          exportedFiles: [`已导入 ${result.importedCount} 个用户记录`],
+          errors: result.errors,
+          metadata: {
+            version: '1.0',
+            exportTime: new Date().toISOString(),
+            userId: 'import',
+            appVersion: '1.0',
+            tables: ['users']
+          }
+        } : null
+      }))
+      
+      // console.log('Users import completed:', result)
+
+      const exportResult =await dataExportService.exportTable('myRecords', 'dummy')
+
+    } catch (error) {
+      console.error('MyRecords import failed:', error)
+      
+      let errorMessage = 'MyRecords导入失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
+      setState(prev => ({
+        ...prev,
+        syncStatus: 'error',
+        error: errorMessage,
+      }))
+    }
+  }, [state.isAuthenticated])
+
   const actions: OneDriveSyncActions = {
     connect,
     disconnect,
@@ -377,6 +630,10 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     exportTable,
     importUsers,
     clearError,
+    loadFiles,
+    loadFileContent,
+    syncIDBOneDrive,
+    syncIDBOneDriveMyRecords,
   }
 
   return [state, actions]

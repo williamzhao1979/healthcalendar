@@ -1,6 +1,7 @@
 import { userDB } from './userDatabase'
 import { microsoftAuth } from './microsoftAuth'
 import { getPageFiles } from 'next/dist/server/get-page-files'
+import { adminService } from '@/lib/adminService'
 
 export interface ExportMetadata {
   version: string
@@ -327,10 +328,12 @@ export class DataExportService {
       
       const fileName = `${tableName}.json`
       const filePath = `${userDataPath}/${fileName}`
-      
+
       const dataPackage = {
+        dbName: adminService.getDBName(),
         tableName: tableName,
         exportTime: new Date().toISOString(),
+        syncTime: new Date().toISOString(),
         recordCount: tableData.length,
         data: tableData
       }
@@ -437,6 +440,7 @@ export class DataExportService {
     }
   }
 
+
   // 从OneDrive读取users.json文件
   async readUsersFile(): Promise<any> {
     const graphClient = microsoftAuth.getGraphClient()
@@ -451,6 +455,60 @@ export class DataExportService {
 
       const filePath = `${this.APP_FOLDER_PATH}/users.json`
       
+      // 获取文件元数据
+      const fileMetadata = await graphClient
+        .api(`/me/drive/root:/${filePath}`)
+        .get()
+
+      // 下载文件内容
+      // const content = await graphClient
+      //   .api(`/me/drive/items/${fileMetadata.id}/content`)
+      //   .get()
+      const accessToken = microsoftAuth.getAuthState()!.accessToken
+      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileMetadata.id}/content`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        }
+      })
+      // console.log('Response status:', response.status)
+      // console.log('response:', response)
+      // const data = typeof content === 'string' ? JSON.parse(content) : content
+      
+      const jsonString = await response.text(); // 👈 这里拿到原始 JSON 字符串
+      // 如果你需要解析成对象，可以再用 JSON.parse
+      const data = JSON.parse(jsonString);
+      console.log(`File content: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`);
+      console.log('Successfully read users.json file')
+      return data;
+    } catch (error) {
+      if (error instanceof Error) {
+        // 检查是否是文件不存在的错误
+        if (error.message.includes('404') || error.message.includes('NotFound')) {
+          console.warn('users.json file not found on OneDrive')
+          return null
+        }
+        console.error('Failed to read users.json file:', error.message)
+      } else {
+        console.error('Failed to read users.json file:', error)
+      }
+      throw error
+    }
+  }
+
+  // 从OneDrive读取users.json文件
+  async readFile(fileName: string): Promise<any> {
+    const graphClient = microsoftAuth.getGraphClient()
+    if (!graphClient) {
+      throw new Error('Graph client not initialized')
+    }
+
+    try {
+      if (!microsoftAuth.isLoggedIn()) {
+        throw new Error('User not authenticated with OneDrive')
+      }
+
+      const filePath = `${this.APP_FOLDER_PATH}/${fileName}`
+
       // 获取文件元数据
       const fileMetadata = await graphClient
         .api(`/me/drive/root:/${filePath}`)
@@ -752,7 +810,8 @@ console.log('microsoftAuth', microsoftAuth)
       console.log(`Found ${usersArray.length} users in OneDrive file`)
 
       // 获取本地现有用户数据
-      const localUsers = await userDB.getAllUsers()
+      // const localUsers = await userDB.getAllUsers()
+      const localUsers = await adminService.getAllUsers()
       console.log(`Found ${localUsers.length} local users`)
 
       let importedCount = 0
@@ -842,6 +901,123 @@ console.log('microsoftAuth', microsoftAuth)
     }
   }
 
+  // 从OneDrive导入用户数据
+  async importMyRecordsFromOneDrive(): Promise<{ 
+    success: boolean; 
+    importedCount: number; 
+    errors: string[] 
+  }> {
+    try {
+      console.log('Starting import from OneDrive...')
+
+      // 从OneDrive读取myRecords.json文件
+      const oneDriveFile = await this.readFile('myRecords.json')
+
+      if (!oneDriveFile) {
+        return {
+          success: false,
+          importedCount: 0,
+          errors: ['OneDrive上未找到myRecords.json文件']
+        }
+      }
+
+      // 确保数据格式正确
+      const dataArray = (oneDriveFile.data && Array.isArray(oneDriveFile.data)) ? oneDriveFile.data : []
+
+      if (dataArray.length === 0) {
+        return {
+          success: false,
+          importedCount: 0,
+          errors: ['OneDrive文件中未找到用户数据']
+        }
+      }
+
+      console.log(`Found ${dataArray.length} data in OneDrive file`)
+
+      // 获取本地现有用户数据
+      // const localUsers = await userDB.getAllUsers()
+      const localRecords = await adminService.getAllRecordsIDB('myRecords')
+      console.log(`Found ${localRecords.length} local recoreds`)
+
+      let importedCount = 0
+      const errors: string[] = []
+
+      // 合并用户数据
+      for (const oneDriveRecord of dataArray) {
+        try {
+          // 验证必要字段
+          if (!oneDriveRecord.id || !oneDriveRecord.updatedAt) {
+            errors.push(`用户数据格式错误: ${JSON.stringify(oneDriveRecord)}`)
+            continue
+          }
+
+          // 查找本地是否存在相同ID的用户
+          const existingRecord = localRecords.find(record => record.id === oneDriveRecord.id)
+
+          if (!existingRecord) {
+            // 本地不存在，直接添加
+              const newRecord = {
+                ...oneDriveRecord
+              }
+            try {
+
+              
+              // 直接使用IndexedDB添加完整的用户对象
+              await this.addUserDirectly(newRecord)
+              
+              importedCount++
+              console.log(`Added new user: ${newRecord.id}`)
+            } catch (addError) {
+              errors.push(`添加失败 ${newRecord.id}: ${addError instanceof Error ? addError.message : 'Unknown error'}`)
+            }
+          } else {
+            // 本地存在，比较updatedAt时间戳
+            const oneDriveDate = new Date(oneDriveRecord.updatedAt)
+            const localDate = new Date(existingRecord.updatedAt)
+
+            if (oneDriveDate > localDate) {
+              // OneDrive数据更新，更新本地数据
+                const updatedRecord = {
+                  ...oneDriveRecord,
+                }
+                
+              try {
+
+                // 直接使用IndexedDB更新完整的用户对象
+                await this.updateUserDirectly(updatedRecord)
+                
+                importedCount++
+                console.log(`Updated user: ${oneDriveRecord.id} (OneDrive newer: ${oneDriveRecord.updatedAt} > ${existingRecord.updatedAt})`)
+              } catch (updateError) {
+                errors.push(`更新用户失败 ${oneDriveRecord.id}: ${updateError instanceof Error ? updateError.message : 'Unknown error'}`)
+              }
+            } else {
+              console.log(`Skipped user: ${oneDriveRecord.id} (Local newer or same: ${existingRecord.updatedAt} >= ${oneDriveRecord.updatedAt})`)
+            }
+          }
+        } catch (error) {
+          errors.push(`处理用户数据失败 ${oneDriveRecord.id}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
+      }
+
+      console.log(`Import completed. Imported: ${importedCount}, Errors: ${errors.length}`)
+
+      return {
+        success: errors.length === 0 || importedCount > 0,
+        importedCount,
+        errors
+      }
+
+    } catch (error) {
+      console.error('Import users from OneDrive failed:', error)
+      return {
+        success: false,
+        importedCount: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error']
+      }
+    }
+  }
+
   // 直接添加用户到IndexedDB（包含所有字段）
   private async addUserDirectly(user: any): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -896,6 +1072,34 @@ console.log('microsoftAuth', microsoftAuth)
         reject(new Error('Failed to open database'))
       }
     })
+  }
+
+  public mergeRecords = (existing: any[], incoming: any[]): any[] => {
+    const merged: { [key: string]: any } = {}
+
+    // 合并现有记录
+    existing.forEach(record => {
+      merged[record.id] = record
+    })
+
+    // 合并新记录
+    incoming.forEach(record => {
+      if (merged[record.id]) {
+        // 如果存在，比较updatedAt时间戳
+        const existingDate = new Date(merged[record.id].updatedAt)
+        const incomingDate = new Date(record.updatedAt)
+
+        if (incomingDate > existingDate) {
+          // 如果新记录更新，则替换
+          merged[record.id] = record
+        }
+      } else {
+        // 如果不存在，直接添加
+        merged[record.id] = record
+      }
+    })
+
+    return Object.values(merged)
   }
 }
 

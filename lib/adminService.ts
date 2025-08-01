@@ -910,6 +910,76 @@ export class IndexedDBAdminService {
     return records.find(record => record.id === recordId) || null;
   }
 
+  public async saveUser(record: any): Promise<string> {
+    const db = await this.getDB();
+    
+    return new Promise<string>((resolve, reject) => {
+      const transaction = db.transaction('users', 'readwrite');
+      const store = transaction.objectStore('users');
+      
+      // 如果没有ID，生成一个
+      if (!record.id) {
+        record.id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      }
+      
+      // 添加时间戳
+      const now = new Date().toISOString();
+      if (!record.createdAt) record.createdAt = now;
+      record.updatedAt = now;
+      
+      const addRequest = store.add(record);
+      addRequest.onsuccess = () => resolve(record.id);
+      addRequest.onerror = () => reject(addRequest.error);
+    });
+  }
+
+  public async updateUser(editId: string, record: any): Promise<void> {
+    const db = await this.getDB();
+    
+    return new Promise<void>((resolve, reject) => {
+      try {
+      const transaction = db.transaction('users', 'readwrite');
+      const store = transaction.objectStore('users');
+      console.log('Updating user with ID:', editId);
+      const getRequest = store.get(editId);
+      getRequest.onsuccess = () => {
+        const existingRecord = getRequest.result;
+        if (!existingRecord) {
+          return reject(new Error(`Record with ID ${editId} not found`));
+        }
+        
+        // 合并现有记录和新记录
+        Object.assign(existingRecord, record);
+        
+        // 验证记录格式
+        // const validation = this.validateRecord('myRecords', existingRecord);
+        // if (!validation.valid) {
+        //   return reject(new Error(`记录格式错误: ${validation.errors.join(', ')}`));
+        // }
+        
+        // 更新时间戳
+        existingRecord.updatedAt = new Date().toISOString();
+        
+        // this.updateMyRecordInStore(store, existingRecord, resolve, reject);
+        const putRequest = store.put(existingRecord);
+        putRequest.onsuccess = () => resolve(); 
+        putRequest.onerror = () => reject(putRequest.error);
+      };
+      
+      console.log('Updating my record:', record);
+      // // 更新时间戳
+      // record.updatedAt = new Date().toISOString();
+      
+      // const putRequest = store.put(record);
+      // putRequest.onsuccess = () => resolve();
+      // putRequest.onerror = () => reject(putRequest.error);
+      } catch (error) {
+          console.error('更新我的记录失败:', error);
+          reject(error);
+      }
+    });
+  }
+
   public async saveMyRecord(record: any): Promise<string> {
     const db = await this.getDB();
     
@@ -1005,6 +1075,25 @@ export class IndexedDBAdminService {
       
       getRequest.onerror = () => reject(getRequest.error);
     });
+  }
+
+  public async getAllRecordsIDB(storeName: string): Promise<any[]> {
+    const db = await this.getDB();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(storeName, 'readonly');
+      const store = transaction.objectStore(storeName);
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        resolve(request.result || []);
+      };
+      request.onerror = () => reject(new Error(`Failed to get records from ${storeName}`));
+    });
+  }
+
+  public getDBName(): string {
+    return this.dbName;
   }
 }
 

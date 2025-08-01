@@ -37,6 +37,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { adminService, type DatabaseStats, type ObjectStoreStats } from '@/lib/adminService'
+import { useOneDriveSync, formatSyncTime } from '../../hooks/useOneDriveSync'
+import { on } from 'events'
+import { dataExportService, ExportResult } from '../../lib/dataExportService'
 
 // 管理组件
 const IndexedDBAdmin: React.FC = () => {
@@ -55,8 +58,10 @@ const IndexedDBAdmin: React.FC = () => {
   const [recordsPerPage] = useState<number>(20)
   const [sortField, setSortField] = useState<string>('updatedAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [usersIDB, setUsersIDB] = useState<string>('')
+  const [usersOneDrive, setUsersOneDrive] = useState<string>('')
+  const [oneDriveState, oneDriveActions] = useOneDriveSync()
 
-  
 const idbJsonDefault = `{
   "dbName": "HealthCalendar",
   "tableName": "users",
@@ -89,8 +94,27 @@ const idbJsonDefault = `{
   useEffect(() => {
     loadDatabaseInfo()
     performHealthCheck()
+
+    loadUsersIDB()
   }, [])
 
+  const loadUsersIDB = async () => {  
+    try {
+      const users = await adminService.getAllRecordsIDB('users')
+
+      const jsonWithSchema = {
+        dbName: 'HealthCalendar',
+        tableName: 'users',
+        exportTime: new Date().toISOString(),
+        syncTime: new Date().toISOString(),
+        recordCount: users.length,
+        data: users
+      }
+      setUsersIDB(JSON.stringify(jsonWithSchema, null, 2))
+    } catch (err) {
+      console.error('加载用户IDB失败:', err)
+    }
+  }
   // 加载数据库信息
   const loadDatabaseInfo = async () => {
     setLoading(true)
@@ -352,6 +376,47 @@ const initializeIDB = async () => {
     }
 }
 
+const handleDebug = async () => {
+  try {
+    // if (oneDriveState.files.length === 0) {
+    //   await oneDriveActions.loadFiles()
+    //   console.log('OneDrive 文件加载成功:', oneDriveState.files)
+    // }
+    // const userFile = oneDriveState.files.find(f => f.name === 'users.json')
+    // console.log('loadFileContent:', userFile)
+    // oneDriveActions.loadFileContent(userFile.id, userFile.name, false)
+
+    // await loadUsersIDB();
+    // const usersFileOneDrive = await dataExportService.readUsersFile();
+
+    // oneDriveActions.importUsers();
+    oneDriveActions.syncIDBOneDrive();
+    oneDriveActions.syncIDBOneDriveMyRecords();
+    // setUsersOneDrive(JSON.stringify(usersFileOneDrive, null, 2));
+  } catch (err) {
+    setError('加载 OneDrive 文件失败: ' + (err as Error).message)
+  }
+}
+
+// useEffect(() => {
+//     console.log('useEffect OneDrive 文件加载成功:', oneDriveState.files);
+//     setIDBJson(JSON.stringify(oneDriveState.files, null, 2));
+//     if (oneDriveState.files.length > 0) {
+//       // const file = oneDriveState.files.filter(f => f.name === 'users.json')[0];
+//       // setUsersOneDrive(JSON.stringify(file, null, 2));
+//     } else {
+//       setUsersOneDrive('没有 OneDrive 文件');
+//     }
+// }, [oneDriveState.files]);
+
+// useEffect(() => {
+//   const file = oneDriveState.selectedFileContent;
+//   console.log('Selected file content:', file);
+//   // setUsersOneDrive(JSON.stringify(file, null, 2));
+//   file && setUsersOneDrive(file);
+//   file && setIDBJson(file);
+// }, [oneDriveState.selectedFileContent]);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-7xl mx-auto">
@@ -379,7 +444,7 @@ const initializeIDB = async () => {
           </Alert>
         )}
 
-        <Tabs defaultValue="tools" className="space-y-6">
+        <Tabs defaultValue="debug" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">数据库概览</TabsTrigger>
             <TabsTrigger value="records">记录管理</TabsTrigger>
@@ -869,6 +934,46 @@ const initializeIDB = async () => {
 
           {/* Debug 工具 */}
           <TabsContent value="debug" className="space-y-6">
+            <button className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors" onClick={handleDebug}>
+              Debug
+            </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* IndexedDB */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Download className="w-5 h-5" />
+                    IndexedDB
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+            <textarea
+              className="w-full h-[400px] border border-gray-300 rounded-md p-2"
+              placeholder="输入一些内容..."
+              value={usersIDB}
+              onChange={(e) => setUsersIDB(e.target.value)}
+            />
+                </CardContent>
+              </Card>
+
+              {/* OneDrive */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trash2 className="w-5 h-5" />
+                    OneDrive
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+            <textarea
+              className="w-full h-[400px] border border-gray-300 rounded-md p-2"
+              placeholder="输入一些内容..."
+              value={usersOneDrive}
+              onChange={(e) => setUsersOneDrive(e.target.value)}
+            />
+                </CardContent>
+              </Card>
+            </div>
             <textarea
               className="w-full h-[400px] border border-gray-300 rounded-md p-2"
               placeholder="输入一些内容..."

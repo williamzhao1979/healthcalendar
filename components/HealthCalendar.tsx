@@ -727,7 +727,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const [users, setUsers] = useState<UserType[]>([])
   const [currentUser, setCurrentUser] = useState<UserType | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  
+
+
   // 添加 stoolRecords 状态
   const [stoolRecords, setStoolRecords] = useState<StoolRecord[]>([])
   
@@ -737,6 +738,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // 编辑用户相关状态
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
+  const [oneDriveStateV2, oneDriveActionsV2] = useOneDriveSync()
 
   // OneDrive同步状态 - 使用错误边界保护
   const [oneDriveState, oneDriveActions] = (() => {
@@ -836,6 +838,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       // const activeUser = await userDB.getActiveUser()
       // setUsers(allUsers)
       // setCurrentUser(activeUser)
+      initializeUsers()
       
     } catch (error) {
       console.error('刷新用户数据失败:', error)
@@ -1102,7 +1105,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       }
 
       // 检查用户名是否已存在
-      const existingUsers = await userDB.getAllUsers()
+      // const existingUsers = await userDB.getAllUsers()
+      const existingUsers = await adminService.getAllUsers()
       const nameExists = existingUsers.some(user => user.name.toLowerCase() === userName.toLowerCase())
       
       if (nameExists) {
@@ -1111,7 +1115,13 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       }
 
       // 添加新用户
-      const newUser = await userDB.addUser({
+      // const newUser = await userDB.addUser({
+      //   name: userName,
+      //   avatarUrl,
+      //   isActive: false // 新用户默认不激活
+      // })
+
+      const newUser = await adminService.saveUser({
         name: userName,
         avatarUrl,
         isActive: false // 新用户默认不激活
@@ -1185,29 +1195,31 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     setEditingUser(null)
   }
 
-  const handleEditUser = async (userName: string, avatarUrl: string) => {
+  const handleEditUser = async (userId: string, userName: string, avatarUrl: string) => {
     if (!editingUser) return
 
     try {
       // 验证用户名
-      if (!UserUtils.isValidUserName(userName)) {
-        alert('用户名长度应在1-20个字符之间')
-        return
-      }
+      // if (!UserUtils.isValidUserName(userName)) {
+      //   alert('用户名长度应在1-20个字符之间')
+      //   return
+      // }
 
       // 检查用户名是否已存在（排除当前编辑的用户）
-      const existingUsers = await userDB.getAllUsers()
-      const nameExists = existingUsers.some(user => 
-        user.name.toLowerCase() === userName.toLowerCase() && user.id !== editingUser.id
-      )
+      // const existingUsers = await userDB.getAllUsers()
+      // const nameExists = existingUsers.some(user => 
+      //   user.name.toLowerCase() === userName.toLowerCase() && user.id !== editingUser.id
+      // )
       
-      if (nameExists) {
-        alert('用户名已存在，请选择其他名称')
-        return
-      }
+      // if (nameExists) {
+      //   alert('用户名已存在，请选择其他名称')
+      //   return
+      // }
 
+      console.log('正在更新用户信息:', editingUser)
       // 更新用户信息
-      await userDB.updateUser(editingUser.id, {
+      await adminService.updateUser(editingUser.id, {
+        ...editingUser,
         name: userName,
         avatarUrl
       })
@@ -1250,6 +1262,17 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       alert('数据已清除！')
     }
   }
+
+const syncData = async () => {
+  try {
+    console.log('开始同步 OneDrive 数据...')
+    oneDriveActionsV2.syncIDBOneDrive();
+    oneDriveActionsV2.syncIDBOneDriveMyRecords();
+    // setUsersOneDrive(JSON.stringify(usersFileOneDrive, null, 2));
+  } catch (err) {
+    console.log('syncData失败: ' + (err as Error).message)
+  }
+}
 
   return (
     <div className="overflow-x-hidden">
@@ -1905,7 +1928,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                             </div>
                             <div className="text-xs text-gray-500">
                               {oneDriveState.isAuthenticated 
-                                ? `已连接 · 最后同步: ${formatSyncTime(oneDriveState.lastSyncTime)}`
+                                ? `已连接 · 最后同步: ${formatSyncTime(oneDriveStateV2.lastSyncTime)}`
                                 : '自动备份到OneDrive云端'
                               }
                             </div>
@@ -1921,7 +1944,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                             )}
                           </div>
                           <div className="flex items-center space-x-2">
-                            {oneDriveState.isAuthenticated && (
+                            {/* {oneDriveState.isAuthenticated && (
                               <button
                                 onClick={() => {
                                   if (currentUser) {
@@ -1933,8 +1956,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                               >
                                 {oneDriveState.isExporting ? '导出中...' : oneDriveState.syncStatus === 'syncing' ? '同步中...' : '导出数据'}
                               </button>
-                            )}
-                            {oneDriveState.isAuthenticated && (
+                            )} */}
+                            {/* {oneDriveState.isAuthenticated && (
                               <button
                                 onClick={() => currentUser && oneDriveActions.startSync(currentUser.id)}
                                 disabled={!currentUser || oneDriveState.syncStatus === 'syncing' || oneDriveState.isConnecting || oneDriveState.isExporting}
@@ -1942,7 +1965,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                               >
                                 {oneDriveState.syncStatus === 'syncing' ? '同步中...' : '立即同步'}
                               </button>
-                            )}
+                            )} */}
                             <label className="relative inline-flex items-center cursor-pointer">
                               <input 
                                 type="checkbox" 
@@ -1961,6 +1984,17 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                             </label>
                           </div>
                         </div>
+
+                        <button onClick={syncData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                          <div className="flex items-center space-x-3">
+                            <Download className="text-blue-500" />
+                            <div className="text-left">
+                              <div className="text-sm font-medium text-gray-900">立即同步</div>
+                              <div className="text-xs text-gray-500">立即同步</div>
+                            </div>
+                          </div>
+                          <ChevronRight className="text-gray-400" />
+                        </button>
 
                         <button onClick={exportData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
@@ -2051,7 +2085,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                  {!user.isActive && (
+                                  {!(user.id === currentUser.id) && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
@@ -2062,7 +2096,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
                                       切换
                                     </button>
                                   )}
-                                  {user.isActive && (
+                                  {user.id === currentUser.id && (
                                     <span className="px-2 py-1 bg-health-primary/10 text-health-primary text-xs rounded-md">
                                       当前
                                     </span>

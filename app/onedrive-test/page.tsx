@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useOneDriveSync, formatSyncTime } from '../../hooks/useOneDriveSync'
-import { CheckCircle, AlertCircle, RefreshCw, User, Database, Download, Smartphone, Monitor } from 'lucide-react'
+import { CheckCircle, AlertCircle, RefreshCw, User, Database, Download, Smartphone, Monitor, Folder, File, FileText } from 'lucide-react'
 import CompatibilityChecker from '../../components/CompatibilityChecker'
 import { MobileCompatibilityUtils } from '../../lib/mobileCompatibility'
 
@@ -285,6 +285,100 @@ export default function OneDriveTestPage() {
                   {oneDriveState.userInfo.homeAccountId || '未知'}
                 </span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* OneDrive 文件浏览器 */}
+        {oneDriveState.isAuthenticated && (
+          <div className="bg-blue-50 rounded-xl p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+              <Folder className="w-5 h-5 mr-2" />
+              Apps/HealthCalendar 文件浏览器
+            </h2>
+            
+            <div className="space-y-4">
+              {/* 加载文件按钮 */}
+              <button
+                onClick={oneDriveActions.loadFiles}
+                disabled={oneDriveState.isLoadingFiles}
+                className="flex items-center justify-center space-x-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors"
+              >
+                {oneDriveState.isLoadingFiles && <RefreshCw className="w-4 h-4 animate-spin" />}
+                <span>{oneDriveState.isLoadingFiles ? '加载中...' : '刷新文件列表'}</span>
+              </button>
+
+              {/* 文件列表 */}
+              {oneDriveState.files.length > 0 && (
+                <div className="bg-white rounded-lg border">
+                  <div className="p-3 border-b bg-gray-50 rounded-t-lg">
+                    <h3 className="text-sm font-semibold text-gray-700">文件列表 ({oneDriveState.files.length} 个文件)</h3>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {oneDriveState.files.map((file, index) => (
+                      <div key={file.id} className={`flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}
+                           onClick={() => oneDriveActions.loadFileContent(file.id, file.name, !!file.folder)}>
+                        <div className="flex items-center space-x-3">
+                          {file.folder ? (
+                            <Folder className="w-4 h-4 text-blue-500" />
+                          ) : file.name.endsWith('.json') ? (
+                            <FileText className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <File className="w-4 h-4 text-gray-500" />
+                          )}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{file.name}</div>
+                            <div className="text-xs text-gray-500">
+                              {file.size ? `${(file.size / 1024).toFixed(1)} KB` : ''}
+                              {file.lastModifiedDateTime && ` • ${new Date(file.lastModifiedDateTime).toLocaleDateString()}`}
+                            </div>
+                          </div>
+                        </div>
+                        {!file.folder && (
+                          <div className="text-xs text-blue-600 opacity-0 group-hover:opacity-100">
+                            点击查看内容
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 文件内容显示 */}
+              {(oneDriveState.selectedFileContent || oneDriveState.isLoadingFileContent) && (
+                <div className="bg-white rounded-lg border">
+                  <div className="p-3 border-b bg-gray-50 rounded-t-lg">
+                    <h3 className="text-sm font-semibold text-gray-700 flex items-center">
+                      <FileText className="w-4 h-4 mr-2" />
+                      文件内容
+                      {oneDriveState.isLoadingFileContent && <RefreshCw className="w-4 h-4 animate-spin ml-2" />}
+                    </h3>
+                  </div>
+                  <div className="p-3">
+                    {oneDriveState.isLoadingFileContent ? (
+                      <div className="flex items-center justify-center py-8">
+                        <RefreshCw className="w-6 h-6 animate-spin text-blue-500 mr-2" />
+                        <span className="text-gray-600">加载文件内容中...</span>
+                      </div>
+                    ) : (
+                      <textarea
+                        value={oneDriveState.selectedFileContent || ''}
+                        readOnly
+                        className="w-full h-64 p-3 border border-gray-200 rounded-lg bg-gray-50 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="选择一个文件查看内容..."
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {oneDriveState.files.length === 0 && !oneDriveState.isLoadingFiles && (
+                <div className="text-center py-8 text-gray-500">
+                  <Folder className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>点击"刷新文件列表"加载 OneDrive 文件</p>
+                </div>
+              )}
             </div>
           </div>
         )}
