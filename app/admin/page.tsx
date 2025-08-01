@@ -61,6 +61,7 @@ const IndexedDBAdmin: React.FC = () => {
   const [usersIDB, setUsersIDB] = useState<string>('')
   const [usersOneDrive, setUsersOneDrive] = useState<string>('')
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
+  const [activeTabAdmin, setActiveTabAdmin] = useState('debug');
 
 const idbJsonDefault = `{
   "dbName": "HealthCalendar",
@@ -92,11 +93,21 @@ const idbJsonDefault = `{
 
   // 初始化数据库信息
   useEffect(() => {
+    const storedTab = localStorage.getItem('activeTabAdmin');
+    console.log('Stored activeTabAdmin:', storedTab);
+    if (storedTab) {
+      setActiveTabAdmin(storedTab);
+    }
     loadDatabaseInfo()
     performHealthCheck()
 
     loadUsersIDB()
   }, [])
+
+  useEffect(() => {
+    console.log('Active tab changed:', activeTabAdmin);
+    localStorage.setItem('activeTabAdmin', activeTabAdmin);
+  }, [activeTabAdmin]);
 
   const loadUsersIDB = async () => {  
     try {
@@ -444,7 +455,7 @@ const handleDebug = async () => {
           </Alert>
         )}
 
-        <Tabs defaultValue="debug" className="space-y-6">
+        <Tabs className="space-y-6" value={activeTabAdmin} onValueChange={(val) => setActiveTabAdmin(val)}>
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">数据库概览</TabsTrigger>
             <TabsTrigger value="records">记录管理</TabsTrigger>

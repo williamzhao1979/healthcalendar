@@ -720,9 +720,10 @@ const AddUserModal: React.FC<AddUserModalProps> = ({
 
 const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('activeTab') || 'recent'; // fallback to 'recent' if not set
-  });
+  // const [activeTab, setActiveTab] = useState(() => {
+  //   return localStorage.getItem('activeTab') || 'recent'; // fallback to 'recent' if not set
+  // });
+  const [activeTab, setActiveTab] = useState('recent');
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
@@ -774,6 +775,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // })()
 
   useEffect(() => {
+    const storedTab = localStorage.getItem('activeTab');
+    if (storedTab) {
+      setActiveTab(storedTab);
+    }
+
     // 初始化用户数据
     initializeUsers()
     
@@ -1347,7 +1353,8 @@ const syncData = async () => {
     oneDriveActions.syncIDBOneDriveMyRecords();
     oneDriveActions.syncIDBOneDriveStoolRecords();
     // setUsersOneDrive(JSON.stringify(usersFileOneDrive, null, 2));
-    initializeUsers();
+    // initializeUsers();
+    refreshUsers();
   } catch (err) {
     console.log('syncData失败: ' + (err as Error).message)
   }
