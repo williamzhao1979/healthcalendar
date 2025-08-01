@@ -796,14 +796,14 @@ export class IndexedDBAdminService {
               if (!db.objectStoreNames.contains('users')) {
                   const userStore = db.createObjectStore('users', { keyPath: 'id' })
                   userStore.createIndex('name', 'name', { unique: false })
-                  userStore.createIndex('isActive', 'isActive', { unique: false })
+                  // userStore.createIndex('isActive', 'isActive', { unique: false })
                   console.log('Created users object store')
               }
               
               if (!db.objectStoreNames.contains('stoolRecords')) {
                   const store = db.createObjectStore('stoolRecords', { keyPath: 'id' })
                   store.createIndex('userId', 'userId', { unique: false })
-                  store.createIndex('date', 'date', { unique: false })
+                  store.createIndex('dateTime', 'dateTime', { unique: false })
                   console.log('Created stoolRecords object store')
               }
 
@@ -1149,10 +1149,10 @@ export class IndexedDBAdminService {
         Object.assign(existingRecord, record);
         
         // 验证记录格式
-        const validation = this.validateRecord('stoolRecords', existingRecord);
-        if (!validation.valid) {
-          return reject(new Error(`记录格式错误: ${validation.errors.join(', ')}`));
-        }
+        // const validation = this.validateRecord('stoolRecords', existingRecord);
+        // if (!validation.valid) {
+        //   return reject(new Error(`记录格式错误: ${validation.errors.join(', ')}`));
+        // }
         
         // 更新时间戳
         existingRecord.updatedAt = new Date().toISOString();
@@ -1183,6 +1183,104 @@ export class IndexedDBAdminService {
     return new Promise<void>((resolve, reject) => {
       const transaction = db.transaction('stoolRecords', 'readwrite');
       const store = transaction.objectStore('stoolRecords');
+      
+      const getRequest = store.get(editId);
+      getRequest.onsuccess = () => {
+        const record = getRequest.result;
+        if (!record) {
+          return reject(new Error(`Record with ID ${editId} not found`));
+        }
+        
+        // 设置删除标志
+        record.delFlag = true;
+        record.updatedAt = new Date().toISOString();
+        
+        const putRequest = store.put(record);
+        putRequest.onsuccess = () => resolve();
+        putRequest.onerror = () => reject(putRequest.error);
+      };
+      
+      getRequest.onerror = () => reject(getRequest.error);
+    });
+  }
+
+  public async saveMealRecord(record: any): Promise<string> {
+    const db = await this.getDB();
+    
+    return new Promise<string>((resolve, reject) => {
+      const transaction = db.transaction('mealRecords', 'readwrite');
+      const store = transaction.objectStore('mealRecords');
+      
+      // 如果没有ID，生成一个
+      if (!record.id) {
+        record.id = `mealRecord_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      }
+      
+      // 添加时间戳
+      const now = new Date().toISOString();
+      if (!record.createdAt) record.createdAt = now;
+      record.updatedAt = now;
+      
+      const addRequest = store.add(record);
+      addRequest.onsuccess = () => resolve(record.id);
+      addRequest.onerror = () => reject(addRequest.error);
+    });
+  }
+
+
+  public async updateMealRecord(editId: string, record: any): Promise<void> {
+    const db = await this.getDB();
+    
+    return new Promise<void>((resolve, reject) => {
+      try {
+      const transaction = db.transaction('mealRecords', 'readwrite');
+      const store = transaction.objectStore('mealRecords');
+      console.log('Updating meal record with ID:', editId);
+      const getRequest = store.get(editId);
+      getRequest.onsuccess = () => {
+        const existingRecord = getRequest.result;
+        if (!existingRecord) {
+          return reject(new Error(`Record with ID ${editId} not found`));
+        }
+        
+        // 合并现有记录和新记录
+        Object.assign(existingRecord, record);
+        
+        // 验证记录格式
+        const validation = this.validateRecord('mealRecords', existingRecord);
+        if (!validation.valid) {
+          return reject(new Error(`记录格式错误: ${validation.errors.join(', ')}`));
+        }
+        
+        // 更新时间戳
+        existingRecord.updatedAt = new Date().toISOString();
+        
+        // this.updateMyRecordInStore(store, existingRecord, resolve, reject);
+        const putRequest = store.put(existingRecord);
+        putRequest.onsuccess = () => resolve(); 
+        putRequest.onerror = () => reject(putRequest.error);
+      };
+      
+      console.log('Updating meal record:', record);
+      // // 更新时间戳
+      // record.updatedAt = new Date().toISOString();
+      
+      // const putRequest = store.put(record);
+      // putRequest.onsuccess = () => resolve();
+      // putRequest.onerror = () => reject(putRequest.error);
+      } catch (error) {
+          console.error('更新我的记录失败:', error);
+          reject(error);
+      }
+    });
+  }
+
+  public async softDeleteMealRecord(editId: string): Promise<void> {
+    const db = await this.getDB();
+    
+    return new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction('mealRecords', 'readwrite');
+      const store = transaction.objectStore('mealRecords');
       
       const getRequest = store.get(editId);
       getRequest.onsuccess = () => {

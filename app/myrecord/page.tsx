@@ -463,12 +463,12 @@ function MyRecordPageContent() {
 
   const handleUserChange = async (user: UserType) => {
     // 更新用户活跃状态
-    await userDB.setActiveUser(user.id)
+    // await userDB.setActiveUser(user.id)
     setCurrentUser(user)
     
     // 重新加载用户列表以更新活跃状态
-    const updatedUsers = await userDB.getAllUsers()
-    setUsers(updatedUsers)
+    // const updatedUsers = await userDB.getAllUsers()
+    // setUsers(updatedUsers)
   }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {

@@ -737,6 +737,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // 添加 myRecords 状态
   const [myRecords, setMyRecords] = useState<MyRecord[]>([])
   
+  const [mealRecords, setMealRecords] = useState<any[]>([])
+
   // 编辑用户相关状态
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
@@ -892,11 +894,34 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
   }
 
+  // 添加获取用餐记录的函数
+  const loadMealRecords = async () => {
+    if (!currentUser) {
+      console.log('loadMealRecords: 没有当前用户')
+      return
+    }
+    
+    try {
+      console.log('loadMealRecords: 开始加载数据，用户ID:', currentUser.id)
+      // await myRecordDB.ensureInitialized()
+      // const records = await myRecordDB.getUserRecords(currentUser.id)
+      const records = await adminService.getUserRecords('mealRecords', currentUser.id)
+      console.log('loadMealRecords: 获取到记录数:', records.length)
+      console.log('loadMealRecords: 记录详情:', records)
+      // 按日期倒序排列
+      records.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+      setMealRecords(records)
+    } catch (error) {
+      console.error('获取用餐记录失败:', error)
+    }
+  }
+
   // 当用户变化时重新加载数据
   useEffect(() => {
     if (currentUser) {
       loadStoolRecords()
       loadMyRecords()
+      loadMealRecords()
       // 添加测试数据（仅在开发环境中）
       // addTestDataIfNeeded()
     }
@@ -982,7 +1007,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     switch(type) {
       case 'meals':
         console.log('选择了一日三餐记录')
-        window.location.href = 'meal_page.html'
+        // window.location.href = 'meal_page.html'
+        router.push('/meal')
         break
       case 'stool':
         console.log('选择了排便记录')
@@ -1014,6 +1040,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     router.push(`/myrecord?edit=${recordId}`)
   }
 
+  const editMealRecord = (recordId: string) => {
+    console.log('编辑用餐记录:', recordId)
+    router.push(`/meal?edit=${recordId}`)
+  }
+
   const deleteStoolRecord = async (recordId: string) => {
     try {
       if (!confirm('确定要删除此记录吗？')) return
@@ -1039,6 +1070,20 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       console.log('我的记录已删除')
     } catch (error) {
       console.error('删除我的记录失败:', error)
+    }
+  }
+
+  const deleteMealRecord = async (recordId: string) => {
+    try {
+      if (!confirm('确定要删除此记录吗？')) return
+      console.log('删除用餐记录:', recordId)
+      // await adminService.softDeleteMealRecord(recordId)
+      await adminService.softDeleteRecord('mealRecords', recordId)
+      // 重新加载数据
+      await loadMealRecords()
+      console.log('用餐记录已删除')
+    } catch (error) {
+      console.error('删除用餐记录失败:', error)
     }
   }
 
@@ -1622,7 +1667,7 @@ const gotoOneDriveStatus = () => {
                       const stoolRecordsFormatted: DisplayRecord[] = stoolRecords.map(record => ({
                         id: record.id,
                         type: 'stool',
-                        date: record.date,
+                        date: record.dateTime,
                         title: '排便记录',
                         description: record.notes || `${getStatusText(record.status)}，${getTypeText(record.type)}`,
                         tags: [
@@ -1644,8 +1689,20 @@ const gotoOneDriveStatus = () => {
                         record: record
                       }))
 
+                      // 将用餐记录转换为统一格式
+                      const mealRecordsFormatted: DisplayRecord[] = mealRecords.map(record => ({
+                        id: record.id,
+                        type: 'meal',
+                        date: record.dateTime,
+                        title: '用餐记录',
+                        description: record.notes?.slice(0, 50) + (record.notes?.length > 50 ? '...' : '') || '用餐记录',
+                        tags: record.tags || [],
+                        record: record
+                      }))
+
                       // 合并所有记录并按时间排序
-                      const allRecords = [...staticRecords, ...stoolRecordsFormatted, ...myRecordsFormatted]
+                      // const allRecords = [...staticRecords, ...stoolRecordsFormatted, ...myRecordsFormatted, ...mealRecordsFormatted]
+                      const allRecords = [...stoolRecordsFormatted, ...myRecordsFormatted, ...mealRecordsFormatted]
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
                       // 按日期分组
@@ -1671,7 +1728,7 @@ const gotoOneDriveStatus = () => {
                               <div className="timeline-time">{formatRecordTime(record.date)}</div>
                               <div className={`record-card rounded-xl p-2.5 shadow-sm transition-all relative`}>
                                 {/* 删除按钮 - 只为可编辑的记录类型显示 */}
-                                {(record.type === 'stool' || record.type === 'myrecord') && (
+                                {(record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal') && (
                                   <button
                                     className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center transition-colors z-10"
                                     onClick={(e) => {
@@ -1680,6 +1737,8 @@ const gotoOneDriveStatus = () => {
                                         deleteStoolRecord(record.id)
                                       } else if (record.type === 'myrecord') {
                                         deleteMyRecord(record.id)
+                                      } else if (record.type === 'meal') {
+                                        deleteMealRecord(record.id)
                                       }
                                     }}
                                     title="删除记录"
@@ -1690,13 +1749,15 @@ const gotoOneDriveStatus = () => {
                                 
                                 <div 
                                   className={`flex items-start ${
-                                    record.type === 'stool' || record.type === 'myrecord' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
+                                    record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
                                   }`}
                                   onClick={() => {
                                     if (record.type === 'stool') {
                                       editStoolRecord(record.id)
                                     } else if (record.type === 'myrecord') {
                                       editMyRecord(record.id)
+                                    } else if (record.type === 'meal') {
+                                      editMealRecord(record.id)
                                     }
                                   }}
                                 >
@@ -1720,7 +1781,7 @@ const gotoOneDriveStatus = () => {
                                       <div className="text-sm font-semibold text-gray-900">
                                         {record.title}
                                       </div>
-                                      {(record.type === 'stool' || record.type === 'myrecord') && (
+                                      {(record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal') && (
                                         <div className="text-xs text-gray-400">点击编辑</div>
                                       )}
                                     </div>
@@ -1806,8 +1867,21 @@ const gotoOneDriveStatus = () => {
                         isUpdated: record.updatedAt !== record.createdAt
                       }))
 
+                      // 将用餐记录转换为统一格式，按 updatedAt 排序
+                      const mealRecordsFormattedByUpdate: DisplayRecord[] = mealRecords.map(record => ({
+                        id: record.id,
+                        type: 'meal',
+                        date: record.updatedAt,
+                        originalDate: record.dateTime, // 保留原始日期时间用于显示
+                        title: '用餐记录',
+                        description: record.notes?.slice(0, 50) + (record.notes?.length > 50 ? '...' : '') || '用餐记录',
+                        tags: record.tags || [],
+                        record: record,
+                        isUpdated: record.updatedAt !== record.createdAt
+                      }))
+
                       // 显示所有记录，按 updatedAt 时间排序（最新的在前）
-                      const updatedRecords = [...stoolRecordsFormatted, ...myRecordsFormattedByUpdate]
+                      const updatedRecords = [...stoolRecordsFormatted, ...myRecordsFormattedByUpdate, ...mealRecordsFormattedByUpdate]
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
                       if (updatedRecords.length === 0) {
@@ -1853,6 +1927,8 @@ const gotoOneDriveStatus = () => {
                                       deleteStoolRecord(record.id)
                                     } else if (record.type === 'myrecord') {
                                       deleteMyRecord(record.id)
+                                    } else if (record.type === 'meal') {
+                                      deleteMealRecord(record.id)
                                     }
                                   }}
                                   title="删除记录"
@@ -1862,23 +1938,27 @@ const gotoOneDriveStatus = () => {
                                 
                                 <div 
                                   className={`flex items-start ${
-                                    record.type === 'stool' || record.type === 'myrecord' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
+                                    record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
                                   }`}
                                   onClick={() => {
                                     if (record.type === 'stool') {
                                       editStoolRecord(record.id)
                                     } else if (record.type === 'myrecord') {
                                       editMyRecord(record.id)
+                                    } else if (record.type === 'meal') {
+                                      editMealRecord(record.id)
                                     }
                                   }}
                                 >
                                   {/* Icon based on record type */}
                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                                     record.type === 'stool' ? 'bg-green-100' : 
-                                    record.type === 'myrecord' ? 'bg-blue-100' : 'bg-gray-100'
+                                    record.type === 'myrecord' ? 'bg-blue-100' :
+                                    record.type === 'meal' ? 'bg-orange-100' : 'bg-gray-100'
                                   }`}>
                                     {record.type === 'stool' && <Sprout className="text-green-500 w-4 h-4" />}
                                     {record.type === 'myrecord' && <Folder className="text-blue-500 w-4 h-4" />}
+                                    {record.type === 'meal' && <Utensils className="text-orange-500 w-4 h-4" />}
                                   </div>
                                   
                                   <div className="ml-2 flex-1 pr-8">
@@ -1891,7 +1971,7 @@ const gotoOneDriveStatus = () => {
                                           {record.isUpdated ? '已更新' : '新增'}
                                         </span>
                                       </div>
-                                      {record.type === 'stool' && (
+                                      {(record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal') && (
                                         <div className="text-xs text-gray-400">点击编辑</div>
                                       )}
                                     </div>
@@ -1909,6 +1989,8 @@ const gotoOneDriveStatus = () => {
                                             key={tagIndex} 
                                             className={`px-1.5 py-0.5 text-xs rounded-md ${
                                               record.type === 'stool' && tagIndex === 0 ? getStatusColor((record as any).record?.status) :
+                                              record.type === 'meal' && tagIndex === 0 ? 'bg-orange-100 text-orange-600' :
+                                              record.type === 'myrecord' ? 'bg-blue-100 text-blue-600' :
                                               'bg-gray-100 text-gray-600'
                                             }`}
                                           >
