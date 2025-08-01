@@ -1,6 +1,6 @@
 import { PublicClientApplication, Configuration, AuthenticationResult, SilentRequest, BrowserCacheLocation } from '@azure/msal-browser'
 import { Client } from '@microsoft/microsoft-graph-client'
-
+import { MobileCompatibilityUtils } from './mobileCompatibility'
 
 type AuthState = {
     timestamp: number;
@@ -90,15 +90,34 @@ export class MicrosoftAuthService {
   private graphClient: Client | null = null
   private initializationPromise: Promise<void> | null = null
   private isInitialized = false
+  private cryptoUnavailable = false
 
   constructor() {
     if (typeof window !== 'undefined') {
-      this.msalInstance = new PublicClientApplication(msalConfig)
+      // Check if crypto API is available before creating MSAL instance
+      const capabilities = MobileCompatibilityUtils.checkBrowserCapabilities()
+      if (!capabilities.hasCrypto) {
+        this.cryptoUnavailable = true
+        console.warn('Web Crypto API not available - OneDrive sync will be disabled')
+        return
+      }
+      
+      // Use mobile-optimized MSAL config
+      const optimizedConfig = MobileCompatibilityUtils.getRecommendedMSALConfig(msalConfig)
+      this.msalInstance = new PublicClientApplication(optimizedConfig)
     }
   }
 
   // 初始化MSAL - 增加幂等性和状态缓存
   async initialize(): Promise<void> {
+    // 如果Crypto API不可用，抛出友好错误
+    if (this.cryptoUnavailable) {
+      const friendlyMessage = MobileCompatibilityUtils.getUserFriendlyErrorMessage(
+        new Error('crypto_nonexistent: The crypto object or function is not available.')
+      )
+      throw new Error(friendlyMessage)
+    }
+
     // 如果已经初始化，直接返回
     if (this.isInitialized) {
       return
@@ -167,6 +186,13 @@ export class MicrosoftAuthService {
 
   // 登录 - 增强移动端支持
   async login(): Promise<AuthenticationResult> {
+    if (this.cryptoUnavailable) {
+      const friendlyMessage = MobileCompatibilityUtils.getUserFriendlyErrorMessage(
+        new Error('crypto_nonexistent: The crypto object or function is not available.')
+      )
+      throw new Error(friendlyMessage)
+    }
+
     if (!this.msalInstance) {
       throw new Error('MSAL instance not initialized')
     }
@@ -210,13 +236,8 @@ export class MicrosoftAuthService {
       
       // 提供更友好的错误信息
       if (error instanceof Error) {
-        if (error.message.includes('crypto')) {
-          throw new Error('登录失败：浏览器不支持所需的加密功能。请使用最新版本的浏览器。')
-        } else if (error.message.includes('popup')) {
-          throw new Error('登录失败：弹窗被阻止。请允许弹窗或尝试刷新页面。')
-        } else if (error.message.includes('network')) {
-          throw new Error('登录失败：网络连接问题。请检查网络连接。')
-        }
+        const friendlyMessage = MobileCompatibilityUtils.getUserFriendlyErrorMessage(error)
+        throw new Error(friendlyMessage)
       }
       
       throw error
@@ -225,6 +246,7 @@ export class MicrosoftAuthService {
 
   // 静默获取令牌 - 增强持久化和重试机制
   async getTokenSilently(): Promise<string | null> {
+    if (this.cryptoUnavailable) return null
     if (!this.msalInstance) return null
 
     try {
@@ -311,8 +333,24 @@ export class MicrosoftAuthService {
 
   // 检查是否已登录
   isLoggedIn(): boolean {
+    if (this.cryptoUnavailable) return false
     if (!this.msalInstance) return false
     return this.msalInstance.getAllAccounts().length > 0
+  }
+
+  // 检查是否可以使用OneDrive功能
+  isOneDriveAvailable(): boolean {
+    return !this.cryptoUnavailable && this.msalInstance !== null
+  }
+
+  // 获取不可用原因
+  getUnavailabilityReason(): string | null {
+    if (this.cryptoUnavailable) {
+      return MobileCompatibilityUtils.getUserFriendlyErrorMessage(
+        new Error('crypto_nonexistent: The crypto object or function is not available.')
+      )
+    }
+    return null
   }
 
   // 创建Graph客户端

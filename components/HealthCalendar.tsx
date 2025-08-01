@@ -1155,7 +1155,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
   }
 
-  const deleteUser = async (userId: string) => {
+  const deleteUserOrig = async (userId: string) => {
     try {
       const user = users.find(u => u.id === userId)
       if (!user) return
@@ -1165,7 +1165,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         return
       }
 
-      if (confirm(`确定要删除用户 "${user.name}" 吗？此操作不可恢复！`)) {
+      if (confirm(`确定要删除用户 "${user.name}" 吗？`)) {
         await userDB.deleteUser(userId)
         
         // 如果删除的是当前当前用户，则激活第一个剩余用户
@@ -1177,6 +1177,32 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         }
         
         await refreshUsers()
+        console.log('用户已删除:', userId)
+      }
+    } catch (error) {
+      console.error('删除用户失败:', error)
+      alert('删除用户失败，请重试')
+    }
+  }
+
+  const deleteUser = async (userId: string) => {
+    try {
+      const user = users.find(u => u.id === userId)
+      if (!user) return
+
+      if (users.length <= 1) {
+        alert('至少需要保留一个用户')
+        return
+      }
+
+      if (confirm(`确定要删除用户 "${user.name}" 吗？`)) {
+
+        await adminService.updateUser(userId, {
+          ...user,
+          delFlag: true
+        })
+        
+        await refreshUsers();
         console.log('用户已删除:', userId)
       }
     } catch (error) {

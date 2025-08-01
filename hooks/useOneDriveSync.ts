@@ -12,6 +12,8 @@ export interface OneDriveSyncState {
   userInfo: any | null
   exportResult: ExportResult | null
   isExporting: boolean
+  isOneDriveAvailable: boolean
+  unavailabilityReason: string | null
 }
 
 export interface OneDriveSyncActions {
@@ -35,11 +37,28 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     userInfo: null,
     exportResult: null,
     isExporting: false,
+    isOneDriveAvailable: true, // Will be updated on initialization
+    unavailabilityReason: null,
   })
 
   // 检查连接状态 - 增强持久化认证支持
   const checkConnection = useCallback(async () => {
     try {
+      // First check if OneDrive is available at all
+      const isOneDriveAvailable = microsoftAuth.isOneDriveAvailable()
+      const unavailabilityReason = microsoftAuth.getUnavailabilityReason()
+      
+      setState(prev => ({
+        ...prev,
+        isOneDriveAvailable,
+        unavailabilityReason,
+      }))
+
+      if (!isOneDriveAvailable) {
+        console.warn('OneDrive not available:', unavailabilityReason)
+        return
+      }
+
       await microsoftAuth.initialize()
       
       const isLoggedIn = microsoftAuth.isLoggedIn()
@@ -96,6 +115,17 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
   // 连接OneDrive
   const connect = useCallback(async () => {
+    // Check if OneDrive is available before attempting connection
+    if (!microsoftAuth.isOneDriveAvailable()) {
+      const reason = microsoftAuth.getUnavailabilityReason()
+      setState(prev => ({ 
+        ...prev, 
+        isConnecting: false, 
+        error: reason || 'OneDrive功能不可用'
+      }))
+      return
+    }
+
     setState(prev => ({ ...prev, isConnecting: true, error: null }))
     
     try {

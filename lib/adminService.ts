@@ -844,11 +844,12 @@ export class IndexedDBAdminService {
       const request = store.getAll();
 
       request.onsuccess = () => {
-        this.allUsers = request.result as User[];
+        // this.allUsers = request.result as User[];
+        this.allUsers = request.result.filter(user => !user.delFlag) as User[];
         this.defaultUser = this.allUsers.find(user => user.id === 'user_self') || null;
         this.activeUser = this.allUsers.find(user => user.isActive) || null;
         console.log('获取所有用户:', this.allUsers);
-        resolve(request.result || []);
+        resolve(this.allUsers || []);
       };
 
       request.onerror = () => {
