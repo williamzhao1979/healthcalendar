@@ -637,8 +637,9 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       }))
       
       // console.log('Users import completed:', result)
-
-      const exportResult =await dataExportService.exportTable('myRecords', 'dummy')
+      if (result.success) {
+        const exportResult = await dataExportService.exportTable('myRecords', 'dummy')
+      }
 
     } catch (error) {
       console.error('MyRecords import failed:', error)

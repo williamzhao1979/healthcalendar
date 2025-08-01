@@ -966,7 +966,8 @@ console.log('microsoftAuth', microsoftAuth)
       for (const oneDriveRecord of dataArray) {
         try {
           // 验证必要字段
-          console.log(`Processing record: ${JSON.stringify(oneDriveRecord)}`)
+          // console.log(`Processing record: ${JSON.stringify(oneDriveRecord)}`)
+          console.log(`Processing record: ${oneDriveRecord.id}`)
           if (!oneDriveRecord.id || !oneDriveRecord.updatedAt) {
             console.warn(`用户数据格式错误: ${JSON.stringify(oneDriveRecord)}`)
             errors.push(`用户数据格式错误: ${JSON.stringify(oneDriveRecord)}`)

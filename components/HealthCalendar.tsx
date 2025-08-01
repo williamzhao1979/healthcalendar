@@ -1293,7 +1293,7 @@ const syncData = async () => {
   try {
     console.log('开始同步 OneDrive 数据...')
     oneDriveActions.syncIDBOneDrive();
-    // oneDriveActions.syncIDBOneDriveMyRecords();
+    oneDriveActions.syncIDBOneDriveMyRecords();
     // setUsersOneDrive(JSON.stringify(usersFileOneDrive, null, 2));
     initializeUsers();
   } catch (err) {
