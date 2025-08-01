@@ -1423,8 +1423,8 @@ const gotoOneDriveStatus = () => {
                 <Utensils className="text-white text-xs" />
               </div>
               <div className="text-left">
+                <div className="text-xs text-gray-600">上次用餐</div>
                 <div className="text-sm font-bold text-gray-800 leading-tight">3</div>
-                <div className="text-xs text-gray-600">今日饮食</div>
               </div>
             </div>
             <div className="stat-card rounded-xl p-2 flex items-center space-x-1.5">
@@ -1432,8 +1432,8 @@ const gotoOneDriveStatus = () => {
                 <Sprout className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-sm font-bold text-gray-800 leading-tight">2</div>
                 <div className="text-xs text-gray-600">上次排便</div>
+                <div className="text-sm font-bold text-gray-800 leading-tight">2</div>
               </div>
             </div>
             <div className="stat-card rounded-xl p-2 flex items-center space-x-1.5">
@@ -1441,8 +1441,7 @@ const gotoOneDriveStatus = () => {
                 <Folder className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-sm font-bold text-gray-800 leading-tight">1</div>
-                <div className="text-xs text-gray-600">我的记录</div>
+                <div className="text-xs text-gray-600">健康统计</div>
               </div>
             </div>
           </div>
