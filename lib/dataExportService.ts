@@ -532,7 +532,7 @@ export class DataExportService {
       // 如果你需要解析成对象，可以再用 JSON.parse
       const data = JSON.parse(jsonString);
       console.log(`File content: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`);
-      console.log('Successfully read users.json file')
+      console.log(`Successfully read ${fileName} file`)
       return data;
     } catch (error) {
       if (error instanceof Error) {
@@ -811,7 +811,7 @@ console.log('microsoftAuth', microsoftAuth)
 
       // 获取本地现有用户数据
       // const localUsers = await userDB.getAllUsers()
-      const localUsers = await adminService.getAllUsers()
+      const localUsers = await adminService.getAllUsersRecord()
       console.log(`Found ${localUsers.length} local users`)
 
       let importedCount = 0
@@ -821,13 +821,16 @@ console.log('microsoftAuth', microsoftAuth)
       for (const oneDriveUser of usersArray) {
         try {
           // 验证必要字段
+          console.log(`Processing user: ${JSON.stringify(oneDriveUser)}`)
           if (!oneDriveUser.id || !oneDriveUser.updatedAt) {
+            console.warn(`用户数据格式错误: ${JSON.stringify(oneDriveUser)}`)
             errors.push(`用户数据格式错误: ${JSON.stringify(oneDriveUser)}`)
             continue
           }
 
           // 查找本地是否存在相同ID的用户
           const existingUser = localUsers.find(user => user.id === oneDriveUser.id)
+          console.log(`Processing user: ${oneDriveUser.id}, existing: ${!!existingUser}`)
 
           if (!existingUser) {
             // 本地不存在，直接添加
@@ -858,12 +861,7 @@ console.log('microsoftAuth', microsoftAuth)
               // OneDrive数据更新，更新本地数据
               try {
                 const updatedUser = {
-                  ...existingUser,
-                  name: oneDriveUser.name || existingUser.name,
-                  avatarUrl: oneDriveUser.avatarUrl || existingUser.avatarUrl,
-                  isActive: oneDriveUser.isActive !== undefined ? oneDriveUser.isActive : existingUser.isActive,
-                  createdAt: oneDriveUser.createdAt || existingUser.createdAt,
-                  updatedAt: oneDriveUser.updatedAt
+                  ...oneDriveUser
                 }
                 
                 // 直接使用IndexedDB更新完整的用户对象
@@ -908,7 +906,7 @@ console.log('microsoftAuth', microsoftAuth)
     errors: string[] 
   }> {
     try {
-      console.log('Starting import from OneDrive...')
+      console.log('Starting import MyRecords from OneDrive...')
 
       // 从OneDrive读取myRecords.json文件
       const oneDriveFile = await this.readFile('myRecords.json')
@@ -946,7 +944,9 @@ console.log('microsoftAuth', microsoftAuth)
       for (const oneDriveRecord of dataArray) {
         try {
           // 验证必要字段
+          console.log(`Processing record: ${JSON.stringify(oneDriveRecord)}`)
           if (!oneDriveRecord.id || !oneDriveRecord.updatedAt) {
+            console.warn(`用户数据格式错误: ${JSON.stringify(oneDriveRecord)}`)
             errors.push(`用户数据格式错误: ${JSON.stringify(oneDriveRecord)}`)
             continue
           }
@@ -955,6 +955,7 @@ console.log('microsoftAuth', microsoftAuth)
           const existingRecord = localRecords.find(record => record.id === oneDriveRecord.id)
 
           if (!existingRecord) {
+            console.log(`Processing record: ${oneDriveRecord.id}, existing: ${!!existingRecord}`)
             // 本地不存在，直接添加
               const newRecord = {
                 ...oneDriveRecord
@@ -963,15 +964,17 @@ console.log('microsoftAuth', microsoftAuth)
 
               
               // 直接使用IndexedDB添加完整的用户对象
-              await this.addUserDirectly(newRecord)
+              await this.addMyRecordDirectly(newRecord)
               
               importedCount++
               console.log(`Added new user: ${newRecord.id}`)
             } catch (addError) {
+              console.error(`添加用户失败 ${newRecord.id}:`, addError)
               errors.push(`添加失败 ${newRecord.id}: ${addError instanceof Error ? addError.message : 'Unknown error'}`)
             }
           } else {
             // 本地存在，比较updatedAt时间戳
+            console.log(`Processing record: ${oneDriveRecord.id}, existing: ${!!existingRecord}`)
             const oneDriveDate = new Date(oneDriveRecord.updatedAt)
             const localDate = new Date(existingRecord.updatedAt)
 
@@ -984,11 +987,12 @@ console.log('microsoftAuth', microsoftAuth)
               try {
 
                 // 直接使用IndexedDB更新完整的用户对象
-                await this.updateUserDirectly(updatedRecord)
+                await this.updateMyRecordDirectly(updatedRecord)
                 
                 importedCount++
                 console.log(`Updated user: ${oneDriveRecord.id} (OneDrive newer: ${oneDriveRecord.updatedAt} > ${existingRecord.updatedAt})`)
               } catch (updateError) {
+                console.error(`更新用户失败 ${oneDriveRecord.id}:`, updateError)
                 errors.push(`更新用户失败 ${oneDriveRecord.id}: ${updateError instanceof Error ? updateError.message : 'Unknown error'}`)
               }
             } else {
@@ -996,6 +1000,7 @@ console.log('microsoftAuth', microsoftAuth)
             }
           }
         } catch (error) {
+          console.error(`处理用户数据失败 ${oneDriveRecord.id}:`, error)
           errors.push(`处理用户数据失败 ${oneDriveRecord.id}: ${error instanceof Error ? error.message : 'Unknown error'}`)
         }
       }
@@ -1030,17 +1035,19 @@ console.log('microsoftAuth', microsoftAuth)
         const addRequest = store.add(user)
         
         addRequest.onsuccess = () => {
-          db.close()
+          // db.close()
           resolve()
         }
         
         addRequest.onerror = () => {
-          db.close()
+          // db.close()
+          console.error('Failed to add user directly:', addRequest.error)
           reject(new Error('Failed to add user directly'))
         }
       }
       
       request.onerror = () => {
+        console.error('Failed to open database:', request.error)
         reject(new Error('Failed to open database'))
       }
     })
@@ -1058,17 +1065,80 @@ console.log('microsoftAuth', microsoftAuth)
         const putRequest = store.put(user)
         
         putRequest.onsuccess = () => {
-          db.close()
+          // db.close()
           resolve()
         }
         
         putRequest.onerror = () => {
-          db.close()
+          // db.close()
+          console.error('Failed to update user directly:', putRequest.error)
           reject(new Error('Failed to update user directly'))
         }
       }
       
       request.onerror = () => {
+        console.error('Failed to open database:', request.error)
+        reject(new Error('Failed to open database'))
+      }
+    })
+  }
+
+  // 直接添加用户到IndexedDB（包含所有字段）
+  private async addMyRecordDirectly(record: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('HealthCalendarDB')
+      
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        const transaction = db.transaction(['myRecords'], 'readwrite')
+        const store = transaction.objectStore('myRecords')
+        const addRequest = store.add(record)
+        
+        addRequest.onsuccess = () => {
+          // db.close()
+          resolve()
+        }
+        
+        addRequest.onerror = () => {
+          // db.close()
+          console.error('Failed to add MyRecord directly:', addRequest.error)
+          reject(new Error('Failed to add MyRecord directly'))
+        }
+      }
+      
+      request.onerror = () => {
+        console.error('Failed to open database:', request.error)
+        reject(new Error('Failed to open database'))
+      }
+    })
+  }
+
+  // 直接更新用户到IndexedDB（包含所有字段）
+  private async updateMyRecordDirectly(record: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('HealthCalendarDB')
+      
+      request.onsuccess = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        const transaction = db.transaction(['myRecords'], 'readwrite')
+        const store = transaction.objectStore('myRecords')
+        const putRequest = store.put(record)
+        
+        putRequest.onsuccess = () => {
+          // db.close()
+          // console.log('MyRecord updated successfully:', record.id)
+          resolve()
+        }
+        
+        putRequest.onerror = () => {
+          // db.close()
+          console.error('Failed to update MyRecord directly:', putRequest.error)
+          reject(new Error('Failed to update MyRecord directly'))
+        }
+      }
+      
+      request.onerror = () => {
+        console.error('Failed to open database:', request.error)
         reject(new Error('Failed to open database'))
       }
     })

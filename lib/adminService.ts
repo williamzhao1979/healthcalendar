@@ -862,6 +862,35 @@ export class IndexedDBAdminService {
     });
   }
 
+  // 获取所有用户
+  async getAllUsersRecord(): Promise<User[]> {
+    await this.ensureIDB();
+    const db = await this.getDB();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(['users'], 'readonly');
+      const store = transaction.objectStore('users');
+      const request = store.getAll();
+
+      request.onsuccess = () => {
+        // this.allUsers = request.result as User[];
+        // this.allUsers = request.result.filter(user => !user.delFlag) as User[];
+        // this.defaultUser = this.allUsers.find(user => user.id === 'user_self') || null;
+        // this.activeUser = this.allUsers.find(user => user.isActive) || null;
+        // console.log('获取所有用户:', this.allUsers);
+        resolve(request.result|| []);
+      };
+
+      request.onerror = () => {
+        reject(new Error('Failed to get users'));
+      };
+
+      // transaction.oncomplete = () => {
+      //   db.close();
+      // };
+    });
+  }
+
   public getDefaultUser(): User | null {
     return this.defaultUser;
   }
