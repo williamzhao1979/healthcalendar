@@ -13,6 +13,7 @@ interface AttachmentUploaderProps {
   recordType: string
   recordId: string
   disabled?: boolean
+  compressImages?: boolean
 }
 
 export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
@@ -25,7 +26,8 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
   onGetUrl,
   recordType,
   recordId,
-  disabled = false
+  disabled = false,
+  compressImages = true
 }) => {
   const [uploadState, setUploadState] = useState<AttachmentUploadState>({
     isUploading: false,
@@ -34,6 +36,75 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
   })
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 图片压缩函数
+  const compressImage = useCallback((file: File, quality: number = 0.8, maxWidth: number = 1920, maxHeight: number = 1080): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      const img = new Image()
+      
+      img.onload = () => {
+        // 计算新的尺寸
+        let { width, height } = img
+        
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height)
+          width = width * ratio
+          height = height * ratio
+        }
+        
+        canvas.width = width
+        canvas.height = height
+        
+        // 绘制压缩后的图片
+        ctx?.drawImage(img, 0, 0, width, height)
+        
+        // 转换为Blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            // 创建新的File对象
+            const compressedFile = new File([blob], file.name, {
+              type: file.type,
+              lastModified: Date.now()
+            })
+            
+            console.log(`图片压缩完成: ${file.name}`)
+            console.log(`原始大小: ${(file.size / 1024 / 1024).toFixed(2)}MB`)
+            console.log(`压缩后大小: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`)
+            console.log(`压缩率: ${((1 - compressedFile.size / file.size) * 100).toFixed(1)}%`)
+            
+            resolve(compressedFile)
+          } else {
+            // 压缩失败，返回原文件
+            resolve(file)
+          }
+        }, file.type, quality)
+      }
+      
+      img.onerror = () => {
+        // 加载失败，返回原文件
+        resolve(file)
+      }
+      
+      img.src = URL.createObjectURL(file)
+    })
+  }, [])
+
+  // 预处理文件（可能包含压缩）
+  const preprocessFile = useCallback(async (file: File): Promise<File> => {
+    // 检查是否是图片且需要压缩
+    if (compressImages && file.type.startsWith('image/')) {
+      try {
+        return await compressImage(file)
+      } catch (error) {
+        console.error('图片压缩失败，使用原始文件:', error)
+        return file
+      }
+    }
+    
+    return file
+  }, [compressImages, compressImage])
 
   // 验证文件
   const validateFile = (file: File): string | null => {
@@ -55,10 +126,10 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
       return
     }
 
-    const file = files[0] // 暂时只支持单文件上传
-    if (!file) return
+    const originalFile = files[0] // 暂时只支持单文件上传
+    if (!originalFile) return
 
-    const validationError = validateFile(file)
+    const validationError = validateFile(originalFile)
     if (validationError) {
       setUploadState(prev => ({ ...prev, error: validationError }))
       return
@@ -71,6 +142,9 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
     })
 
     try {
+      // 预处理文件（可能包含压缩）
+      const processedFile = await preprocessFile(originalFile)
+
       // 模拟上传进度
       const progressInterval = setInterval(() => {
         setUploadState(prev => ({
@@ -79,7 +153,7 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
         }))
       }, 100)
 
-      const fileName = await onUpload(file, recordType, recordId)
+      const fileName = await onUpload(processedFile, recordType, recordId)
 
       clearInterval(progressInterval)
 
@@ -87,9 +161,9 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
       const newAttachment: Attachment = {
         id: `attachment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         fileName,
-        originalName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
+        originalName: originalFile.name,
+        fileSize: processedFile.size, // 使用处理后的文件大小
+        mimeType: originalFile.type,
         uploadedAt: new Date().toISOString(),
         isUploaded: true
       }
@@ -113,7 +187,7 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
       })
       console.error('附件上传失败:', error)
     }
-  }, [oneDriveConnected, attachments, onUpload, onAttachmentsChange, recordType, recordId])
+  }, [oneDriveConnected, attachments, onUpload, onAttachmentsChange, recordType, recordId, validateFile, preprocessFile])
 
   // 处理删除附件
   const handleDeleteAttachment = useCallback(async (attachment: Attachment) => {

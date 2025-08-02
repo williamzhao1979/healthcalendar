@@ -188,6 +188,67 @@ class MyRecordDB {
 
 const myRecordDB = new MyRecordDB()
 
+// 动态图片组件
+const DynamicImage: React.FC<{
+  attachment: Attachment;
+  onGetUrl: (fileName: string) => Promise<string>;
+  onClick: () => void;
+}> = ({ attachment, onGetUrl, onClick }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    const loadImage = async () => {
+      try {
+        setLoading(true)
+        setError(false)
+        const url = await onGetUrl(attachment.fileName)
+        setImageUrl(url)
+      } catch (err) {
+        console.error('Failed to load image:', err)
+        setError(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadImage()
+  }, [attachment.fileName, onGetUrl])
+
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-1"></div>
+          <div className="text-xs text-gray-500">加载中...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !imageUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <FileImage className="w-8 h-8 text-gray-400 mx-auto mb-1" />
+          <div className="text-xs text-gray-500">图片加载失败</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={attachment.fileName}
+      className="w-full h-full object-cover cursor-pointer"
+      onClick={onClick}
+      onError={() => setError(true)}
+    />
+  )
+}
+
 // 用户切换组件
 const UserSwitcher: React.FC<{
   currentUser: UserType | null
@@ -391,20 +452,32 @@ function MyRecordPageContent() {
   // UI状态 - 仿照stool页面
   const [showFullImageModal, setShowFullImageModal] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string>('')
+  const [compressImages, setCompressImages] = useState(true) // 默认开启图片压缩
 
   // 初始化
   useEffect(() => {
-    loadUsers()
-    initializeDateTime()
-    
-    // 检查是否为编辑模式
-    const editId = searchParams.get('edit')
-    if (editId) {
-      setIsEditing(true)
-      setEditingId(editId)
-      loadRecordForEdit(editId)
+    const initializeData = async () => {
+      await loadUsers()
+      initializeDateTime()
+      
+      // 检查是否为编辑模式
+      const editId = searchParams.get('edit')
+      if (editId) {
+        setIsEditing(true)
+        setEditingId(editId)
+      }
     }
+    
+    initializeData()
   }, [searchParams])
+
+  // 当用户加载完成且处于编辑模式时，加载记录
+  useEffect(() => {
+    if (currentUser && editingId && isEditing) {
+      loadRecordForEdit(editingId)
+    }
+  }, [currentUser, editingId, isEditing])
+
 
   // 键盘事件处理
   useEffect(() => {
@@ -455,16 +528,18 @@ function MyRecordPageContent() {
 
   const loadRecordForEdit = async (id: string) => {
     try {
-      // const record = await myRecordDB.getRecord(id)
       if (!currentUser?.id) {
-        throw new Error('当前用户未找到')
+        console.error('当前用户未找到')
+        return
       }
+      
       const record = await adminService.getUserRecord('myRecords', currentUser.id, id)
       if (record) {
         setDateTime(record.dateTime)
         setContent(record.content)
-        setSelectedTags(record.tags)
-        setAttachments(record.attachments)
+        setSelectedTags(record.tags || [])
+        setAttachments(record.attachments || [])
+        console.log('Loaded record for edit:', record)
       }
     } catch (error) {
       console.error('Failed to load record for edit:', error)
@@ -680,6 +755,28 @@ function MyRecordPageContent() {
                 )}
               </h3>
 
+              {/* 图片压缩选项 */}
+              <div className="mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={compressImages}
+                    onChange={(e) => setCompressImages(e.target.checked)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                  />
+                  <div className="flex items-center space-x-1">
+                    <span className="text-sm text-gray-700 font-medium">压缩图片</span>
+                    <span className="text-xs text-gray-500">(推荐开启以节省存储空间)</span>
+                  </div>
+                </label>
+                <div className="text-xs text-gray-500 mt-1 ml-6">
+                  {compressImages 
+                    ? "✓ 图片将被压缩至较小尺寸，减少存储空间占用" 
+                    : "⚠️ 图片将保持原始大小，可能占用较多存储空间"
+                  }
+                </div>
+              </div>
+
               {/* 使用新的 AttachmentUploader 组件 */}
               <AttachmentUploader
                 oneDriveConnected={oneDriveState.isAuthenticated}
@@ -691,22 +788,105 @@ function MyRecordPageContent() {
                 onGetUrl={handleAttachmentGetUrl}
                 recordType="myrecord"
                 recordId={editingId || 'new'}
+                compressImages={compressImages}
               />
 
-              {/* Attached Images Preview */}
+              {/* Existing Attachments Display */}
               {attachments.length > 0 && (
-                <div>
+                <div className="mt-3">
                   <div className="text-xs text-gray-600 mb-2 flex items-center justify-between">
                     <div className="flex items-center">
                       <FileImage className="w-3 h-3 mr-1" />
-                      已上传的图片 ({attachments.length})
+                      已上传的附件 ({attachments.length})
                     </div>
                     <div className="text-xs text-gray-400">
-                      悬停图片显示删除按钮
+                      点击查看大图
                     </div>
                   </div>
                   
-                  {/* 附件已通过 AttachmentUploader 组件处理 */}
+                  {/* Image Preview Grid */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {attachments.map((attachment, index) => {
+                      const isImage = attachment.mimeType?.startsWith('image/') || 
+                                    attachment.fileName?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                      
+                      return (
+                        <div key={attachment.id || index} className="relative group">
+                          {isImage ? (
+                            <div 
+                              className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 border border-gray-200"
+                              onClick={async () => {
+                                try {
+                                  const imageUrl = await handleAttachmentGetUrl(attachment.fileName);
+                                  handleViewFullImage(imageUrl);
+                                } catch (error) {
+                                  console.error('Failed to get image URL:', error);
+                                }
+                              }}
+                            >
+                              <DynamicImage
+                                attachment={attachment}
+                                onGetUrl={handleAttachmentGetUrl}
+                                onClick={async () => {
+                                  try {
+                                    const imageUrl = await handleAttachmentGetUrl(attachment.fileName);
+                                    handleViewFullImage(imageUrl);
+                                  } catch (error) {
+                                    console.error('Failed to get image URL:', error);
+                                  }
+                                }}
+                              />
+                              
+                              {/* Overlay with zoom indicator */}
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
+                                <div className="bg-white/90 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                  <FileImage className="w-4 h-4 text-gray-700" />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                              <div className="text-center">
+                                <File className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                                <div className="text-xs text-gray-500 truncate px-1">
+                                  {attachment.fileName}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Delete button */}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm('确定要删除这个附件吗？')) {
+                                try {
+                                  await handleAttachmentDelete(attachment.fileName);
+                                  // Remove from local state
+                                  setAttachments(prev => prev.filter((_, i) => i !== index));
+                                } catch (error) {
+                                  console.error('Failed to delete attachment:', error);
+                                }
+                              }
+                            }}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
+                            title="删除附件"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          
+                          {/* File name tooltip */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 truncate">
+                            {attachment.fileName}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  
+                  <AttachmentViewer
+                    attachments={attachments}
+                  />
                 </div>
               )}
             </div>
