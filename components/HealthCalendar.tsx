@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/router"
-import Heart from "components/icons/Heart"
-import adminService from "services/adminService"
+import { useRouter } from "next/navigation"
+import Heart from "@/components/icons/Heart"
+import { adminService } from "@/lib/adminService"
 
 const HealthCalendar = () => {
   const router = useRouter()
@@ -12,21 +12,29 @@ const HealthCalendar = () => {
 
   useEffect(() => {
     const loadUserData = async () => {
-      const userId = await adminService.getCurrentUserId()
-      setUserId(userId)
-
-      const periods = await adminService.getPeriodRecords(userId)
-      setPeriodRecords(periods)
+      try {
+        const user = await adminService.getCurrentUser()
+        if (user) {
+          setUserId(user.id)
+          const periods = await adminService.getPeriodRecords(user.id)
+          setPeriodRecords(periods)
+        }
+      } catch (error) {
+        console.error("Failed to load user data:", error)
+      }
     }
 
     loadUserData()
   }, [])
 
   const handleUserChange = async (newUserId: string) => {
-    setUserId(newUserId)
-
-    const periods = await adminService.getPeriodRecords(newUserId)
-    setPeriodRecords(periods)
+    try {
+      setUserId(newUserId)
+      const periods = await adminService.getPeriodRecords(newUserId)
+      setPeriodRecords(periods)
+    } catch (error) {
+      console.error("Failed to change user:", error)
+    }
   }
 
   const renderDayContent = (date: Date) => {
@@ -71,6 +79,22 @@ const HealthCalendar = () => {
         <span>生理记录</span>
       </button>
       {/* 日历渲染部分 */}
+      <div className="mt-4">
+        {/* 这里可以添加实际的日历组件 */}
+        <div className="grid grid-cols-7 gap-1">
+          {/* 示例日历格子 */}
+          {Array.from({ length: 35 }, (_, i) => {
+            const date = new Date()
+            date.setDate(date.getDate() - 17 + i)
+            return (
+              <div key={i} className="p-2 border border-gray-200 rounded min-h-[60px]">
+                <div className="text-sm font-medium text-gray-900">{date.getDate()}</div>
+                {renderDayContent(date)}
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
