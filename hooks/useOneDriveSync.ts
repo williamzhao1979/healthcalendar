@@ -34,6 +34,11 @@ export interface OneDriveSyncActions {
   syncIDBOneDriveUsers: () => Promise<void>
   syncIDBOneDriveMyRecords: () => Promise<void>
   syncIDBOneDriveStoolRecords: () => Promise<void>
+  // 附件相关方法
+  uploadAttachment: (file: File, recordType: string, recordId: string) => Promise<string>
+  deleteAttachment: (fileName: string) => Promise<void>
+  getAttachmentUrl: (fileName: string) => Promise<string>
+  listAttachments: (recordId?: string) => Promise<string[]>
 }
 
 export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
@@ -718,6 +723,212 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
   }, [state.isAuthenticated])
 
+  // 附件管理方法
+  // 上传附件到OneDrive
+  const uploadAttachment = useCallback(async (file: File, recordType: string, recordId: string): Promise<string> => {
+    if (!state.isAuthenticated) {
+      throw new Error('需要先连接OneDrive才能上传附件')
+    }
+
+    try {
+      console.log(`🌐 OneDrive上传开始`)
+      console.log(`📄 文件名: ${file.name}`)
+      console.log(`📦 文件大小: ${(file.size / 1024 / 1024).toFixed(2)}MB (${file.size} bytes)`)
+      console.log(`🏷️ 文件类型: ${file.type}`)
+      console.log(`📂 记录类型: ${recordType}, 记录ID: ${recordId}`)
+
+      // 生成唯一文件名：{recordType}_{recordId}_{timestamp}_{originalFileName}
+      const timestamp = Date.now()
+      const fileName = `${recordType}_${recordId}_${timestamp}_${file.name}`
+      const filePath = `/Apps/HealthCalendar/attachments/${fileName}`
+
+      // 确保附件目录存在
+      await ensureAttachmentsFolder()
+
+      // 获取访问令牌
+      const token = await microsoftAuth.getTokenSilently()
+      if (!token) {
+        throw new Error('无法获取访问令牌，请重新登录')
+      }
+
+      console.log(`📤 上传到路径: ${filePath}`)
+
+      // 上传文件到OneDrive
+      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${filePath}:/content`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': file.type || 'application/octet-stream'
+        },
+        body: file
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`上传附件失败: ${response.status} ${response.statusText} - ${errorText}`)
+      }
+
+      const fileInfo = await response.json()
+      
+      console.log(`✅ OneDrive上传成功`)
+      console.log(`📁 文件名: ${fileName}`)
+      console.log(`🔗 文件ID: ${fileInfo.id}`)
+      console.log(`📊 上传后大小: ${fileInfo.size} bytes`)
+      
+      return fileName // 返回文件名用于存储在记录中
+    } catch (error) {
+      console.error('❌ OneDrive上传失败:', error)
+      throw error
+    }
+  }, [state.isAuthenticated])
+
+  // 删除附件
+  const deleteAttachment = useCallback(async (fileName: string): Promise<void> => {
+    if (!state.isAuthenticated) {
+      throw new Error('需要先连接OneDrive')
+    }
+
+    try {
+      const token = await microsoftAuth.getTokenSilently()
+      if (!token) {
+        throw new Error('无法获取访问令牌，请重新登录')
+      }
+
+      const filePath = `/Apps/HealthCalendar/attachments/${fileName}`
+      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${filePath}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok && response.status !== 404) {
+        const errorText = await response.text()
+        throw new Error(`删除附件失败: ${response.status} ${response.statusText} - ${errorText}`)
+      }
+
+      console.log('附件删除成功:', fileName)
+    } catch (error) {
+      console.error('删除附件失败:', error)
+      throw error
+    }
+  }, [state.isAuthenticated])
+
+  // 获取附件下载URL
+  const getAttachmentUrl = useCallback(async (fileName: string): Promise<string> => {
+    if (!state.isAuthenticated) {
+      throw new Error('需要先连接OneDrive')
+    }
+
+    try {
+      const token = await microsoftAuth.getTokenSilently()
+      if (!token) {
+        throw new Error('无法获取访问令牌，请重新登录')
+      }
+
+      const filePath = `/Apps/HealthCalendar/attachments/${fileName}`
+      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${filePath}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`获取附件信息失败: ${response.statusText}`)
+      }
+
+      const fileInfo = await response.json()
+      return fileInfo['@microsoft.graph.downloadUrl'] || fileInfo.webUrl
+    } catch (error) {
+      console.error('获取附件URL失败:', error)
+      throw error
+    }
+  }, [state.isAuthenticated])
+
+  // 列出附件
+  const listAttachments = useCallback(async (recordId?: string): Promise<string[]> => {
+    if (!state.isAuthenticated) {
+      throw new Error('需要先连接OneDrive')
+    }
+
+    try {
+      const token = await microsoftAuth.getTokenSilently()
+      if (!token) {
+        throw new Error('无法获取访问令牌，请重新登录')
+      }
+
+      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/Apps/HealthCalendar/attachments:/children`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return [] // 附件目录不存在，返回空数组
+        }
+        throw new Error(`获取附件列表失败: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      const files = data.value || []
+      
+      // 如果指定了recordId，则过滤相关文件
+      if (recordId) {
+        return files
+          .filter((file: any) => file.name.includes(`_${recordId}_`))
+          .map((file: any) => file.name)
+      }
+
+      return files.map((file: any) => file.name)
+    } catch (error) {
+      console.error('获取附件列表失败:', error)
+      throw error
+    }
+  }, [state.isAuthenticated])
+
+  // 确保附件目录存在
+  const ensureAttachmentsFolder = useCallback(async (): Promise<void> => {
+    try {
+      const token = await microsoftAuth.getTokenSilently()
+      if (!token) {
+        throw new Error('无法获取访问令牌')
+      }
+
+      // 检查附件目录是否存在
+      const checkResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/Apps/HealthCalendar/attachments`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (checkResponse.status === 404) {
+        // 目录不存在，创建它
+        const createResponse = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/Apps/HealthCalendar:/children`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: 'attachments',
+            folder: {},
+            '@microsoft.graph.conflictBehavior': 'rename'
+          })
+        })
+
+        if (!createResponse.ok) {
+          throw new Error(`创建附件目录失败: ${createResponse.statusText}`)
+        }
+
+        console.log('附件目录创建成功')
+      }
+    } catch (error) {
+      console.error('确保附件目录存在失败:', error)
+      throw error
+    }
+  }, [])
+
   const actions: OneDriveSyncActions = {
     connect,
     disconnect,
@@ -732,6 +943,10 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     syncIDBOneDriveUsers,
     syncIDBOneDriveMyRecords,
     syncIDBOneDriveStoolRecords,
+    uploadAttachment,
+    deleteAttachment,
+    getAttachmentUrl,
+    listAttachments,
   }
 
   return [state, actions]

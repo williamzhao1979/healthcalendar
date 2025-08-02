@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Heart, 
@@ -31,6 +31,8 @@ import { HEALTH_CALENDAR_DB_VERSION } from '../lib/dbVersion'
 import { BaseRecord } from '../type/baserecord'
 import { useOneDriveSync, formatSyncTime } from '../hooks/useOneDriveSync'
 import { adminService } from '@/lib/adminService'
+import { AttachmentViewer } from './AttachmentViewer'
+import { Attachment } from '../types/attachment'
 import { set } from 'react-hook-form'
 
 // 简单的类型定义 - 避免复杂的语法
@@ -47,7 +49,7 @@ type StoolRecord = BaseRecord & {
   color: StoolColor
   notes: string
   tags: string[]
-  attachments: string[]
+  attachments: Attachment[]
 }
 
 // MyRecord 类型定义
@@ -55,7 +57,7 @@ type MyRecord = BaseRecord & {
   dateTime: string
   content: string
   tags: string[]
-  attachments: string[]
+  attachments: Attachment[]
 }
 
 type StoolDatabase = {
@@ -1678,6 +1680,27 @@ const gotoOneDriveStatus = () => {
   router.push('/onedrive-test');
 }
 
+// 处理附件下载
+const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
+  try {
+    const downloadUrl = await oneDriveActions.getAttachmentUrl(attachment.fileName)
+    
+    // 创建临时链接并下载
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = attachment.originalName
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    console.log('开始下载附件:', attachment.originalName)
+  } catch (error) {
+    console.error('下载附件失败:', error)
+    alert('下载附件失败: ' + (error instanceof Error ? error.message : '未知错误'))
+  }
+}, [oneDriveActions])
+
   return (
     <div className="overflow-x-hidden">
       {/* Background */}
@@ -2196,6 +2219,17 @@ const gotoOneDriveStatus = () => {
                                         ))}
                                       </div>
                                     )}
+                                    
+                                    {/* 附件显示 */}
+                                    {record.record && record.record.attachments && record.record.attachments.length > 0 && (
+                                      <div className="mt-2">
+                                        <AttachmentViewer 
+                                          attachments={record.record.attachments}
+                                          onDownload={handleAttachmentDownload}
+                                          compact={true}
+                                        />
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -2407,6 +2441,17 @@ const gotoOneDriveStatus = () => {
                                             {tag}
                                           </span>
                                         ))}
+                                      </div>
+                                    )}
+                                    
+                                    {/* 附件显示 */}
+                                    {record.record && record.record.attachments && record.record.attachments.length > 0 && (
+                                      <div className="mt-2">
+                                        <AttachmentViewer 
+                                          attachments={record.record.attachments}
+                                          onDownload={handleAttachmentDownload}
+                                          compact={true}
+                                        />
                                       </div>
                                     )}
                                   </div>
@@ -3310,6 +3355,17 @@ const gotoOneDriveStatus = () => {
                                 +{record.tags.length - 3}
                               </span>
                             )}
+                          </div>
+                        )}
+                        
+                        {/* 附件显示 */}
+                        {record.attachments && record.attachments.length > 0 && (
+                          <div className="mt-2">
+                            <AttachmentViewer 
+                              attachments={record.attachments}
+                              onDownload={handleAttachmentDownload}
+                              compact={true}
+                            />
                           </div>
                         )}
                       </div>
