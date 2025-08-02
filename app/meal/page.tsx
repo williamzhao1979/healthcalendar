@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { userDB, User as UserType } from '../../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
+import { adminService } from '@/lib/adminService'
 
 interface MealRecord {
   id: string
@@ -289,6 +290,7 @@ function MealPageContent() {
 
   // 表单状态
   const [date, setDate] = useState('')
+  const [dateTime, setDateTime] = useState('')
   const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner'>('breakfast')
   const [amount, setAmount] = useState<'very_little' | 'little' | 'moderate' | 'much'>('moderate')
   const [notes, setNotes] = useState('')
@@ -330,25 +332,27 @@ function MealPageContent() {
   const initializeData = async () => {
     try {
       setIsLoading(true)
-      await userDB.ensureInitialized()
-      await mealDB.ensureInitialized()
+      // await userDB.ensureInitialized()
+      // await mealDB.ensureInitialized()
 
-      const allUsers = await userDB.getAllUsers()
-      const activeUser = await userDB.getActiveUser()
+      const allUsers = await adminService.getAllUsers()
+      const defaultUser = await adminService.getDefaultUser()
       
       setUsers(allUsers)
-      setCurrentUser(activeUser)
+      setCurrentUser(await adminService.getCurrentUser() || defaultUser)
 
       // 设置默认日期时间
       const now = new Date()
       const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      setDate(localDateTime.toISOString().slice(0, 16))
+      // setDate(localDateTime.toISOString().slice(0, 16))
+      setDateTime(localDateTime.toISOString().slice(0, 16))
 
       // 如果是编辑模式，加载记录数据
       if (isEditMode && editId) {
-        const record = await mealDB.getRecord(editId)
+        // const record = await mealDB.getRecord(editId)
+        const record = await adminService.getUserRecord('mealRecords', currentUser?.id, editId)
         if (record) {
-          setDate(record.date)
+          setDateTime(record.dateTime)
           setMealType(record.mealType)
           setAmount(record.amount)
           setNotes(record.notes)
@@ -365,7 +369,7 @@ function MealPageContent() {
 
   const handleUserChange = async (user: UserType) => {
     setCurrentUser(user)
-    await userDB.setActiveUser(user.id)
+    // await userDB.setActiveUser(user.id)
   }
 
   const handleSaveRecord = async () => {
@@ -379,7 +383,7 @@ function MealPageContent() {
 
       const recordData = {
         userId: currentUser.id,
-        date,
+        dateTime,
         mealType,
         amount,
         notes,
@@ -388,11 +392,13 @@ function MealPageContent() {
       }
 
       if (isEditMode && editId) {
-        await mealDB.updateRecord(editId, recordData)
-        alert('记录更新成功！')
+        // await mealDB.updateRecord(editId, recordData)
+        await adminService.updateMealRecord(editId, recordData)
+        // alert('记录更新成功！')
       } else {
-        await mealDB.saveRecord(recordData)
-        alert('记录保存成功！')
+        // await mealDB.saveRecord(recordData)
+        await adminService.saveMealRecord(recordData)
+        // alert('记录保存成功！')
       }
 
       router.push('/health-calendar')
@@ -550,8 +556,8 @@ function MealPageContent() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">选择日期和时间</label>
                 <input
                   type="datetime-local"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  value={dateTime}
+                  onChange={(e) => setDateTime(e.target.value)}
                   className="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:border-health-primary focus:ring-2 focus:ring-health-primary/20 transition-all text-sm"
                 />
               </div>

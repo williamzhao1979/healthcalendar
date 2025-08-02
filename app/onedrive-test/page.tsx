@@ -309,7 +309,7 @@ export default function OneDriveTestPage() {
               </button>
 
               {/* 文件列表 */}
-              {oneDriveState.files.length > 0 && (
+              {oneDriveState.files?.length > 0 && (
                 <div className="bg-white rounded-lg border">
                   <div className="p-3 border-b bg-gray-50 rounded-t-lg">
                     <h3 className="text-sm font-semibold text-gray-700">文件列表 ({oneDriveState.files.length} 个文件)</h3>
@@ -373,7 +373,7 @@ export default function OneDriveTestPage() {
                 </div>
               )}
 
-              {oneDriveState.files.length === 0 && !oneDriveState.isLoadingFiles && (
+              {oneDriveState.files?.length === 0 && !oneDriveState.isLoadingFiles && (
                 <div className="text-center py-8 text-gray-500">
                   <Folder className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                   <p>点击"刷新文件列表"加载 OneDrive 文件</p>

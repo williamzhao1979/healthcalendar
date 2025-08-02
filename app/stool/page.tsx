@@ -26,6 +26,7 @@ import {
 import { userDB, User as UserType } from '../../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
 import { BaseRecord } from '../../type/baserecord'
+import { adminService } from '@/lib/adminService'
 
 interface StoolRecord extends BaseRecord {
   date: string
@@ -289,6 +290,7 @@ function StoolPageContent() {
 
   // 表单状态
   const [date, setDate] = useState('')
+  const [dateTime, setDateTime] = useState('')
   const [status, setStatus] = useState<'normal' | 'difficult' | 'constipation' | 'diarrhea'>('normal')
   const [type, setType] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 'unknown'>(4)
   const [volume, setVolume] = useState<'small' | 'medium' | 'large'>('medium')
@@ -332,25 +334,28 @@ function StoolPageContent() {
   const initializeData = async () => {
     try {
       setIsLoading(true)
-      await userDB.ensureInitialized()
-      await stoolDB.ensureInitialized()
+      // await userDB.ensureInitialized()
+      // await stoolDB.ensureInitialized()
 
-      const allUsers = await userDB.getAllUsers()
-      const activeUser = await userDB.getActiveUser()
-      
+      // const allUsers = await userDB.getAllUsers()
+      const allUsers = await adminService.getAllUsers()
+      // const activeUser = await userDB.getActiveUser()
+      // 初始化默认用户（如果没有用户）
+      const defaultUser = await adminService.getDefaultUser()
+
       setUsers(allUsers)
-      setCurrentUser(activeUser)
-
+      setCurrentUser(await adminService.getCurrentUser() || defaultUser)
       // 设置默认日期时间
       const now = new Date()
       const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      setDate(localDateTime.toISOString().slice(0, 16))
+      // setDate(localDateTime.toISOString().slice(0, 16))
+      setDateTime(localDateTime.toISOString().slice(0, 16))
 
       // 如果是编辑模式，加载记录数据
       if (isEditMode && editId) {
-        const record = await stoolDB.getRecord(editId)
+        const record = await adminService.getUserRecord('stoolRecords', currentUser?.id, editId)
         if (record) {
-          setDate(record.date)
+          setDateTime(record.dateTime)
           setStatus(record.status)
           setType(record.type)
           setVolume(record.volume)
@@ -369,7 +374,7 @@ function StoolPageContent() {
 
   const handleUserChange = async (user: UserType) => {
     setCurrentUser(user)
-    await userDB.setActiveUser(user.id)
+    // await userDB.setActiveUser(user.id)
   }
 
   const handleSaveRecord = async () => {
@@ -383,7 +388,7 @@ function StoolPageContent() {
 
       const recordData = {
         userId: currentUser.id,
-        date,
+        dateTime,
         status,
         type,
         volume,
@@ -394,11 +399,12 @@ function StoolPageContent() {
       }
 
       if (isEditMode && editId) {
-        await stoolDB.updateRecord(editId, recordData)
-        alert('记录更新成功！')
+        await adminService.updateStoolRecord(editId, recordData)
+        // alert('记录更新成功！')
       } else {
-        await stoolDB.saveRecord(recordData)
-        alert('记录保存成功！')
+        // await stoolDB.saveRecord(recordData)
+        await adminService.saveStoolRecord(recordData)
+        // alert('记录保存成功！')
       }
 
       router.push('/health-calendar')
@@ -577,8 +583,8 @@ function StoolPageContent() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">选择日期和时间</label>
                 <input
                   type="datetime-local"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  value={dateTime}
+                  onChange={(e) => setDateTime(e.target.value)}
                   className="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:border-health-primary focus:ring-2 focus:ring-health-primary/20 transition-all text-sm"
                 />
               </div>
