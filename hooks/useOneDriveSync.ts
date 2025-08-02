@@ -14,6 +14,10 @@ export interface OneDriveSyncState {
   isExporting: boolean
   isOneDriveAvailable: boolean
   unavailabilityReason: string | null
+  isLoadingFiles?: boolean
+  files?: any[]
+  selectedFileContent?: string
+  isLoadingFileContent?: boolean
 }
 
 export interface OneDriveSyncActions {
@@ -25,6 +29,11 @@ export interface OneDriveSyncActions {
   exportTable: (tableName: string, userId: string) => Promise<void>
   importUsers: () => Promise<void>
   clearError: () => void
+  loadFiles: () => Promise<void>
+  loadFileContent: (fileId: string, fileName: string, isFolder?: boolean) => Promise<void>
+  syncIDBOneDriveUsers: () => Promise<void>
+  syncIDBOneDriveMyRecords: () => Promise<void>
+  syncIDBOneDriveStoolRecords: () => Promise<void>
 }
 
 export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
