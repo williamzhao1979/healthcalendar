@@ -731,6 +731,12 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
 
     try {
+      console.log(`🌐 OneDrive上传开始`)
+      console.log(`📄 文件名: ${file.name}`)
+      console.log(`📦 文件大小: ${(file.size / 1024 / 1024).toFixed(2)}MB (${file.size} bytes)`)
+      console.log(`🏷️ 文件类型: ${file.type}`)
+      console.log(`📂 记录类型: ${recordType}, 记录ID: ${recordId}`)
+
       // 生成唯一文件名：{recordType}_{recordId}_{timestamp}_{originalFileName}
       const timestamp = Date.now()
       const fileName = `${recordType}_${recordId}_${timestamp}_${file.name}`
@@ -744,6 +750,8 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       if (!token) {
         throw new Error('无法获取访问令牌，请重新登录')
       }
+
+      console.log(`📤 上传到路径: ${filePath}`)
 
       // 上传文件到OneDrive
       const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${filePath}:/content`, {
@@ -761,10 +769,15 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       }
 
       const fileInfo = await response.json()
-      console.log('附件上传成功:', fileName)
+      
+      console.log(`✅ OneDrive上传成功`)
+      console.log(`📁 文件名: ${fileName}`)
+      console.log(`🔗 文件ID: ${fileInfo.id}`)
+      console.log(`📊 上传后大小: ${fileInfo.size} bytes`)
+      
       return fileName // 返回文件名用于存储在记录中
     } catch (error) {
-      console.error('上传附件失败:', error)
+      console.error('❌ OneDrive上传失败:', error)
       throw error
     }
   }, [state.isAuthenticated])

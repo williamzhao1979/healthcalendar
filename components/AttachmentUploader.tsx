@@ -39,51 +39,73 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
 
   // 图片压缩函数
   const compressImage = useCallback((file: File, quality: number = 0.8, maxWidth: number = 1920, maxHeight: number = 1080): Promise<File> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
-      const img = new Image()
+      
+      if (!ctx) {
+        console.error('Canvas context not available, skipping compression')
+        resolve(file)
+        return
+      }
+      
+      const img = document.createElement('img')
       
       img.onload = () => {
-        // 计算新的尺寸
-        let { width, height } = img
-        
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height)
-          width = width * ratio
-          height = height * ratio
-        }
-        
-        canvas.width = width
-        canvas.height = height
-        
-        // 绘制压缩后的图片
-        ctx?.drawImage(img, 0, 0, width, height)
-        
-        // 转换为Blob
-        canvas.toBlob((blob) => {
-          if (blob) {
-            // 创建新的File对象
-            const compressedFile = new File([blob], file.name, {
-              type: file.type,
-              lastModified: Date.now()
-            })
-            
-            console.log(`图片压缩完成: ${file.name}`)
-            console.log(`原始大小: ${(file.size / 1024 / 1024).toFixed(2)}MB`)
-            console.log(`压缩后大小: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`)
-            console.log(`压缩率: ${((1 - compressedFile.size / file.size) * 100).toFixed(1)}%`)
-            
-            resolve(compressedFile)
-          } else {
-            // 压缩失败，返回原文件
-            resolve(file)
+        try {
+          // 计算新的尺寸
+          let { width, height } = img
+          const originalWidth = width
+          const originalHeight = height
+          
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height)
+            width = Math.floor(width * ratio)
+            height = Math.floor(height * ratio)
           }
-        }, file.type, quality)
+          
+          canvas.width = width
+          canvas.height = height
+          
+          // 绘制压缩后的图片
+          ctx.drawImage(img, 0, 0, width, height)
+          
+          // 转换为Blob
+          canvas.toBlob((blob) => {
+            if (blob) {
+              // 创建新的File对象
+              const compressedFile = new (window as any).File([blob], file.name, {
+                type: file.type,
+                lastModified: Date.now()
+              })
+              
+              console.log(`📷 图片压缩完成: ${file.name}`)
+              console.log(`📐 原始尺寸: ${originalWidth}x${originalHeight}`)
+              console.log(`📐 压缩尺寸: ${width}x${height}`)
+              console.log(`📦 原始大小: ${(file.size / 1024 / 1024).toFixed(2)}MB`)
+              console.log(`📦 压缩后大小: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`)
+              console.log(`💾 压缩率: ${((1 - compressedFile.size / file.size) * 100).toFixed(1)}%`)
+              
+              // 清理临时URL
+              URL.revokeObjectURL(img.src)
+              
+              resolve(compressedFile)
+            } else {
+              console.error('Canvas toBlob failed, using original file')
+              URL.revokeObjectURL(img.src)
+              resolve(file)
+            }
+          }, file.type, quality)
+        } catch (error) {
+          console.error('Image compression error:', error)
+          URL.revokeObjectURL(img.src)
+          resolve(file)
+        }
       }
       
       img.onerror = () => {
-        // 加载失败，返回原文件
+        console.error('Image load error for file:', file.name)
+        URL.revokeObjectURL(img.src)
         resolve(file)
       }
       
@@ -129,6 +151,9 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
     const originalFile = files[0] // 暂时只支持单文件上传
     if (!originalFile) return
 
+    console.log(`🔄 开始处理文件上传: ${originalFile.name}`)
+    console.log(`📝 原始文件信息 - 大小: ${(originalFile.size / 1024 / 1024).toFixed(2)}MB, 类型: ${originalFile.type}`)
+
     const validationError = validateFile(originalFile)
     if (validationError) {
       setUploadState(prev => ({ ...prev, error: validationError }))
@@ -143,7 +168,12 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
 
     try {
       // 预处理文件（可能包含压缩）
+      console.log(`🔧 预处理文件 - 压缩选项: ${compressImages ? '启用' : '禁用'}`)
       const processedFile = await preprocessFile(originalFile)
+      
+      console.log(`✅ 文件预处理完成`)
+      console.log(`📝 处理后文件信息 - 大小: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB, 类型: ${processedFile.type}`)
+      console.log(`📊 文件大小变化: ${originalFile.size === processedFile.size ? '无变化' : `${originalFile.size} -> ${processedFile.size} bytes`}`)
 
       // 模拟上传进度
       const progressInterval = setInterval(() => {
@@ -153,6 +183,7 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
         }))
       }, 100)
 
+      console.log(`⬆️ 开始上传到OneDrive`)
       const fileName = await onUpload(processedFile, recordType, recordId)
 
       clearInterval(progressInterval)
@@ -178,16 +209,16 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
         error: null
       })
 
-      console.log('附件上传成功:', newAttachment)
+      console.log('🎉 附件上传成功:', newAttachment)
     } catch (error) {
       setUploadState({
         isUploading: false,
         progress: 0,
         error: error instanceof Error ? error.message : '上传失败'
       })
-      console.error('附件上传失败:', error)
+      console.error('❌ 附件上传失败:', error)
     }
-  }, [oneDriveConnected, attachments, onUpload, onAttachmentsChange, recordType, recordId, validateFile, preprocessFile])
+  }, [oneDriveConnected, attachments, onUpload, onAttachmentsChange, recordType, recordId, validateFile, preprocessFile, compressImages])
 
   // 处理删除附件
   const handleDeleteAttachment = useCallback(async (attachment: Attachment) => {
