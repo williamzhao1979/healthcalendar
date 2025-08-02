@@ -21,6 +21,10 @@ import {
 import { userDB, User as UserType } from '../../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
 import { adminService } from '@/lib/adminService'
+import { useOneDriveSync } from '../../hooks/useOneDriveSync'
+import { AttachmentUploader } from '../../components/AttachmentUploader'
+import { AttachmentViewer } from '../../components/AttachmentViewer'
+import { Attachment } from '../../types/attachment'
 
 // 导入数据库类型，避免重复定义
 interface MyRecord {
@@ -29,7 +33,7 @@ interface MyRecord {
   dateTime: string
   content: string
   tags: string[]
-  attachments: string[]
+  attachments: Attachment[]
   createdAt: string
   updatedAt: string
 }
@@ -375,11 +379,14 @@ function MyRecordPageContent() {
   const [isEditing, setIsEditing] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   
+  // OneDrive 同步状态
+  const [oneDriveState, oneDriveActions] = useOneDriveSync()
+  
   // 表单状态
   const [dateTime, setDateTime] = useState('')
   const [content, setContent] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>(['想法', '灵感'])
-  const [attachments, setAttachments] = useState<string[]>([])
+  const [attachments, setAttachments] = useState<Attachment[]>([])
   
   // UI状态 - 仿照stool页面
   const [showFullImageModal, setShowFullImageModal] = useState(false)
@@ -449,7 +456,10 @@ function MyRecordPageContent() {
   const loadRecordForEdit = async (id: string) => {
     try {
       // const record = await myRecordDB.getRecord(id)
-      const record = await adminService.getUserRecord('myRecords', currentUser?.id, id)
+      if (!currentUser?.id) {
+        throw new Error('当前用户未找到')
+      }
+      const record = await adminService.getUserRecord('myRecords', currentUser.id, id)
       if (record) {
         setDateTime(record.dateTime)
         setContent(record.content)
@@ -472,56 +482,30 @@ function MyRecordPageContent() {
   }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files) return
-
-    const maxFiles = 5
-    const maxSize = 5 * 1024 * 1024 // 5MB
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-
-    const processFiles = async () => {
-      const newAttachments: string[] = []
-      const filesToProcess = Array.from(files).slice(0, maxFiles - attachments.length)
-
-      for (const file of filesToProcess) {
-        if (file.size > maxSize) {
-          alert(`文件 ${file.name} 太大，请选择小于5MB的文件`)
-          continue
-        }
-
-        if (!allowedTypes.includes(file.type)) {
-          alert(`文件 ${file.name} 格式不支持，请选择图片文件`)
-          continue
-        }
-
-        try {
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = (e) => resolve(e.target?.result as string)
-            reader.onerror = reject
-            reader.readAsDataURL(file)
-          })
-
-          newAttachments.push(dataUrl)
-        } catch (error) {
-          console.error('读取文件失败:', error)
-          alert(`读取文件 ${file.name} 失败`)
-        }
-      }
-
-      if (newAttachments.length > 0) {
-        setAttachments(prev => [...prev, ...newAttachments])
-      }
-    }
-
-    processFiles()
-
-    // 清空input value 以允许重复选择同一文件
-    event.target.value = ''
+    // 这个函数现在由 AttachmentUploader 组件处理
+    // 保留以避免破坏现有引用，但不再使用
   }
 
   const handleRemoveAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index))
+    // 这个函数现在由 AttachmentUploader 组件处理
+    // 保留以避免破坏现有引用，但不再使用
+  }
+
+  // 新的附件处理方法
+  const handleAttachmentsChange = (newAttachments: Attachment[]) => {
+    setAttachments(newAttachments)
+  }
+
+  const handleAttachmentUpload = async (file: File, recordType: string, recordId: string): Promise<string> => {
+    return await oneDriveActions.uploadAttachment(file, recordType, recordId)
+  }
+
+  const handleAttachmentDelete = async (fileName: string): Promise<void> => {
+    await oneDriveActions.deleteAttachment(fileName)
+  }
+
+  const handleAttachmentGetUrl = async (fileName: string): Promise<string> => {
+    return await oneDriveActions.getAttachmentUrl(fileName)
   }
 
   const handleViewFullImage = (imageUrl: string) => {
@@ -589,9 +573,7 @@ function MyRecordPageContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500">
-      {/* 背景层 */}
       <div className="fixed inset-0 bg-white/10"></div>
-      
       <div className="relative min-h-screen">
         {/* Header */}
         <header className="sticky top-0 z-50 px-3 py-2 bg-white/25 backdrop-blur-md border-b border-white/20">
@@ -698,30 +680,18 @@ function MyRecordPageContent() {
                 )}
               </h3>
 
-              {/* Upload Area */}
-              {attachments.length < 5 && (
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center mb-3 hover:border-green-500 transition-colors">
-                  <div className="w-8 h-8 bg-gray-100 rounded-lg mx-auto mb-2 flex items-center justify-center">
-                    <CloudUpload className="w-5 h-5 text-gray-400" />
-                  </div>
-                  <div className="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽图片</div>
-                  <div className="text-xs text-gray-500 mb-2">支持 JPG, PNG, GIF, WebP 格式，单个文件不超过5MB</div>
-                  <input
-                    type="file"
-                    onChange={handleFileUpload}
-                    multiple
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    className="hidden"
-                    id="fileInput"
-                  />
-                  <button
-                    onClick={() => document.getElementById('fileInput')?.click()}
-                    className="px-3 py-1.5 bg-green-500 text-white text-xs rounded-lg hover:bg-green-600 transition-colors"
-                  >
-                    选择图片
-                  </button>
-                </div>
-              )}
+              {/* 使用新的 AttachmentUploader 组件 */}
+              <AttachmentUploader
+                oneDriveConnected={oneDriveState.isAuthenticated}
+                onConnect={oneDriveActions.connect}
+                attachments={attachments}
+                onAttachmentsChange={handleAttachmentsChange}
+                onUpload={handleAttachmentUpload}
+                onDelete={handleAttachmentDelete}
+                onGetUrl={handleAttachmentGetUrl}
+                recordType="myrecord"
+                recordId={editingId || 'new'}
+              />
 
               {/* Attached Images Preview */}
               {attachments.length > 0 && (
@@ -735,121 +705,29 @@ function MyRecordPageContent() {
                       悬停图片显示删除按钮
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {attachments.map((attachment, index) => (
-                      <div key={index} className="relative group">
-                        <div 
-                          className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer border-2 border-transparent hover:border-green-500 transition-all transform hover:scale-105 shadow-sm"
-                          onClick={() => handleViewFullImage(attachment)}
-                        >
-                          <img
-                            src={attachment}
-                            alt={`附件 ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                            onError={(e) => {
-                              console.error('图片加载失败:', attachment.substring(0, 50))
-                              e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMCAyNkM3LjI1IDI2IDIgMTUuMjUgMiAxNS4yNUMyIDE1LjI1IDcuMjUgNC41IDIwIDQuNUMzMi43NSA0LjUgMzggMTUuMjUgMzggMTUuMjVDMzggMTUuMjUgMzIuNzUgMjYgMjAgMjZaIiBzdHJva2U9IiM5Q0EzQUYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxjaXJjbGUgY3g9IjIwIiBjeT0iMTUuMjUiIHI9IjMuNzUiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg=='
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-all flex items-center justify-center">
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              <div className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                                <FileImage className="w-4 h-4 text-gray-700" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Delete Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (confirm('确定要删除这张图片吗？')) {
-                              handleRemoveAttachment(index)
-                            }
-                          }}
-                          className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-all shadow-lg border-2 border-white opacity-80 hover:opacity-100 group-hover:scale-110"
-                          title="删除图片"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-
-                        {/* Image Index */}
-                        <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-full backdrop-blur-sm font-medium">
-                          {index + 1}
-                        </div>
-
-                        {/* Image Size Info */}
-                        <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                          {Math.round(attachment.length / 1024)} KB
-                        </div>
-
-                        {/* 删除提示（悬停时显示） */}
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                          <div className="bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
-                            点击右上角 × 删除
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                   
-                  {/* 批量删除按钮 */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-500">共 {attachments.length} 张图片</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (confirm(`确定要删除所有 ${attachments.length} 张图片吗？`)) {
-                          setAttachments([])
-                        }
-                      }}
-                      className="px-2 py-1 bg-red-50 text-red-600 text-xs rounded-md hover:bg-red-100 transition-colors border border-red-200 flex items-center space-x-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>全部删除</span>
-                    </button>
-                  </div>
+                  {/* 附件已通过 AttachmentUploader 组件处理 */}
                 </div>
               )}
-
-              {/* Upload Tips */}
-              <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
-                <div className="flex items-center space-x-1.5 mb-1">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                    <div className="w-1 h-1 bg-white rounded-full"></div>
-                  </div>
-                  <span className="text-xs font-medium text-blue-700">使用说明</span>
-                </div>
-                <div className="text-xs text-blue-600 space-y-0.5">
-                  <div>• 最多可上传5张图片，每张不超过5MB</div>
-                  <div>• 支持JPG、PNG、GIF、WebP格式</div>
-                  <div>• 点击图片可查看大图</div>
-                  <div>• <strong>删除图片</strong>：将鼠标悬停在图片上，点击右上角红色 × 按钮</div>
-                  <div>• 或使用"全部删除"按钮清除所有图片</div>
-                </div>
-              </div>
             </div>
-          </div>
 
-          {/* 操作按钮 */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={handleBack}
-              className="py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm flex items-center justify-center space-x-1"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>返回</span>
-            </button>
-            <button
-              onClick={handleSave}
-              className="py-2.5 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors text-sm flex items-center justify-center space-x-1"
-            >
-              <Check className="w-4 h-4" />
-              <span>{isEditing ? '更新记录' : '保存记录'}</span>
-            </button>
+            {/* 操作按钮 */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleBack}
+                className="py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm flex items-center justify-center space-x-1"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>返回</span>
+              </button>
+              <button
+                onClick={handleSave}
+                className="py-2.5 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors text-sm flex items-center justify-center space-x-1"
+              >
+                <Check className="w-4 h-4" />
+                <span>{isEditing ? '更新记录' : '保存记录'}</span>
+              </button>
+            </div>
           </div>
         </main>
 
