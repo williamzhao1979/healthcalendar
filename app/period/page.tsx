@@ -2,25 +2,6 @@
 
 import React, { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import {
-  ArrowLeft,
-  Save,
-  Calendar,
-  Clock,
-  Tag,
-  Upload,
-  X,
-  Plus,
-  Heart,
-  Droplets,
-  Palette,
-  Smile,
-  User,
-  ChevronDown,
-  Check,
-  AlertCircle,
-  FileText,
-} from "lucide-react"
 import { adminService } from "@/lib/adminService"
 
 // 生理记录类型定义
@@ -46,348 +27,7 @@ type PeriodRecord = {
 }
 
 // 预设标签
-const presetTags = ["规律", "正常", "疼痛", "异常", "头痛", "腹痛", "疲劳", "失眠", "情绪低落", "胸胀", "腰痛", "其他"]
-
-// 状态选项
-const statusOptions = [
-  { value: "start", label: "开始", color: "bg-pink-100 text-pink-600", icon: "🔴" },
-  { value: "ongoing", label: "进行中", color: "bg-rose-100 text-rose-600", icon: "🟡" },
-  { value: "end", label: "结束", color: "bg-purple-100 text-purple-600", icon: "🟢" },
-]
-
-// 流量选项
-const flowOptions = [
-  { value: "minimal", label: "极少", color: "bg-pink-50 text-pink-500", icon: "💧" },
-  { value: "light", label: "较少", color: "bg-pink-100 text-pink-600", icon: "💧💧" },
-  { value: "normal", label: "正常", color: "bg-pink-200 text-pink-700", icon: "💧💧💧" },
-  { value: "heavy", label: "较多", color: "bg-pink-300 text-pink-800", icon: "💧💧💧💧" },
-]
-
-// 颜色选项
-const colorOptions = [
-  { value: "bright_red", label: "鲜红色", color: "bg-red-500", textColor: "text-red-600" },
-  { value: "dark_red", label: "暗红色", color: "bg-red-700", textColor: "text-red-700" },
-  { value: "deep_red", label: "深红色", color: "bg-red-900", textColor: "text-red-900" },
-  { value: "orange_red", label: "橙红色", color: "bg-orange-600", textColor: "text-orange-600" },
-  { value: "pink", label: "粉红色", color: "bg-pink-400", textColor: "text-pink-600" },
-]
-
-// 情绪选项
-const moodOptions = [
-  { value: "very_sad", label: "很难过", color: "bg-gray-100 text-gray-600", icon: "😢" },
-  { value: "sad", label: "难过", color: "bg-blue-100 text-blue-600", icon: "😔" },
-  { value: "neutral", label: "一般", color: "bg-yellow-100 text-yellow-600", icon: "😐" },
-  { value: "happy", label: "开心", color: "bg-green-100 text-green-600", icon: "😊" },
-  { value: "very_happy", label: "很开心", color: "bg-emerald-100 text-emerald-600", icon: "😄" },
-]
-
-// 通用头像组件
-const SafeAvatar: React.FC<{
-  src: string
-  alt: string
-  className?: string
-  fallbackClassName?: string
-}> = ({ src, alt, className = "", fallbackClassName = "" }) => {
-  const [hasError, setHasError] = useState(false)
-
-  const DefaultAvatar = () => (
-    <div
-      className={`bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center rounded-full ${fallbackClassName}`}
-    >
-      <User className="text-white w-1/2 h-1/2" />
-    </div>
-  )
-
-  if (hasError || !src) {
-    return <DefaultAvatar />
-  }
-
-  return <img src={src || "/placeholder.svg"} alt={alt} className={className} onError={() => setHasError(true)} />
-}
-
-// 用户切换组件
-const UserSwitcher: React.FC<{
-  users: any[]
-  currentUser: any | null
-  onUserChange: (userId: string) => void
-}> = ({ users, currentUser, onUserChange }) => {
-  const [isOpen, setIsOpen] = useState(false)
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-3 py-2 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20"
-      >
-        {currentUser && (
-          <>
-            <SafeAvatar
-              src={currentUser.avatarUrl}
-              alt={currentUser.name}
-              className="w-6 h-6 rounded-full ring-1 ring-white/50 object-cover"
-              fallbackClassName="w-6 h-6"
-            />
-            <span className="text-sm font-medium text-gray-800">{currentUser.name}</span>
-          </>
-        )}
-        <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute top-full left-0 mt-2 w-48 bg-white/95 backdrop-blur-lg rounded-xl shadow-2xl border border-white/30 z-50 p-2">
-          {users.map((user) => (
-            <button
-              key={user.id}
-              onClick={() => {
-                onUserChange(user.id)
-                setIsOpen(false)
-              }}
-              className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors text-left ${
-                user.id === currentUser?.id ? "bg-pink-100 text-pink-700" : "hover:bg-gray-100 text-gray-700"
-              }`}
-            >
-              <SafeAvatar
-                src={user.avatarUrl}
-                alt={user.name}
-                className="w-6 h-6 rounded-full ring-1 ring-gray-200 object-cover"
-                fallbackClassName="w-6 h-6"
-              />
-              <span className="text-sm font-medium">{user.name}</span>
-              {user.id === currentUser?.id && <Check className="w-4 h-4 text-pink-600 ml-auto" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// 选择器组件
-const Selector: React.FC<{
-  label: string
-  icon: React.ReactNode
-  options: any[]
-  value: string
-  onChange: (value: string) => void
-  className?: string
-}> = ({ label, icon, options, value, onChange, className = "" }) => {
-  return (
-    <div className={`space-y-3 ${className}`}>
-      <label className="flex items-center text-sm font-semibold text-gray-700">
-        {icon}
-        <span className="ml-2">{label}</span>
-      </label>
-      <div className="grid grid-cols-2 gap-2">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onChange(option.value)}
-            className={`p-3 rounded-xl border-2 transition-all text-left ${
-              value === option.value
-                ? "border-pink-300 bg-pink-50"
-                : "border-gray-200 bg-white hover:border-pink-200 hover:bg-pink-25"
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              {option.icon && <span className="text-lg">{option.icon}</span>}
-              {option.color && !option.icon && <div className={`w-4 h-4 rounded-full ${option.color}`}></div>}
-              <span className={`text-sm font-medium ${value === option.value ? "text-pink-700" : "text-gray-700"}`}>
-                {option.label}
-              </span>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// 标签管理组件
-const TagManager: React.FC<{
-  selectedTags: string[]
-  onTagsChange: (tags: string[]) => void
-}> = ({ selectedTags, onTagsChange }) => {
-  const [customTag, setCustomTag] = useState("")
-  const [showCustomInput, setShowCustomInput] = useState(false)
-
-  const toggleTag = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      onTagsChange(selectedTags.filter((t) => t !== tag))
-    } else {
-      onTagsChange([...selectedTags, tag])
-    }
-  }
-
-  const addCustomTag = () => {
-    if (customTag.trim() && !selectedTags.includes(customTag.trim())) {
-      onTagsChange([...selectedTags, customTag.trim()])
-      setCustomTag("")
-      setShowCustomInput(false)
-    }
-  }
-
-  const removeTag = (tag: string) => {
-    onTagsChange(selectedTags.filter((t) => t !== tag))
-  }
-
-  return (
-    <div className="space-y-4">
-      <label className="flex items-center text-sm font-semibold text-gray-700">
-        <Tag className="w-4 h-4" />
-        <span className="ml-2">标签</span>
-      </label>
-
-      {/* 已选标签 */}
-      {selectedTags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {selectedTags.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-pink-100 text-pink-700"
-            >
-              {tag}
-              <button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:text-pink-900">
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* 预设标签 */}
-      <div className="grid grid-cols-3 gap-2">
-        {presetTags.map((tag) => (
-          <button
-            key={tag}
-            type="button"
-            onClick={() => toggleTag(tag)}
-            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-              selectedTags.includes(tag)
-                ? "bg-pink-100 text-pink-700 border border-pink-300"
-                : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-pink-50 hover:text-pink-600"
-            }`}
-          >
-            {tag}
-          </button>
-        ))}
-      </div>
-
-      {/* 自定义标签 */}
-      <div className="space-y-2">
-        {!showCustomInput ? (
-          <button
-            type="button"
-            onClick={() => setShowCustomInput(true)}
-            className="flex items-center space-x-2 px-3 py-2 text-sm text-pink-600 hover:text-pink-700 hover:bg-pink-50 rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>添加自定义标签</span>
-          </button>
-        ) : (
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              value={customTag}
-              onChange={(e) => setCustomTag(e.target.value)}
-              placeholder="输入自定义标签"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm"
-              onKeyPress={(e) => e.key === "Enter" && addCustomTag()}
-            />
-            <button
-              type="button"
-              onClick={addCustomTag}
-              className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
-            >
-              <Check className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowCustomInput(false)
-                setCustomTag("")
-              }}
-              className="px-3 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// 文件上传组件
-const FileUpload: React.FC<{
-  attachments: string[]
-  onAttachmentsChange: (attachments: string[]) => void
-}> = ({ attachments, onAttachmentsChange }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files) {
-      Array.from(files).forEach((file) => {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          const result = e.target?.result as string
-          onAttachmentsChange([...attachments, result])
-        }
-        reader.readAsDataURL(file)
-      })
-    }
-  }
-
-  const removeAttachment = (index: number) => {
-    onAttachmentsChange(attachments.filter((_, i) => i !== index))
-  }
-
-  return (
-    <div className="space-y-4">
-      <label className="flex items-center text-sm font-semibold text-gray-700">
-        <Upload className="w-4 h-4" />
-        <span className="ml-2">附件</span>
-      </label>
-
-      {/* 上传按钮 */}
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        className="w-full p-4 border-2 border-dashed border-gray-300 rounded-xl hover:border-pink-400 hover:bg-pink-50 transition-all text-center"
-      >
-        <div className="flex flex-col items-center space-y-2">
-          <Upload className="w-6 h-6 text-gray-400" />
-          <span className="text-sm text-gray-600">点击上传图片</span>
-        </div>
-      </button>
-
-      <input ref={fileInputRef} type="file" multiple accept="image/*" onChange={handleFileSelect} className="hidden" />
-
-      {/* 已上传文件 */}
-      {attachments.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {attachments.map((attachment, index) => (
-            <div key={index} className="relative group">
-              <img
-                src={attachment || "/placeholder.svg"}
-                alt={`附件 ${index + 1}`}
-                className="w-full h-24 object-cover rounded-lg border border-gray-200"
-              />
-              <button
-                type="button"
-                onClick={() => removeAttachment(index)}
-                className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+const presetTags = ["规律", "正常", "疼痛", "异常", "头痛", "腹痛", "疲劳", "失眠", "情绪低落"]
 
 // 主页面组件
 const PeriodPageContent: React.FC = () => {
@@ -421,9 +61,14 @@ const PeriodPageContent: React.FC = () => {
     color: "bright_red",
     mood: "neutral",
     notes: "",
-    tags: [],
+    tags: ["正常"],
     attachments: [],
   })
+
+  // 标签和文件上传状态
+  const [showCustomTagInput, setShowCustomTagInput] = useState(false)
+  const [customTag, setCustomTag] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 初始化数据
   useEffect(() => {
@@ -493,11 +138,6 @@ const PeriodPageContent: React.FC = () => {
       return
     }
 
-    if (!formData.notes.trim()) {
-      setError("请填写备注信息")
-      return
-    }
-
     try {
       setIsSaving(true)
       setError(null)
@@ -535,9 +175,47 @@ const PeriodPageContent: React.FC = () => {
     }
   }
 
-  const clearMessages = () => {
-    setError(null)
-    setSuccess(null)
+  // 标签管理
+  const toggleTag = (tag: string) => {
+    if (formData.tags.includes(tag)) {
+      setFormData((prev) => ({ ...prev, tags: prev.tags.filter((t) => t !== tag) }))
+    } else {
+      setFormData((prev) => ({ ...prev, tags: [...prev.tags, tag] }))
+    }
+  }
+
+  const addCustomTag = () => {
+    if (customTag.trim() && !formData.tags.includes(customTag.trim())) {
+      setFormData((prev) => ({ ...prev, tags: [...prev.tags, customTag.trim()] }))
+      setCustomTag("")
+      setShowCustomTagInput(false)
+    }
+  }
+
+  const removeSelectedTag = (tag: string) => {
+    setFormData((prev) => ({ ...prev, tags: prev.tags.filter((t) => t !== tag) }))
+  }
+
+  // 文件上传
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (files) {
+      Array.from(files).forEach((file) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const result = e.target?.result as string
+          setFormData((prev) => ({ ...prev, attachments: [...prev.attachments, result] }))
+        }
+        reader.readAsDataURL(file)
+      })
+    }
+  }
+
+  const removeFile = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((_, i) => i !== index),
+    }))
   }
 
   if (isLoading) {
@@ -552,222 +230,659 @@ const PeriodPageContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-purple-50">
-      {/* 背景装饰 */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-pink-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-rose-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-40 left-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
-      </div>
+    <>
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --health-primary: #10B981;
+            --health-secondary: #059669;
+            --health-accent: #34D399;
+            --health-warm: #F59E0B;
+            --health-cool: #3B82F6;
+            --health-soft: #8B5CF6;
+            --health-pink: #EC4899;
+            --health-rose: #F43F5E;
+        }
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #667eea 50%, #f093fb 75%, #f5576c 100%);
+            background-size: 300% 300%;
+            animation: gradient 15s ease infinite;
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .form-card {
+            background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            transition: all 0.3s ease;
+        }
+        
+        .form-card:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border-color: rgba(236, 72, 153, 0.2);
+        }
+        
+        .status-option, .flow-option, .color-option {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        
+        .status-option:hover, .flow-option:hover, .color-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-option.selected {
+            background: linear-gradient(135deg, #EC4899 0%, #F43F5E 100%);
+            color: white;
+            transform: scale(1.02);
+            box-shadow: 0 8px 25px rgba(236, 72, 153, 0.3);
+        }
+        
+        .flow-option.selected {
+            background: linear-gradient(135deg, #EC4899 0%, #F43F5E 100%);
+            color: white;
+            border-color: #EC4899;
+        }
+        
+        .color-option.selected {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.3);
+        }
+        
+        .upload-area {
+            transition: all 0.3s ease;
+            border: 2px dashed #cbd5e1;
+            background: #f8fafc;
+        }
+        
+        .upload-area:hover {
+            border-color: #EC4899;
+            background: rgba(236, 72, 153, 0.05);
+        }
+        
+        .upload-area.dragover {
+            border-color: #EC4899;
+            background: rgba(236, 72, 153, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .file-preview {
+            transition: all 0.3s ease;
+        }
+        
+        .file-preview:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        
+        .text-health-primary {
+            color: #10B981;
+        }
+        
+        .text-health-pink {
+            color: #EC4899;
+        }
+        
+        .bg-health-pink {
+            background-color: #EC4899;
+        }
+        
+        .border-health-pink {
+            border-color: #EC4899;
+        }
+        
+        .focus\\:border-health-pink:focus {
+            border-color: #EC4899;
+        }
+        
+        .focus\\:ring-health-pink:focus {
+            --tw-ring-color: rgba(236, 72, 153, 0.5);
+        }
+        
+        .tag-option {
+            transition: all 0.3s ease;
+        }
+        
+        .tag-option:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tag-option.selected {
+            background: linear-gradient(135deg, #EC4899 0%, #F43F5E 100%);
+            color: white;
+            border-color: #EC4899;
+            box-shadow: 0 2px 10px rgba(236, 72, 153, 0.3);
+        }
+        
+        .add-tag-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(236, 72, 153, 0.2);
+        }
+        
+        .selected-tag {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            0% { opacity: 0; transform: translateX(-10px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
 
-      <div className="relative z-10">
-        {/* Header */}
-        <header className="bg-white/80 backdrop-blur-lg border-b border-white/20 sticky top-0 z-50">
-          <div className="max-w-4xl mx-auto px-4 py-4">
+      <div className="overflow-x-hidden">
+        {/* Background */}
+        <div className="fixed inset-0 hero-gradient"></div>
+        <div className="fixed inset-0 bg-white/10"></div>
+
+        <div className="relative min-h-screen">
+          {/* Header */}
+          <header className="glass-morphism sticky top-0 z-50 px-3 py-2 animate-fade-in">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <button onClick={() => router.back()} className="p-2 hover:bg-pink-100 rounded-xl transition-colors">
-                  <ArrowLeft className="w-5 h-5 text-gray-600" />
+              {/* Back Button and Title */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => router.back()}
+                  className="w-8 h-8 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20 flex items-center justify-center"
+                >
+                  <i className="fas fa-arrow-left text-gray-700 text-sm"></i>
                 </button>
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center">
-                    <Heart className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-xl font-bold text-gray-900">{isEditMode ? "编辑生理记录" : "生理记录"}</h1>
-                    <p className="text-sm text-gray-600">记录生理期状态和感受</p>
-                  </div>
+                <div>
+                  <h1 className="text-base font-bold text-gray-800">生理记录</h1>
+                  <p className="text-xs text-gray-600">记录您的月经周期</p>
                 </div>
               </div>
 
-              {allUsers.length > 0 && (
-                <UserSwitcher users={allUsers} currentUser={activeUser} onUserChange={handleUserChange} />
+              {/* User Switch */}
+              {allUsers.length > 0 && activeUser && (
+                <div className="relative">
+                  <button className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20">
+                    <img
+                      src={activeUser.avatarUrl || "/placeholder.svg"}
+                      alt="用户头像"
+                      className="w-5 h-5 rounded-full ring-1 ring-white/50"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/placeholder.svg"
+                      }}
+                    />
+                    <span className="text-xs font-semibold text-gray-800">{activeUser.name}</span>
+                    <i className="fas fa-chevron-down text-gray-500 text-xs"></i>
+                  </button>
+                </div>
               )}
             </div>
-          </div>
-        </header>
+          </header>
 
-        {/* 主要内容 */}
-        <main className="max-w-4xl mx-auto px-4 py-6">
-          {/* 消息提示 */}
-          {(error || success) && (
-            <div
-              className={`mb-6 p-4 rounded-xl flex items-center justify-between ${
-                error ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                {error ? (
-                  <AlertCircle className="w-5 h-5 text-red-500" />
-                ) : (
-                  <Check className="w-5 h-5 text-green-500" />
-                )}
-                <span className={`text-sm font-medium ${error ? "text-red-700" : "text-green-700"}`}>
-                  {error || success}
-                </span>
-              </div>
+          {/* Main Content */}
+          <main className="px-3 py-2 pb-16">
+            {/* Main Form Card */}
+            <div className="form-card rounded-2xl p-3 mb-3 animate-fade-in relative">
+              {/* Close Button */}
               <button
-                onClick={clearMessages}
-                className={`p-1 rounded-lg hover:bg-opacity-20 ${error ? "hover:bg-red-200" : "hover:bg-green-200"}`}
+                onClick={() => router.push("/health-calendar")}
+                className="absolute top-3 right-3 w-6 h-6 bg-gray-100 hover:bg-red-100 rounded-full flex items-center justify-center transition-all z-10"
               >
-                <X className="w-4 h-4" />
+                <i className="fas fa-times text-gray-400 hover:text-red-500 text-xs"></i>
               </button>
-            </div>
-          )}
 
-          {/* 表单卡片 */}
-          <div className="bg-white/70 backdrop-blur-lg rounded-2xl shadow-xl border border-white/20 p-6">
-            <div className="space-y-6">
-              {/* 日期时间 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="flex items-center text-sm font-semibold text-gray-700">
-                    <Calendar className="w-4 h-4" />
-                    <span className="ml-2">日期</span>
-                  </label>
+              {/* Date and Time Section */}
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                  <i className="fas fa-calendar-alt text-health-pink mr-1.5 text-sm"></i>
+                  日期时间
+                </h3>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">选择日期和时间</label>
                   <input
-                    type="date"
-                    value={formData.dateTime.split("T")[0]}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        dateTime: e.target.value + "T" + prev.dateTime.split("T")[1],
-                      }))
-                    }
-                    className="w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="flex items-center text-sm font-semibold text-gray-700">
-                    <Clock className="w-4 h-4" />
-                    <span className="ml-2">时间</span>
-                  </label>
-                  <input
-                    type="time"
-                    value={formData.dateTime.split("T")[1]}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        dateTime: prev.dateTime.split("T")[0] + "T" + e.target.value,
-                      }))
-                    }
-                    className="w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                    type="datetime-local"
+                    value={formData.dateTime}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, dateTime: e.target.value }))}
+                    className="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all text-sm"
                   />
                 </div>
               </div>
 
-              {/* 状态选择 */}
-              <Selector
-                label="状态"
-                icon={<Heart className="w-4 h-4" />}
-                options={statusOptions}
-                value={formData.status}
-                onChange={(value) => setFormData((prev) => ({ ...prev, status: value as PeriodStatus }))}
-              />
+              {/* Divider */}
+              <hr className="border-gray-200 mb-3" />
 
-              {/* 流量选择 */}
-              <Selector
-                label="流量"
-                icon={<Droplets className="w-4 h-4" />}
-                options={flowOptions}
-                value={formData.flow}
-                onChange={(value) => setFormData((prev) => ({ ...prev, flow: value as PeriodFlow }))}
-              />
+              {/* Period Status Selection */}
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                  <i className="fas fa-heart text-health-pink mr-1.5 text-sm"></i>
+                  月经状态
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <div
+                    className={`status-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center cursor-pointer ${formData.status === "start" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, status: "start" }))}
+                  >
+                    <div className="w-7 h-7 bg-red-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+                      <i className="fas fa-play text-red-500 text-sm"></i>
+                    </div>
+                    <div className="text-xs font-semibold">开始</div>
+                    <div className="text-xs text-gray-500 mt-0.5">月经开始</div>
+                  </div>
+                  <div
+                    className={`status-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center cursor-pointer ${formData.status === "ongoing" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, status: "ongoing" }))}
+                  >
+                    <div className="w-7 h-7 bg-pink-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+                      <i className="fas fa-circle text-pink-500 text-sm"></i>
+                    </div>
+                    <div className="text-xs font-semibold">进行中</div>
+                    <div className="text-xs text-gray-500 mt-0.5">月经期间</div>
+                  </div>
+                  <div
+                    className={`status-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center cursor-pointer ${formData.status === "end" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, status: "end" }))}
+                  >
+                    <div className="w-7 h-7 bg-gray-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+                      <i className="fas fa-stop text-gray-500 text-sm"></i>
+                    </div>
+                    <div className="text-xs font-semibold">结束</div>
+                    <div className="text-xs text-gray-500 mt-0.5">月经结束</div>
+                  </div>
+                </div>
+              </div>
 
-              {/* 颜色选择 */}
-              <Selector
-                label="颜色"
-                icon={<Palette className="w-4 h-4" />}
-                options={colorOptions}
-                value={formData.color}
-                onChange={(value) => setFormData((prev) => ({ ...prev, color: value as PeriodColor }))}
-              />
+              {/* Divider */}
+              <hr className="border-gray-200 mb-3" />
 
-              {/* 情绪选择 */}
-              <Selector
-                label="情绪"
-                icon={<Smile className="w-4 h-4" />}
-                options={moodOptions}
-                value={formData.mood}
-                onChange={(value) => setFormData((prev) => ({ ...prev, mood: value as PeriodMood }))}
-              />
+              {/* Flow Amount Selection */}
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                  <i className="fas fa-tint text-health-pink mr-1.5 text-sm"></i>
+                  流量大小
+                </h3>
+                <div className="grid grid-cols-4 gap-1.5">
+                  <div
+                    className={`flow-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center cursor-pointer ${formData.flow === "minimal" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, flow: "minimal" }))}
+                  >
+                    <div className="text-xs font-semibold text-gray-700">极少</div>
+                    <div className="text-xs text-gray-500 mt-0.5">点滴状</div>
+                  </div>
+                  <div
+                    className={`flow-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center cursor-pointer ${formData.flow === "light" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, flow: "light" }))}
+                  >
+                    <div className="text-xs font-semibold text-gray-700">较少</div>
+                    <div className="text-xs text-gray-500 mt-0.5">轻量</div>
+                  </div>
+                  <div
+                    className={`flow-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center cursor-pointer ${formData.flow === "normal" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, flow: "normal" }))}
+                  >
+                    <div className="text-xs font-semibold">正常</div>
+                    <div className="text-xs mt-0.5">中等量</div>
+                  </div>
+                  <div
+                    className={`flow-option p-2 bg-gray-50 rounded-lg border border-gray-200 text-center cursor-pointer ${formData.flow === "heavy" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, flow: "heavy" }))}
+                  >
+                    <div className="text-xs font-semibold text-gray-700">较多</div>
+                    <div className="text-xs text-gray-500 mt-0.5">大量</div>
+                  </div>
+                </div>
+              </div>
 
-              {/* 备注 */}
-              <div className="space-y-2">
-                <label className="flex items-center text-sm font-semibold text-gray-700">
-                  <FileText className="w-4 h-4" />
-                  <span className="ml-2">备注</span>
-                </label>
+              {/* Divider */}
+              <hr className="border-gray-200 mb-3" />
+
+              {/* Color Selection */}
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                  <i className="fas fa-palette text-health-pink mr-1.5 text-sm"></i>
+                  颜色记录
+                </h3>
+                <div className="grid grid-cols-5 gap-2">
+                  <div
+                    className={`color-option p-1.5 rounded-lg text-center cursor-pointer ${formData.color === "bright_red" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, color: "bright_red" }))}
+                  >
+                    <div className="w-6 h-6 bg-red-600 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                    <div className="text-xs font-medium text-gray-700">鲜红</div>
+                  </div>
+                  <div
+                    className={`color-option p-1.5 rounded-lg text-center cursor-pointer ${formData.color === "dark_red" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, color: "dark_red" }))}
+                  >
+                    <div className="w-6 h-6 bg-red-800 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                    <div className="text-xs font-medium text-gray-700">暗红</div>
+                  </div>
+                  <div
+                    className={`color-option p-1.5 rounded-lg text-center cursor-pointer ${formData.color === "deep_red" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, color: "deep_red" }))}
+                  >
+                    <div className="w-6 h-6 bg-red-900 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                    <div className="text-xs font-medium text-gray-700">深红</div>
+                  </div>
+                  <div
+                    className={`color-option p-1.5 rounded-lg text-center cursor-pointer ${formData.color === "orange_red" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, color: "orange_red" }))}
+                  >
+                    <div className="w-6 h-6 bg-orange-600 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                    <div className="text-xs font-medium text-gray-700">橙红</div>
+                  </div>
+                  <div
+                    className={`color-option p-1.5 rounded-lg text-center cursor-pointer ${formData.color === "pink" ? "selected" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, color: "pink" }))}
+                  >
+                    <div className="w-6 h-6 bg-pink-400 rounded-full mx-auto mb-1 border-2 border-gray-200"></div>
+                    <div className="text-xs font-medium text-gray-700">粉红</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <hr className="border-gray-200 mb-3" />
+
+              {/* Notes Section */}
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                  <i className="fas fa-edit text-health-pink mr-1.5 text-sm"></i>
+                  备注信息
+                </h3>
                 <textarea
+                  placeholder="请记录详细信息，如疼痛程度、情绪变化、特殊情况等..."
+                  rows={2}
                   value={formData.notes}
                   onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                  placeholder="记录今天的感受、症状或其他想要记录的内容..."
-                  rows={4}
-                  className="w-full px-4 py-3 bg-white/80 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+                  className="w-full px-2.5 py-2 border border-gray-200 rounded-lg focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all resize-none text-sm"
                 />
               </div>
 
-              {/* 标签管理 */}
-              <TagManager
-                selectedTags={formData.tags}
-                onTagsChange={(tags) => setFormData((prev) => ({ ...prev, tags }))}
-              />
+              {/* Divider */}
+              <hr className="border-gray-200 mb-3" />
 
-              {/* 文件上传 */}
-              <FileUpload
-                attachments={formData.attachments}
-                onAttachmentsChange={(attachments) => setFormData((prev) => ({ ...prev, attachments }))}
-              />
+              {/* Mood Tracking */}
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                  <i className="fas fa-smile text-health-pink mr-1.5 text-sm"></i>
+                  情绪记录
+                </h3>
+                <div className="flex justify-between">
+                  <div
+                    className={`mood-option p-1.5 rounded-lg text-center cursor-pointer ${formData.mood === "very_sad" ? "bg-pink-50 border border-pink-200" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, mood: "very_sad" }))}
+                  >
+                    <div className="text-xl mb-1">😭</div>
+                    <div
+                      className={`text-xs ${formData.mood === "very_sad" ? "text-pink-600 font-medium" : "text-gray-600"}`}
+                    >
+                      很难过
+                    </div>
+                  </div>
+                  <div
+                    className={`mood-option p-1.5 rounded-lg text-center cursor-pointer ${formData.mood === "sad" ? "bg-pink-50 border border-pink-200" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, mood: "sad" }))}
+                  >
+                    <div className="text-xl mb-1">😟</div>
+                    <div
+                      className={`text-xs ${formData.mood === "sad" ? "text-pink-600 font-medium" : "text-gray-600"}`}
+                    >
+                      不开心
+                    </div>
+                  </div>
+                  <div
+                    className={`mood-option p-1.5 rounded-lg text-center cursor-pointer ${formData.mood === "neutral" ? "bg-pink-50 border border-pink-200" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, mood: "neutral" }))}
+                  >
+                    <div className="text-xl mb-1">😐</div>
+                    <div
+                      className={`text-xs ${formData.mood === "neutral" ? "text-pink-600 font-medium" : "text-gray-600"}`}
+                    >
+                      一般
+                    </div>
+                  </div>
+                  <div
+                    className={`mood-option p-1.5 rounded-lg text-center cursor-pointer ${formData.mood === "happy" ? "bg-pink-50 border border-pink-200" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, mood: "happy" }))}
+                  >
+                    <div className="text-xl mb-1">😊</div>
+                    <div
+                      className={`text-xs ${formData.mood === "happy" ? "text-pink-600 font-medium" : "text-gray-600"}`}
+                    >
+                      开心
+                    </div>
+                  </div>
+                  <div
+                    className={`mood-option p-1.5 rounded-lg text-center cursor-pointer ${formData.mood === "very_happy" ? "bg-pink-50 border border-pink-200" : ""}`}
+                    onClick={() => setFormData((prev) => ({ ...prev, mood: "very_happy" }))}
+                  >
+                    <div className="text-xl mb-1">😄</div>
+                    <div
+                      className={`text-xs ${formData.mood === "very_happy" ? "text-pink-600 font-medium" : "text-gray-600"}`}
+                    >
+                      很开心
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <hr className="border-gray-200 mb-3" />
+
+              {/* Tags Selection */}
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                  <i className="fas fa-tags text-health-pink mr-1.5 text-sm"></i>
+                  标签选择
+                </h3>
+
+                {/* Tag Container */}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {/* Preset Tags */}
+                  {presetTags.map((tag) => (
+                    <div
+                      key={tag}
+                      className={`tag-option px-2 py-1 bg-gray-100 border border-gray-200 rounded-full text-xs font-medium text-gray-700 cursor-pointer transition-all hover:bg-gray-200 ${formData.tags.includes(tag) ? "selected" : ""}`}
+                      onClick={() => toggleTag(tag)}
+                    >
+                      {tag}
+                    </div>
+                  ))}
+
+                  {/* Add Custom Tag Button */}
+                  <div
+                    className="add-tag-btn px-2 py-1 bg-health-pink/10 border border-health-pink/30 rounded-full text-xs font-medium text-health-pink cursor-pointer transition-all hover:bg-health-pink/20 flex items-center space-x-1"
+                    onClick={() => setShowCustomTagInput(true)}
+                  >
+                    <i className="fas fa-plus text-xs"></i>
+                    <span>自定义</span>
+                  </div>
+                </div>
+
+                {/* Custom Tag Input */}
+                {showCustomTagInput && (
+                  <div className="mb-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        placeholder="输入自定义标签..."
+                        value={customTag}
+                        onChange={(e) => setCustomTag(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && addCustomTag()}
+                        className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg focus:border-health-pink focus:ring-2 focus:ring-health-pink/20 transition-all text-xs"
+                        maxLength={10}
+                      />
+                      <button
+                        onClick={addCustomTag}
+                        className="px-2.5 py-1.5 bg-health-pink text-white text-xs rounded-lg hover:bg-pink-600 transition-colors"
+                      >
+                        添加
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCustomTagInput(false)
+                          setCustomTag("")
+                        }}
+                        className="px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Selected Tags Display */}
+                {formData.tags.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-xs text-gray-500 mb-1">已选择的标签：</div>
+                    <div className="flex flex-wrap gap-1">
+                      {formData.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="selected-tag px-1.5 py-0.5 bg-health-pink/10 text-health-pink text-xs rounded-md border border-health-pink/20"
+                        >
+                          {tag}
+                          <button
+                            onClick={() => removeSelectedTag(tag)}
+                            className="ml-1 text-health-pink/60 hover:text-health-pink"
+                          >
+                            <i className="fas fa-times text-xs"></i>
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Divider */}
+              <hr className="border-gray-200 mb-3" />
+
+              {/* File Upload Section */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
+                  <i className="fas fa-paperclip text-health-pink mr-1.5 text-sm"></i>
+                  附件上传
+                </h3>
+
+                {/* Upload Area */}
+                <div className="upload-area rounded-lg p-3 text-center mb-2">
+                  <div className="w-6 h-6 bg-gray-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
+                    <i className="fas fa-cloud-upload-alt text-gray-400 text-xs"></i>
+                  </div>
+                  <div className="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽文件</div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.txt"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-2.5 py-1.5 bg-health-pink text-white text-xs rounded-md hover:bg-pink-600 transition-colors"
+                  >
+                    选择文件
+                  </button>
+                </div>
+
+                {/* File Preview Area */}
+                {formData.attachments.length > 0 && (
+                  <div className="space-y-1">
+                    {formData.attachments.map((attachment, index) => (
+                      <div
+                        key={index}
+                        className="file-preview bg-white p-1.5 rounded-lg border border-gray-200 flex items-center space-x-2"
+                      >
+                        <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <i className="fas fa-image text-blue-500 text-xs"></i>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium text-gray-900 truncate">附件 {index + 1}</div>
+                          <div className="text-xs text-gray-500">图片文件</div>
+                        </div>
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="w-5 h-5 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors"
+                        >
+                          <i className="fas fa-times text-red-500 text-xs"></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* 操作按钮 */}
-          <div className="mt-6 flex space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="flex-1 py-3 px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving || !formData.notes.trim()}
-              className="flex-1 py-3 px-6 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-semibold rounded-xl transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
-            >
-              {isSaving ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>保存中...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>{isEditMode ? "更新记录" : "保存记录"}</span>
-                </>
-              )}
-            </button>
-          </div>
-        </main>
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => router.back()}
+                className="py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm"
+              >
+                <i className="fas fa-arrow-left mr-1.5"></i>
+                返回
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="py-2.5 bg-health-pink text-white font-semibold rounded-xl hover:bg-pink-600 transition-colors text-sm disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1.5"></div>
+                    保存中...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-check mr-1.5"></i>
+                    保存记录
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Success/Error Messages */}
+            {success && (
+              <div className="mt-4 p-3 bg-green-100 border border-green-200 rounded-lg text-green-700 text-sm">
+                <i className="fas fa-check-circle mr-2"></i>
+                {success}
+              </div>
+            )}
+            {error && (
+              <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg text-red-700 text-sm">
+                <i className="fas fa-exclamation-circle mr-2"></i>
+                {error}
+              </div>
+            )}
+          </main>
+        </div>
       </div>
-
-      <style jsx>{`
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
-    </div>
+    </>
   )
 }
 
