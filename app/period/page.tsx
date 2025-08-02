@@ -218,6 +218,14 @@ const PeriodPageContent: React.FC = () => {
     }))
   }
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -396,6 +404,14 @@ const PeriodPageContent: React.FC = () => {
             0% { opacity: 0; transform: translateX(-10px); }
             100% { opacity: 1; transform: translateX(0); }
         }
+        
+        .mood-option {
+            transition: all 0.3s ease;
+        }
+        
+        .mood-option:hover {
+            transform: scale(1.05);
+        }
       `}</style>
 
       <div className="overflow-x-hidden">
@@ -413,7 +429,9 @@ const PeriodPageContent: React.FC = () => {
                   onClick={() => router.back()}
                   className="w-8 h-8 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20 flex items-center justify-center"
                 >
-                  <i className="fas fa-arrow-left text-gray-700 text-sm"></i>
+                  <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
                 </button>
                 <div>
                   <h1 className="text-base font-bold text-gray-800">生理记录</h1>
@@ -435,7 +453,9 @@ const PeriodPageContent: React.FC = () => {
                       }}
                     />
                     <span className="text-xs font-semibold text-gray-800">{activeUser.name}</span>
-                    <i className="fas fa-chevron-down text-gray-500 text-xs"></i>
+                    <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
                 </div>
               )}
@@ -451,13 +471,32 @@ const PeriodPageContent: React.FC = () => {
                 onClick={() => router.push("/health-calendar")}
                 className="absolute top-3 right-3 w-6 h-6 bg-gray-100 hover:bg-red-100 rounded-full flex items-center justify-center transition-all z-10"
               >
-                <i className="fas fa-times text-gray-400 hover:text-red-500 text-xs"></i>
+                <svg
+                  className="w-3 h-3 text-gray-400 hover:text-red-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
 
               {/* Date and Time Section */}
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                  <i className="fas fa-calendar-alt text-health-pink mr-1.5 text-sm"></i>
+                  <svg
+                    className="w-4 h-4 text-health-pink mr-1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
                   日期时间
                 </h3>
                 <div>
@@ -477,7 +516,13 @@ const PeriodPageContent: React.FC = () => {
               {/* Period Status Selection */}
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                  <i className="fas fa-heart text-health-pink mr-1.5 text-sm"></i>
+                  <svg className="w-4 h-4 text-health-pink mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
                   月经状态
                 </h3>
                 <div className="grid grid-cols-3 gap-2">
@@ -486,7 +531,9 @@ const PeriodPageContent: React.FC = () => {
                     onClick={() => setFormData((prev) => ({ ...prev, status: "start" }))}
                   >
                     <div className="w-7 h-7 bg-red-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
-                      <i className="fas fa-play text-red-500 text-sm"></i>
+                      <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M8 5v10l7-5-7-5z" />
+                      </svg>
                     </div>
                     <div className="text-xs font-semibold">开始</div>
                     <div className="text-xs text-gray-500 mt-0.5">月经开始</div>
@@ -496,7 +543,9 @@ const PeriodPageContent: React.FC = () => {
                     onClick={() => setFormData((prev) => ({ ...prev, status: "ongoing" }))}
                   >
                     <div className="w-7 h-7 bg-pink-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
-                      <i className="fas fa-circle text-pink-500 text-sm"></i>
+                      <svg className="w-4 h-4 text-pink-500" fill="currentColor" viewBox="0 0 20 20">
+                        <circle cx="10" cy="10" r="6" />
+                      </svg>
                     </div>
                     <div className="text-xs font-semibold">进行中</div>
                     <div className="text-xs text-gray-500 mt-0.5">月经期间</div>
@@ -506,7 +555,9 @@ const PeriodPageContent: React.FC = () => {
                     onClick={() => setFormData((prev) => ({ ...prev, status: "end" }))}
                   >
                     <div className="w-7 h-7 bg-gray-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
-                      <i className="fas fa-stop text-gray-500 text-sm"></i>
+                      <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                        <rect x="6" y="6" width="8" height="8" />
+                      </svg>
                     </div>
                     <div className="text-xs font-semibold">结束</div>
                     <div className="text-xs text-gray-500 mt-0.5">月经结束</div>
@@ -520,7 +571,13 @@ const PeriodPageContent: React.FC = () => {
               {/* Flow Amount Selection */}
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                  <i className="fas fa-tint text-health-pink mr-1.5 text-sm"></i>
+                  <svg className="w-4 h-4 text-health-pink mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
                   流量大小
                 </h3>
                 <div className="grid grid-cols-4 gap-1.5">
@@ -561,7 +618,19 @@ const PeriodPageContent: React.FC = () => {
               {/* Color Selection */}
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                  <i className="fas fa-palette text-health-pink mr-1.5 text-sm"></i>
+                  <svg
+                    className="w-4 h-4 text-health-pink mr-1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z"
+                    />
+                  </svg>
                   颜色记录
                 </h3>
                 <div className="grid grid-cols-5 gap-2">
@@ -609,7 +678,19 @@ const PeriodPageContent: React.FC = () => {
               {/* Notes Section */}
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                  <i className="fas fa-edit text-health-pink mr-1.5 text-sm"></i>
+                  <svg
+                    className="w-4 h-4 text-health-pink mr-1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
                   备注信息
                 </h3>
                 <textarea
@@ -627,7 +708,19 @@ const PeriodPageContent: React.FC = () => {
               {/* Mood Tracking */}
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                  <i className="fas fa-smile text-health-pink mr-1.5 text-sm"></i>
+                  <svg
+                    className="w-4 h-4 text-health-pink mr-1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
                   情绪记录
                 </h3>
                 <div className="flex justify-between">
@@ -695,7 +788,19 @@ const PeriodPageContent: React.FC = () => {
               {/* Tags Selection */}
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                  <i className="fas fa-tags text-health-pink mr-1.5 text-sm"></i>
+                  <svg
+                    className="w-4 h-4 text-health-pink mr-1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                    />
+                  </svg>
                   标签选择
                 </h3>
 
@@ -717,7 +822,9 @@ const PeriodPageContent: React.FC = () => {
                     className="add-tag-btn px-2 py-1 bg-health-pink/10 border border-health-pink/30 rounded-full text-xs font-medium text-health-pink cursor-pointer transition-all hover:bg-health-pink/20 flex items-center space-x-1"
                     onClick={() => setShowCustomTagInput(true)}
                   >
-                    <i className="fas fa-plus text-xs"></i>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
                     <span>自定义</span>
                   </div>
                 </div>
@@ -769,7 +876,14 @@ const PeriodPageContent: React.FC = () => {
                             onClick={() => removeSelectedTag(tag)}
                             className="ml-1 text-health-pink/60 hover:text-health-pink"
                           >
-                            <i className="fas fa-times text-xs"></i>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
                           </button>
                         </span>
                       ))}
@@ -784,14 +898,33 @@ const PeriodPageContent: React.FC = () => {
               {/* File Upload Section */}
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
-                  <i className="fas fa-paperclip text-health-pink mr-1.5 text-sm"></i>
+                  <svg
+                    className="w-4 h-4 text-health-pink mr-1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                    />
+                  </svg>
                   附件上传
                 </h3>
 
                 {/* Upload Area */}
                 <div className="upload-area rounded-lg p-3 text-center mb-2">
                   <div className="w-6 h-6 bg-gray-100 rounded-lg mx-auto mb-1.5 flex items-center justify-center">
-                    <i className="fas fa-cloud-upload-alt text-gray-400 text-xs"></i>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
                   </div>
                   <div className="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽文件</div>
                   <input
@@ -819,7 +952,14 @@ const PeriodPageContent: React.FC = () => {
                         className="file-preview bg-white p-1.5 rounded-lg border border-gray-200 flex items-center space-x-2"
                       >
                         <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <i className="fas fa-image text-blue-500 text-xs"></i>
+                          <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                          </svg>
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-medium text-gray-900 truncate">附件 {index + 1}</div>
@@ -829,7 +969,14 @@ const PeriodPageContent: React.FC = () => {
                           onClick={() => removeFile(index)}
                           className="w-5 h-5 bg-red-100 hover:bg-red-200 rounded-full flex items-center justify-center transition-colors"
                         >
-                          <i className="fas fa-times text-red-500 text-xs"></i>
+                          <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
                         </button>
                       </div>
                     ))}
@@ -842,15 +989,17 @@ const PeriodPageContent: React.FC = () => {
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => router.back()}
-                className="py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm"
+                className="py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm flex items-center justify-center"
               >
-                <i className="fas fa-arrow-left mr-1.5"></i>
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
                 返回
               </button>
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="py-2.5 bg-health-pink text-white font-semibold rounded-xl hover:bg-pink-600 transition-colors text-sm disabled:opacity-50"
+                className="py-2.5 bg-health-pink text-white font-semibold rounded-xl hover:bg-pink-600 transition-colors text-sm disabled:opacity-50 flex items-center justify-center"
               >
                 {isSaving ? (
                   <>
@@ -859,7 +1008,9 @@ const PeriodPageContent: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <i className="fas fa-check mr-1.5"></i>
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
                     保存记录
                   </>
                 )}
@@ -868,14 +1019,26 @@ const PeriodPageContent: React.FC = () => {
 
             {/* Success/Error Messages */}
             {success && (
-              <div className="mt-4 p-3 bg-green-100 border border-green-200 rounded-lg text-green-700 text-sm">
-                <i className="fas fa-check-circle mr-2"></i>
+              <div className="mt-4 p-3 bg-green-100 border border-green-200 rounded-lg text-green-700 text-sm flex items-center">
+                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
                 {success}
               </div>
             )}
             {error && (
-              <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg text-red-700 text-sm">
-                <i className="fas fa-exclamation-circle mr-2"></i>
+              <div className="mt-4 p-3 bg-red-100 border border-red-200 rounded-lg text-red-700 text-sm flex items-center">
+                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
                 {error}
               </div>
             )}
