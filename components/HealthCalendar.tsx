@@ -23,7 +23,8 @@ import {
   Camera,
   CheckCircle,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Calendar
 } from 'lucide-react'
 import { userDB, User as UserType, UserUtils } from '../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../lib/dbVersion'
@@ -740,11 +741,26 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   
   const [mealRecords, setMealRecords] = useState<any[]>([])
 
+  // 添加 periodRecords 状态
+  const [periodRecords, setPeriodRecords] = useState<any[]>([])
+
+  // 添加选中日期状态
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [showDateModal, setShowDateModal] = useState(false)
+
+  // 添加健康统计模态框状态
+  const [showHealthStatsModal, setShowHealthStatsModal] = useState(false)
   // 编辑用户相关状态
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
   // const [activeTab, setActiveTab] = useState<'stool' | 'myrecord' | 'personal' | 'physical'>('stool')
+
+  // 日历状态
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
+  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth())
+  const [showPeriodRecords, setShowPeriodRecords] = useState(true)
 
   // OneDrive同步状态 - 使用错误边界保护
   // const [oneDriveState, oneDriveActions] = (() => {
@@ -922,16 +938,245 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
   }
 
+  // 添加获取生理记录的函数
+  const loadPeriodRecords = async () => {
+    if (!currentUser) {
+      console.log('loadPeriodRecords: 没有当前用户')
+      return
+    }
+    
+    try {
+      console.log('loadPeriodRecords: 开始加载数据，用户ID:', currentUser.id)
+      const records = await adminService.getUserRecords('periodRecords', currentUser.id)
+      console.log('loadPeriodRecords: 获取到记录数:', records.length)
+      console.log('loadPeriodRecords: 记录详情:', records)
+      // 按日期倒序排列
+      records.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+      setPeriodRecords(records)
+    } catch (error) {
+      console.error('获取生理记录失败:', error)
+    }
+  }
+
   // 当用户变化时重新加载数据
   useEffect(() => {
     if (currentUser) {
       loadStoolRecords()
       loadMyRecords()
       loadMealRecords()
+      loadPeriodRecords()
       // 添加测试数据（仅在开发环境中）
       // addTestDataIfNeeded()
     }
   }, [currentUser])
+
+  // 获取特定日期的记录圆点
+  const getRecordDotsForDate = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0] // YYYY-MM-DD format
+    const dots = []
+
+    // 检查是否有MyRecord记录
+    const hasMyRecord = myRecords.some(record => {
+      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
+      return recordDate === dateStr && !record.delFlag
+    })
+    if (hasMyRecord) {
+      dots.push({
+        color: 'from-blue-400 to-indigo-500',
+        type: 'myRecord'
+      })
+    }
+
+    // 检查是否有Stool记录
+    const hasStoolRecord = stoolRecords.some(record => {
+      const recordDate = new Date(record.date).toISOString().split('T')[0]
+      return recordDate === dateStr && !record.delFlag
+    })
+    if (hasStoolRecord) {
+      dots.push({
+        color: 'from-green-400 to-emerald-500',
+        type: 'stool'
+      })
+    }
+
+    // 检查是否有Period记录
+    const hasPeriodRecord = showPeriodRecords && periodRecords.some(record => {
+      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
+      return recordDate === dateStr && !record.delFlag
+    })
+    if (hasPeriodRecord) {
+      dots.push({
+        color: 'from-pink-400 to-purple-500',
+        type: 'period'
+      })
+    }
+
+    // 检查是否有Meal记录
+    const hasMealRecord = mealRecords.some(record => {
+      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
+      return recordDate === dateStr && !record.delFlag
+    })
+    if (hasMealRecord) {
+      dots.push({
+        color: 'from-orange-400 to-yellow-500',
+        type: 'meal'
+      })
+    }
+
+    return dots
+  }
+
+  // 计算距离上次用餐的时间
+  const getTimeSinceLastMeal = () => {
+    if (!currentUser || mealRecords.length === 0) return null
+
+    // 获取当前用户的最新用餐记录
+    const userMealRecords = mealRecords
+      .filter(record => record.userId === currentUser.id && !record.delFlag)
+      .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+
+    if (userMealRecords.length === 0) return null
+
+    const lastMealTime = new Date(userMealRecords[0].dateTime)
+    const now = new Date()
+    const diffMs = now.getTime() - lastMealTime.getTime()
+    
+    const hours = Math.floor(diffMs / (1000 * 60 * 60))
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+
+    if (hours === 0) {
+      return `${minutes}分钟`
+    } else if (hours < 24) {
+      return `${hours}小时${minutes}分钟`
+    } else {
+      const days = Math.floor(hours / 24)
+      const remainingHours = hours % 24
+      return `${days}天${remainingHours}小时`
+    }
+  }
+
+  // 计算距离上次排便的时间
+  const getTimeSinceLastStool = () => {
+    if (!currentUser || stoolRecords.length === 0) return null
+
+    // 获取当前用户的最新排便记录
+    const userStoolRecords = stoolRecords
+      .filter(record => record.userId === currentUser.id && !record.delFlag)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+    if (userStoolRecords.length === 0) return null
+
+    const lastStoolTime = new Date(userStoolRecords[0].date)
+    const now = new Date()
+    const diffMs = now.getTime() - lastStoolTime.getTime()
+    
+    const totalHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const days = Math.floor(totalHours / 24)
+    const hours = totalHours % 24
+
+    if (days === 0) {
+      return `${hours}小时`
+    } else {
+      return `${days}天${hours}小时`
+    }
+  }
+
+  // 处理日期点击
+  const handleDateClick = (date: Date) => {
+    if (date.getMonth() === calendarMonth) { // 只对当前显示月份的日期有效
+      setSelectedDate(date)
+      setShowDateModal(true)
+    }
+  }
+
+  // 处理上一个月
+  const handlePreviousMonth = () => {
+    if (calendarMonth === 0) {
+      setCalendarYear(calendarYear - 1)
+      setCalendarMonth(11)
+    } else {
+      setCalendarMonth(calendarMonth - 1)
+    }
+  }
+
+  // 处理下一个月
+  const handleNextMonth = () => {
+    if (calendarMonth === 11) {
+      setCalendarYear(calendarYear + 1)
+      setCalendarMonth(0)
+    } else {
+      setCalendarMonth(calendarMonth + 1)
+    }
+  }
+
+  // 获取月份名称
+  const getMonthName = (month: number) => {
+    const monthNames = [
+      '1月', '2月', '3月', '4月', '5月', '6月',
+      '7月', '8月', '9月', '10月', '11月', '12月'
+    ]
+    return monthNames[month]
+  }
+
+  // 获取选中日期的所有记录
+  const getRecordsForSelectedDate = () => {
+    if (!selectedDate) return []
+    
+    const dateStr = selectedDate.toISOString().split('T')[0]
+    const allRecords: any[] = []
+
+    // MyRecords
+    myRecords.forEach(record => {
+      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
+      if (recordDate === dateStr && !record.delFlag) {
+        allRecords.push({
+          ...record,
+          type: 'myRecord',
+          typeName: '个人记录'
+        })
+      }
+    })
+
+    // Stool Records
+    stoolRecords.forEach(record => {
+      const recordDate = new Date(record.date).toISOString().split('T')[0]
+      if (recordDate === dateStr && !record.delFlag) {
+        allRecords.push({
+          ...record,
+          type: 'stool',
+          typeName: '排便记录'
+        })
+      }
+    })
+
+    // Period Records (根据toggle状态)
+    if (showPeriodRecords) {
+      periodRecords.forEach(record => {
+        const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
+        if (recordDate === dateStr && !record.delFlag) {
+          allRecords.push({
+            ...record,
+            type: 'period',
+            typeName: '生理记录'
+          })
+        }
+      })
+    }
+
+    // Meal Records
+    mealRecords.forEach(record => {
+      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
+      if (recordDate === dateStr && !record.delFlag) {
+        allRecords.push({
+          ...record,
+          type: 'meal',
+          typeName: '饮食记录'
+        })
+      }
+    })
+
+    return allRecords.sort((a, b) => new Date(a.dateTime || a.date).getTime() - new Date(b.dateTime || b.date).getTime())
+  }
 
   // 添加测试数据的函数
   const addTestDataIfNeeded = async () => {
@@ -1022,7 +1267,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         break
       case 'period':
         console.log('选择了生理记录')
-        window.location.href = 'period_page.html'
+        router.push('/period')
         break
       case 'myrecord':
         console.log('选择了我的记录')
@@ -1093,6 +1338,24 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
   }
 
+  const editPeriodRecord = (recordId: string) => {
+    console.log('编辑生理记录:', recordId)
+    router.push(`/period?edit=${recordId}`)
+  }
+
+  const deletePeriodRecord = async (recordId: string) => {
+    try {
+      if (!confirm('确定要删除此记录吗？')) return
+      console.log('删除生理记录:', recordId)
+      await adminService.softDeletePeriodRecord(recordId)
+      // 重新加载数据
+      await loadPeriodRecords()
+      console.log('生理记录已删除')
+    } catch (error) {
+      console.error('删除生理记录失败:', error)
+    }
+  }
+
   // 添加辅助函数
   const formatRecordTime = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -1137,6 +1400,57 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const getTypeText = (type: StoolRecord['type']) => {
     if (type === 'unknown') return '未知类型'
     return `类型${type}`
+  }
+
+  // Period helper functions
+  const getPeriodStatusText = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'start': '开始',
+      'ongoing': '进行中',
+      'end': '结束'
+    }
+    return statusMap[status] || '未知'
+  }
+
+  const getPeriodStatusColor = (status: string) => {
+    const colorMap: Record<string, string> = {
+      'start': 'bg-red-100 text-red-600',
+      'ongoing': 'bg-pink-100 text-pink-600',
+      'end': 'bg-gray-100 text-gray-600'
+    }
+    return colorMap[status] || 'bg-gray-100 text-gray-600'
+  }
+
+  const getFlowAmountText = (flow: string) => {
+    const flowMap: Record<string, string> = {
+      'spotting': '极少',
+      'light': '较少',
+      'normal': '正常',
+      'heavy': '较多'
+    }
+    return flowMap[flow] || '未知'
+  }
+
+  const getPeriodColorText = (color: string) => {
+    const colorMap: Record<string, string> = {
+      'bright-red': '鲜红',
+      'dark-red': '暗红',
+      'deep-red': '深红',
+      'orange-red': '橙红',
+      'pink': '粉红'
+    }
+    return colorMap[color] || '未知'
+  }
+
+  const getMoodEmoji = (mood: string) => {
+    const moodMap: Record<string, string> = {
+      'very-sad': '😭',
+      'sad': '😟',
+      'neutral': '😐',
+      'happy': '😊',
+      'very-happy': '😄'
+    }
+    return moodMap[mood] || '😐'
   }
 
   const switchTab = (tabName: string) => {
@@ -1476,7 +1790,9 @@ const gotoOneDriveStatus = () => {
               </div>
               <div className="text-left">
                 <div className="text-xs text-gray-600">上次用餐</div>
-                <div className="text-sm font-bold text-gray-800 leading-tight">3</div>
+                <div className="text-sm font-bold text-gray-800 leading-tight">
+                  {getTimeSinceLastMeal() || '无记录'}
+                </div>
               </div>
             </div>
             <div className="stat-card rounded-xl p-2 flex items-center space-x-1.5">
@@ -1485,15 +1801,21 @@ const gotoOneDriveStatus = () => {
               </div>
               <div className="text-left">
                 <div className="text-xs text-gray-600">上次排便</div>
-                <div className="text-sm font-bold text-gray-800 leading-tight">2</div>
+                <div className="text-sm font-bold text-gray-800 leading-tight">
+                  {getTimeSinceLastStool() || '无记录'}
+                </div>
               </div>
             </div>
-            <div className="stat-card rounded-xl p-2 flex items-center space-x-1.5">
+            <div 
+              className="stat-card rounded-xl p-2 flex items-center space-x-1.5 cursor-pointer hover:bg-white/80 transition-all"
+              onClick={() => setShowHealthStatsModal(true)}
+            >
               <div className="health-icon soft w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Folder className="text-white text-xs" />
               </div>
               <div className="text-left">
                 <div className="text-xs text-gray-600">健康统计</div>
+                <div className="text-xs text-gray-500">点击查看</div>
               </div>
             </div>
           </div>
@@ -1506,18 +1828,42 @@ const gotoOneDriveStatus = () => {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-800">2025年 7月</h2>
+                  <h2 className="text-xl font-bold text-gray-800">{calendarYear}年 {getMonthName(calendarMonth)}</h2>
                   <p className="text-xs text-gray-600 mt-0.5">健康记录概览</p>
                 </div>
-                <button onClick={goToPrivacyCalendar} className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm health-icon privacy">
-                  <Flower2 className="text-white text-sm" />
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button onClick={goToPrivacyCalendar} className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm health-icon privacy">
+                    <Flower2 className="text-white text-sm" />
+                  </button>
+                  
+                  {/* 生理记录显示切换 */}
+                  <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
+                    <span className="text-xs font-medium text-gray-700">生理</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={showPeriodRecords}
+                        onChange={(e) => setShowPeriodRecords(e.target.checked)}
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-pink-300 rounded-full peer peer-checked:after:translate-x-4 peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
+                    </label>
+                  </div>
+                </div>
               </div>
               <div className="flex items-center space-x-1">
-                <button className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm">
+                <button 
+                  onClick={handlePreviousMonth}
+                  className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm"
+                  title="上一个月"
+                >
                   <ChevronLeft className="text-gray-700 w-4 h-4" />
                 </button>
-                <button className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm">
+                <button 
+                  onClick={handleNextMonth}
+                  className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm"
+                  title="下一个月"
+                >
                   <ChevronRight className="text-gray-700 w-4 h-4" />
                 </button>
               </div>
@@ -1532,35 +1878,44 @@ const gotoOneDriveStatus = () => {
 
               {/* Calendar Days */}
               {Array.from({ length: 35 }, (_, i) => {
-                const day = i - 1 // Adjust for starting on Sunday
-                const isToday = day === 14
-                const isCurrentMonth = day >= 1 && day <= 31
-                const displayDay = day < 1 ? 30 + day : day > 31 ? day - 31 : day
+                // 使用状态管理的日期
+                const today = new Date()
+                
+                // 获取当前显示月份的第一天是星期几
+                const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1)
+                const startOfWeek = firstDayOfMonth.getDay()
+                
+                // 计算当前格子对应的日期
+                const dayOffset = i - startOfWeek
+                const cellDate = new Date(calendarYear, calendarMonth, dayOffset + 1)
+                
+                const isToday = cellDate.toDateString() === today.toDateString()
+                const isCurrentMonth = cellDate.getMonth() === calendarMonth
+                const displayDay = cellDate.getDate()
+                
+                // 获取该日期的记录圆点
+                const recordDots = isCurrentMonth ? getRecordDotsForDate(cellDate) : []
                 
                 return (
-                  <div key={i} className={`calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`}>
+                  <div 
+                    key={i} 
+                    className={`calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`}
+                    onClick={() => handleDateClick(cellDate)}
+                    title={isCurrentMonth ? `查看 ${cellDate.getMonth() + 1}月${cellDate.getDate()}日 的记录` : ''}
+                  >
                     <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'text-gray-400' : 'text-gray-800'}`}>
                       {displayDay}
                     </span>
-                    {/* Sample dots for some dates */}
-                    {(day === 2 || day === 3 || day === 6 || day === 8 || day === 10 || day === 12 || day === 14 || day === 17) && (
+                    {/* 基于真实记录数据的圆点 */}
+                    {recordDots.length > 0 && (
                       <div className="flex mt-0.5">
-                        {day === 3 || day === 10 || day === 14 ? (
-                          <>
-                            <div className="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
-                            <div className="calendar-dot bg-gradient-to-r from-green-400 to-emerald-500"></div>
-                            {day === 3 || day === 10 ? (
-                              <div className="calendar-dot bg-gradient-to-r from-pink-400 to-purple-500"></div>
-                            ) : null}
-                          </>
-                        ) : day === 2 || day === 6 ? (
-                          <>
-                            <div className="calendar-dot bg-gradient-to-r from-orange-400 to-yellow-500"></div>
-                            <div className="calendar-dot bg-gradient-to-r from-green-400 to-emerald-500"></div>
-                          </>
-                        ) : (
-                          <div className={`calendar-dot bg-gradient-to-r ${isToday ? 'from-white to-white' : 'from-orange-400 to-yellow-500'}`}></div>
-                        )}
+                        {recordDots.map((dot, index) => (
+                          <div 
+                            key={`${dot.type}-${index}`}
+                            className={`calendar-dot bg-gradient-to-r ${isToday ? 'from-white to-white' : dot.color}`}
+                            title={`${dot.type} 记录`}
+                          ></div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -1569,7 +1924,7 @@ const gotoOneDriveStatus = () => {
             </div>
 
             {/* Legend */}
-            <div className="flex items-center justify-center space-x-4 pt-3 border-t border-white/20">
+            <div className="flex items-center justify-center space-x-3 pt-3 border-t border-white/20 flex-wrap gap-y-2">
               <div className="flex items-center space-x-1.5">
                 <div className="w-3 h-3 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-full shadow-sm"></div>
                 <span className="text-xs font-medium text-gray-700">饮食</span>
@@ -1578,8 +1933,14 @@ const gotoOneDriveStatus = () => {
                 <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full shadow-sm"></div>
                 <span className="text-xs font-medium text-gray-700">排便</span>
               </div>
+              {showPeriodRecords && (
+                <div className="flex items-center space-x-1.5">
+                  <div className="w-3 h-3 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full shadow-sm"></div>
+                  <span className="text-xs font-medium text-gray-700">生理</span>
+                </div>
+              )}
               <div className="flex items-center space-x-1.5">
-                <div className="w-3 h-3 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full shadow-sm"></div>
+                <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-sm"></div>
                 <span className="text-xs font-medium text-gray-700">记录</span>
               </div>
             </div>
@@ -1674,7 +2035,7 @@ const gotoOneDriveStatus = () => {
                       const stoolRecordsFormatted: DisplayRecord[] = stoolRecords.map(record => ({
                         id: record.id,
                         type: 'stool',
-                        date: record.dateTime,
+                        date: record.date,
                         title: '排便记录',
                         description: record.notes || `${getStatusText(record.status)}，${getTypeText(record.type)}`,
                         tags: [
@@ -1707,9 +2068,26 @@ const gotoOneDriveStatus = () => {
                         record: record
                       }))
 
+                      // 将生理记录转换为统一格式（根据toggle状态）
+                      const periodRecordsFormatted: DisplayRecord[] = showPeriodRecords ? periodRecords.map(record => ({
+                        id: record.id,
+                        type: 'physical',
+                        date: record.dateTime,
+                        title: '生理记录',
+                        description: record.notes?.slice(0, 50) + (record.notes?.length > 50 ? '...' : '') || 
+                                   `${getPeriodStatusText(record.status)}，${getFlowAmountText(record.flowAmount)}`,
+                        tags: [
+                          `状态: ${getPeriodStatusText(record.status)}`,
+                          `流量: ${getFlowAmountText(record.flowAmount)}`,
+                          `心情: ${getMoodEmoji(record.mood)}`,
+                          ...(record.tags || [])
+                        ],
+                        record: record
+                      })) : []
+
                       // 合并所有记录并按时间排序
                       // const allRecords = [...staticRecords, ...stoolRecordsFormatted, ...myRecordsFormatted, ...mealRecordsFormatted]
-                      const allRecords = [...stoolRecordsFormatted, ...myRecordsFormatted, ...mealRecordsFormatted]
+                      const allRecords = [...stoolRecordsFormatted, ...myRecordsFormatted, ...mealRecordsFormatted, ...periodRecordsFormatted]
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
                       // 按日期分组
@@ -1735,7 +2113,7 @@ const gotoOneDriveStatus = () => {
                               <div className="timeline-time">{formatRecordTime(record.date)}</div>
                               <div className={`record-card rounded-xl p-2.5 shadow-sm transition-all relative`}>
                                 {/* 删除按钮 - 只为可编辑的记录类型显示 */}
-                                {(record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal') && (
+                                {(record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal' || record.type === 'physical') && (
                                   <button
                                     className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center transition-colors z-10"
                                     onClick={(e) => {
@@ -1746,6 +2124,8 @@ const gotoOneDriveStatus = () => {
                                         deleteMyRecord(record.id)
                                       } else if (record.type === 'meal') {
                                         deleteMealRecord(record.id)
+                                      } else if (record.type === 'physical') {
+                                        deletePeriodRecord(record.id)
                                       }
                                     }}
                                     title="删除记录"
@@ -1756,7 +2136,7 @@ const gotoOneDriveStatus = () => {
                                 
                                 <div 
                                   className={`flex items-start ${
-                                    record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
+                                    record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal' || record.type === 'physical' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
                                   }`}
                                   onClick={() => {
                                     if (record.type === 'stool') {
@@ -1765,6 +2145,8 @@ const gotoOneDriveStatus = () => {
                                       editMyRecord(record.id)
                                     } else if (record.type === 'meal') {
                                       editMealRecord(record.id)
+                                    } else if (record.type === 'physical') {
+                                      editPeriodRecord(record.id)
                                     }
                                   }}
                                 >
@@ -1788,7 +2170,7 @@ const gotoOneDriveStatus = () => {
                                       <div className="text-sm font-semibold text-gray-900">
                                         {record.title}
                                       </div>
-                                      {(record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal') && (
+                                      {(record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal' || record.type === 'physical') && (
                                         <div className="text-xs text-gray-400">点击编辑</div>
                                       )}
                                     </div>
@@ -1805,7 +2187,7 @@ const gotoOneDriveStatus = () => {
                                               record.type === 'meal' && tagIndex === 0 ? 'bg-orange-100 text-orange-600' :
                                               record.type === 'myrecord' ? 'bg-blue-100 text-blue-600' :
                                               record.type === 'personal' ? 'bg-purple-100 text-purple-600' :
-                                              record.type === 'physical' ? 'bg-green-100 text-green-600' :
+                                              record.type === 'physical' ? 'bg-pink-100 text-pink-600' :
                                               'bg-gray-100 text-gray-600'
                                             }`}
                                           >
@@ -1887,8 +2269,27 @@ const gotoOneDriveStatus = () => {
                         isUpdated: record.updatedAt !== record.createdAt
                       }))
 
+                      // 将生理记录转换为统一格式，按 updatedAt 排序（根据toggle状态）
+                      const periodRecordsFormattedByUpdate: DisplayRecord[] = showPeriodRecords ? periodRecords.map(record => ({
+                        id: record.id,
+                        type: 'physical',
+                        date: record.updatedAt,
+                        originalDate: record.dateTime, // 保留原始日期时间用于显示
+                        title: '生理记录',
+                        description: record.notes?.slice(0, 50) + (record.notes?.length > 50 ? '...' : '') || 
+                                   `${getPeriodStatusText(record.status)}，${getFlowAmountText(record.flowAmount)}`,
+                        tags: [
+                          `状态: ${getPeriodStatusText(record.status)}`,
+                          `流量: ${getFlowAmountText(record.flowAmount)}`,
+                          `心情: ${getMoodEmoji(record.mood)}`,
+                          ...(record.tags || [])
+                        ],
+                        record: record,
+                        isUpdated: record.updatedAt !== record.createdAt
+                      })) : []
+
                       // 显示所有记录，按 updatedAt 时间排序（最新的在前）
-                      const updatedRecords = [...stoolRecordsFormatted, ...myRecordsFormattedByUpdate, ...mealRecordsFormattedByUpdate]
+                      const updatedRecords = [...stoolRecordsFormatted, ...myRecordsFormattedByUpdate, ...mealRecordsFormattedByUpdate, ...periodRecordsFormattedByUpdate]
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
                       if (updatedRecords.length === 0) {
@@ -1945,7 +2346,7 @@ const gotoOneDriveStatus = () => {
                                 
                                 <div 
                                   className={`flex items-start ${
-                                    record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
+                                    record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal' || record.type === 'physical' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
                                   }`}
                                   onClick={() => {
                                     if (record.type === 'stool') {
@@ -1954,6 +2355,8 @@ const gotoOneDriveStatus = () => {
                                       editMyRecord(record.id)
                                     } else if (record.type === 'meal') {
                                       editMealRecord(record.id)
+                                    } else if (record.type === 'physical') {
+                                      editPeriodRecord(record.id)
                                     }
                                   }}
                                 >
@@ -1978,7 +2381,7 @@ const gotoOneDriveStatus = () => {
                                           {record.isUpdated ? '已更新' : '新增'}
                                         </span>
                                       </div>
-                                      {(record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal') && (
+                                      {(record.type === 'stool' || record.type === 'myrecord' || record.type === 'meal' || record.type === 'physical') && (
                                         <div className="text-xs text-gray-400">点击编辑</div>
                                       )}
                                     </div>
@@ -2224,7 +2627,7 @@ const gotoOneDriveStatus = () => {
                                   </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
-                                  {!(user.id === currentUser.id) && (
+                                  {!(user.id === currentUser?.id) && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
@@ -2235,7 +2638,7 @@ const gotoOneDriveStatus = () => {
                                       切换
                                     </button>
                                   )}
-                                  {user.id === currentUser.id && (
+                                  {user.id === currentUser?.id && (
                                     <span className="px-2 py-1 bg-health-primary/10 text-health-primary text-xs rounded-md">
                                       当前
                                     </span>
@@ -2431,15 +2834,115 @@ const gotoOneDriveStatus = () => {
           <AddUserModal 
             isOpen={isEditUserModalOpen}
             onClose={closeEditUserModal}
-            onAddUser={handleEditUser}
+            onAddUser={handleAddUser}
             onEditUser={handleEditUser}
             editUser={editingUser}
             isEditMode={true}
           />
         )}
-      </div>
-      
-      <style jsx>{`
+
+      {/* 健康统计模态框 */}
+      {showHealthStatsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* 背景遮罩 */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowHealthStatsModal(false)}
+          ></div>
+          
+          {/* 模态框内容 */}
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-hidden">
+            {/* 头部 */}
+            <div className="bg-gradient-to-r from-health-primary to-green-600 text-white p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold">健康统计</h3>
+                  <p className="text-sm text-white/80">数据分析与趋势</p>
+                </div>
+                <button
+                  onClick={() => setShowHealthStatsModal(false)}
+                  className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 内容区域 */}
+            <div className="p-6 max-h-96 overflow-y-auto">
+              <div className="text-center py-8">
+                <div className="w-20 h-20 bg-orange-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <div className="text-3xl">🚧</div>
+                </div>
+                <h4 className="text-lg font-semibold text-gray-800 mb-2">功能开发中</h4>
+                <p className="text-gray-600 mb-4">
+                  健康统计功能正在紧急开发中，将为您提供：
+                </p>
+                
+                {/* 功能列表 */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-4 text-left">
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+                      <span className="text-sm text-gray-700">用餐频率和规律性分析</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-sm text-gray-700">排便健康趋势图表</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-pink-400 rounded-full"></div>
+                      <span className="text-sm text-gray-700">生理周期跟踪统计</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                      <span className="text-sm text-gray-700">个人健康指数评分</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                      <span className="text-sm text-gray-700">智能健康建议推荐</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 预计完成时间 */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center justify-center space-x-2 text-blue-700">
+                    <Clock className="w-4 h-4" />
+                    <span className="text-sm font-medium">预计完成时间：2-3周内</span>
+                  </div>
+                </div>
+
+                {/* 进度条 */}
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600">开发进度</span>
+                    <span className="text-sm font-medium text-orange-600">35%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-gradient-to-r from-orange-400 to-orange-500 h-2 rounded-full w-[35%]"></div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-500">
+                  感谢您的耐心等待，我们正在努力为您打造最好的健康管理体验！
+                </p>
+              </div>
+            </div>
+
+            {/* 底部操作按钮 */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setShowHealthStatsModal(false)}
+                className="w-full px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+              >
+                我知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>      <style jsx>{`
         :root {
           --health-primary: #10B981;
           --health-secondary: #059669;
@@ -2462,7 +2965,25 @@ const gotoOneDriveStatus = () => {
           height: 6px;
           border-radius: 50%;
           margin: 0 1px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+          animation: dot-pulse 2s infinite;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        @keyframes dot-pulse {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          50% {
+            transform: scale(1.1);
+            opacity: 0.8;
+          }
+        }
+        
+        .calendar-dot:hover {
+          transform: scale(1.3);
+          z-index: 10;
         }
         
         .calendar-cell {
@@ -2688,6 +3209,139 @@ const gotoOneDriveStatus = () => {
           color: #6b7280;
         }
       `}</style>
+
+      {/* 日期记录模态框 */}
+      {showDateModal && selectedDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* 背景遮罩 */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowDateModal(false)}
+          ></div>
+          
+          {/* 模态框内容 */}
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden">
+            {/* 头部 */}
+            <div className="bg-gradient-to-r from-health-primary to-green-600 text-white p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold">
+                    {selectedDate.getMonth() + 1}月{selectedDate.getDate()}日记录
+                  </h3>
+                  <p className="text-sm text-white/80">
+                    {selectedDate.toLocaleDateString('zh-CN', { weekday: 'long' })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowDateModal(false)}
+                  className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* 记录列表 */}
+            <div className="p-4 max-h-96 overflow-y-auto">
+              {(() => {
+                const records = getRecordsForSelectedDate()
+                if (records.length === 0) {
+                  return (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                        <Calendar className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <p className="text-gray-500 mb-4">这一天还没有记录</p>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => {
+                            setShowDateModal(false)
+                            // 可以在这里添加跳转到记录页面的逻辑
+                          }}
+                          className="w-full px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                        >
+                          添加记录
+                        </button>
+                      </div>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="space-y-3">
+                    {records.map((record, index) => (
+                      <div key={`${record.type}-${index}`} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-2">
+                            {record.type === 'myRecord' && <Heart className="w-4 h-4 text-blue-500" />}
+                            {record.type === 'stool' && <Sprout className="w-4 h-4 text-green-500" />}
+                            {record.type === 'period' && <Flower2 className="w-4 h-4 text-pink-500" />}
+                            {record.type === 'meal' && <Utensils className="w-4 h-4 text-orange-500" />}
+                            <span className="text-sm font-medium text-gray-900">
+                              {record.typeName}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {new Date(record.dateTime || record.date).toLocaleTimeString('zh-CN', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
+                        </div>
+                        
+                        {/* 记录内容预览 */}
+                        <div className="text-sm text-gray-600">
+                          {record.notes || record.content || '无备注'}
+                        </div>
+                        
+                        {/* 标签 */}
+                        {record.tags && record.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {record.tags.slice(0, 3).map((tag: string, tagIndex: number) => (
+                              <span 
+                                key={tagIndex}
+                                className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                            {record.tags.length > 3 && (
+                              <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">
+                                +{record.tags.length - 3}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* 底部操作按钮 */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setShowDateModal(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                >
+                  关闭
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDateModal(false)
+                    // 这里可以添加跳转到该日期记录详情的逻辑
+                  }}
+                  className="px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                >
+                  查看详情
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
