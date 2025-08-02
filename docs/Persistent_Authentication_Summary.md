@@ -6,14 +6,14 @@
 ## 🔧 技术实现
 
 ### 1. **MSAL 配置优化**
-```typescript
+\`\`\`typescript
 // 缓存配置
 cache: {
   cacheLocation: isMobile() ? BrowserCacheLocation.SessionStorage : BrowserCacheLocation.LocalStorage,
   storeAuthStateInCookie: isMobile() || !isSecureContext(),
   secureCookies: isSecureContext(),
 }
-```
+\`\`\`
 
 **特性**:
 - 桌面端使用 LocalStorage，移动端使用 SessionStorage
@@ -21,7 +21,7 @@ cache: {
 - 根据HTTPS环境调整安全设置
 
 ### 2. **智能初始化机制**
-```typescript
+\`\`\`typescript
 class MicrosoftAuthService {
   private initializationPromise: Promise<void> | null = null
   private isInitialized = false
@@ -35,7 +35,7 @@ class MicrosoftAuthService {
     await this.restoreAuthState()
   }
 }
-```
+\`\`\`
 
 **优势**:
 - 幂等性设计，避免重复初始化
@@ -43,7 +43,7 @@ class MicrosoftAuthService {
 - 优雅的错误处理和重试机制
 
 ### 3. **增强的令牌管理**
-```typescript
+\`\`\`typescript
 async getTokenSilently(): Promise<string | null> {
   try {
     // 首先尝试缓存的令牌
@@ -65,7 +65,7 @@ async getTokenSilently(): Promise<string | null> {
     })
   }
 }
-```
+\`\`\`
 
 **功能**:
 - 优先使用缓存令牌，减少网络请求
@@ -74,7 +74,7 @@ async getTokenSilently(): Promise<string | null> {
 - 本地状态同步
 
 ### 4. **本地状态持久化**
-```typescript
+\`\`\`typescript
 // 保存认证状态（不包含敏感信息）
 private saveAuthState(accessToken: string, account: any): void {
   const authState = {
@@ -92,7 +92,7 @@ private isAuthStateValid(): boolean {
   const maxAge = 24 * 60 * 60 * 1000 // 24小时
   return stateAge < maxAge
 }
-```
+\`\`\`
 
 **安全特性**:
 - 不保存敏感的访问令牌
@@ -101,7 +101,7 @@ private isAuthStateValid(): boolean {
 - 状态验证和清理
 
 ### 5. **React Hook 集成**
-```typescript
+\`\`\`typescript
 useEffect(() => {
   const initializeAuth = async () => {
     // 检查是否有保存的认证状态
@@ -116,7 +116,7 @@ useEffect(() => {
   }
   initializeAuth()
 }, [])
-```
+\`\`\`
 
 **用户体验**:
 - 组件挂载时自动检查保存状态
@@ -132,12 +132,12 @@ useEffect(() => {
 - **HTTP环境**: 基础Cookie + 有限缓存
 
 ### 降级处理
-```typescript
+\`\`\`typescript
 cache: {
   cacheLocation: isMobile() ? BrowserCacheLocation.SessionStorage : BrowserCacheLocation.LocalStorage,
   storeAuthStateInCookie: isMobile() || !isSecureContext(),
 }
-```
+\`\`\`
 
 ## 🚀 用户体验改进
 

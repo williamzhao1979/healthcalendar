@@ -89,7 +89,7 @@
 对于开发环境，如需在移动设备上测试，建议设置HTTPS：
 
 1. **使用mkcert**:
-```bash
+\`\`\`bash
 # 安装mkcert
 npm install -g mkcert
 
@@ -102,10 +102,10 @@ mkcert localhost 192.168.x.x
 # 配置Next.js使用HTTPS
 # 在package.json中修改dev脚本
 "dev": "next dev --experimental-https"
-```
+\`\`\`
 
 2. **或使用ngrok**:
-```bash
+\`\`\`bash
 # 安装ngrok
 npm install -g ngrok
 
@@ -114,7 +114,7 @@ npm run dev
 
 # 在另一个终端创建HTTPS隧道
 ngrok http 3001
-```
+\`\`\`
 
 ### Azure应用注册配置
 
@@ -148,7 +148,7 @@ ngrok http 3001
 
 ### 常用调试命令
 
-```javascript
+\`\`\`javascript
 // 检查crypto支持
 console.log('Crypto支持:', !!(window.crypto && window.crypto.subtle))
 
@@ -160,7 +160,7 @@ console.log('安全上下文:', window.isSecureContext)
 
 // 检查用户代理
 console.log('用户代理:', navigator.userAgent)
-```
+\`\`\`
 
 ---
 

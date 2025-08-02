@@ -44,11 +44,11 @@
 ## 技术实现
 
 ### 架构设计
-```
+\`\`\`
 /admin
 ├── page.tsx              # 主管理界面
 └── /lib/adminService.ts   # 数据库管理服务
-```
+\`\`\`
 
 ### 核心组件
 - **IndexedDBAdmin**: 主管理界面组件
@@ -91,7 +91,7 @@
 
 ### 基础记录结构
 所有记录都继承自 `BaseRecord` 接口：
-```typescript
+\`\`\`typescript
 interface BaseRecord {
   id: string
   userId: string
@@ -99,7 +99,7 @@ interface BaseRecord {
   updatedAt: string
   delFlag: boolean
 }
-```
+\`\`\`
 
 ## 使用指南
 

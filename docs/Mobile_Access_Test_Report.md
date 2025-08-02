@@ -57,7 +57,7 @@
 ### 代码修改要点
 
 1. **`hooks/useOneDriveSync.ts`**:
-   ```typescript
+   \`\`\`typescript
    // 错误容忍度增强
    catch (error) {
      console.warn('OneDrive初始化失败，但不影响主应用功能:', errorMessage)
@@ -68,10 +68,10 @@
        error: null, // 不设置error，让主应用正常显示
      }))
    }
-   ```
+   \`\`\`
 
 2. **`components/HealthCalendar.tsx`**:
-   ```typescript
+   \`\`\`typescript
    // 组件级错误边界
    const [oneDriveState, oneDriveActions] = (() => {
      try {
@@ -80,7 +80,7 @@
        return [defaultState, defaultActions] // 降级处理
      }
    })()
-   ```
+   \`\`\`
 
 ### 关键改进
 
@@ -93,10 +93,10 @@
 ### 移动端测试清单
 
 1. **基础访问测试**
-   ```bash
+   \`\`\`bash
    # 手机浏览器访问
    http://192.168.0.4:3001
-   ```
+   \`\`\`
    - [ ] 页面加载正常
    - [ ] 无JavaScript错误
    - [ ] 布局显示正确
@@ -108,10 +108,10 @@
    - [ ] 基础交互响应正常
 
 3. **兼容性验证**
-   ```bash
+   \`\`\`bash
    # 访问测试页面
    http://192.168.0.4:3001/basic-test
-   ```
+   \`\`\`
    - [ ] 浏览器功能检查通过
    - [ ] 设备信息显示正确
    - [ ] 模拟功能正常工作

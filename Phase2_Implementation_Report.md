@@ -11,25 +11,25 @@
 
 ### 2. 目录结构自动创建
 按照设计方案实现的目录结构：
-```
+\`\`\`
 OneDrive/Apps/HealthCalendar/
 └── users/
     └── {userId}/
         └── data/
             ├── {tableName}.json (每个表一个文件)
             └── export_metadata.json (导出元数据)
-```
+\`\`\`
 
 ### 3. 数据格式标准化
 每个导出的JSON文件包含：
-```json
+\`\`\`json
 {
   "tableName": "stoolRecords",
   "exportTime": "2025-07-24T...",
   "recordCount": 25,
   "data": [...] // 实际数据
 }
-```
+\`\`\`
 
 ### 4. React Hook集成
 - **状态管理**: 导出进度、结果、错误信息
@@ -100,7 +100,7 @@ OneDrive/Apps/HealthCalendar/
 ## 📊 导出结果示例
 
 ### 成功导出
-```json
+\`\`\`json
 {
   "success": true,
   "exportedFiles": [
@@ -118,7 +118,7 @@ OneDrive/Apps/HealthCalendar/
     "tables": ["users", "stoolRecords", "myRecords"]
   }
 }
-```
+\`\`\`
 
 ## 🚀 下一步计划
 

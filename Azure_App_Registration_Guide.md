@@ -47,12 +47,12 @@
 ## 4. 当前配置状态
 
 ### 环境变量 (.env.local)
-```bash
+\`\`\`bash
 # Microsoft 认证配置
 NEXT_PUBLIC_MICROSOFT_CLIENT_ID=67044ccc-4dcb-4d7d-b4ca-b79befe0056d
 NEXT_PUBLIC_MICROSOFT_TENANT_ID=common
 NEXT_PUBLIC_MICROSOFT_REDIRECT_URI=http://localhost:3001
-```
+\`\`\`
 
 ### 已配置的权限范围
 - `User.Read` - 基本用户信息
@@ -109,9 +109,9 @@ NEXT_PUBLIC_MICROSOFT_REDIRECT_URI=http://localhost:3001
 
 ### 环境变量更新
 生产环境需要更新：
-```bash
+\`\`\`bash
 NEXT_PUBLIC_MICROSOFT_REDIRECT_URI=https://yourdomain.com
-```
+\`\`\`
 
 ---
 

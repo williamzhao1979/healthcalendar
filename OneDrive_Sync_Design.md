@@ -42,7 +42,7 @@
 
 ## 3. 完整目录结构设计
 
-```
+\`\`\`
 OneDrive/Apps/HealthCalendar/
 ├── users/
 │   ├── user_self/
@@ -78,12 +78,12 @@ OneDrive/Apps/HealthCalendar/
     │   └── incremental_20250724_150000.zip
     └── 2025-07-23/
         └── full_backup_20250723_103000.zip
-```
+\`\`\`
 
 ## 4. 数据关联设计
 
 ### 4.1 JSON数据中的附件引用
-```json
+\`\`\`json
 {
   "stoolRecords": [
     {
@@ -133,10 +133,10 @@ OneDrive/Apps/HealthCalendar/
     }
   ]
 }
-```
+\`\`\`
 
 ### 4.2 附件元数据管理
-```json
+\`\`\`json
 {
   "attachmentMetadata": {
     "att_001": {
@@ -155,7 +155,7 @@ OneDrive/Apps/HealthCalendar/
     }
   }
 }
-```
+\`\`\`
 
 ## 5. 同步策略
 
@@ -171,7 +171,7 @@ OneDrive/Apps/HealthCalendar/
 3. **低优先级**: 音频和文档附件
 
 ### 5.3 增量同步机制
-```json
+\`\`\`json
 {
   "syncMetadata": {
     "lastFullSync": "2025-07-24T10:00:00.000Z",
@@ -194,7 +194,7 @@ OneDrive/Apps/HealthCalendar/
     ]
   }
 }
-```
+\`\`\`
 
 ## 6. 技术实现考虑
 
@@ -229,14 +229,14 @@ OneDrive/Apps/HealthCalendar/
 - 同步进度指示器
 
 ### 7.3 同步状态显示
-```
+\`\`\`
 OneDrive同步: ✅ 已连接
 最后同步: 2分钟前
 待上传: 3个文件 (2.1MB)
 □ meal_photo_001.jpg (1.2MB)
 □ voice_note_002.m4a (0.7MB) 
 □ document_001.pdf (0.2MB)
-```
+\`\`\`
 
 ### 7.4 附件管理
 - 附件预览和下载
@@ -247,12 +247,12 @@ OneDrive同步: ✅ 已连接
 ## 8. 技术依赖
 
 ### 8.1 新增依赖包
-```json
+\`\`\`json
 {
   "@azure/msal-browser": "^3.x",
   "@microsoft/microsoft-graph-client": "^3.x"
 }
-```
+\`\`\`
 
 ### 8.2 环境配置
 - 注册Microsoft Azure应用

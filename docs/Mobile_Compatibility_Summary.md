@@ -42,7 +42,7 @@
 - **文件**: `server-https.js`, `generate-certs.bat/sh`
 - **功能**: 快速启用HTTPS开发服务器
 - **使用方法**:
-  ```bash
+  \`\`\`bash
   # Windows
   npm run certs:win
   npm run dev:https
@@ -50,7 +50,7 @@
   # Linux/Mac
   npm run certs
   npm run dev:https
-  ```
+  \`\`\`
 
 ## 测试步骤
 
@@ -72,15 +72,15 @@
 ## 关键改进点
 
 ### 1. 智能错误处理
-```typescript
+\`\`\`typescript
 // 移动端特定错误消息
 if (deviceInfo?.isMobile && error.includes('crypto')) {
   return '移动端加密API问题：请使用HTTPS访问或更换浏览器';
 }
-```
+\`\`\`
 
 ### 2. 动态MSAL配置
-```typescript
+\`\`\`typescript
 // 根据设备类型调整配置
 const config = {
   ...baseConfig,
@@ -89,7 +89,7 @@ const config = {
     storeAuthStateInCookie: isMobile
   }
 };
-```
+\`\`\`
 
 ### 3. 用户友好提示
 - 实时兼容性状态显示

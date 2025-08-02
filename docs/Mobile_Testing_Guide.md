@@ -41,10 +41,10 @@
 
 **解决方案**：
 1. **使用HTTPS**
-   ```bash
+   \`\`\`bash
    # 在开发服务器中启用HTTPS
    npm run dev:https
-   ```
+   \`\`\`
 
 2. **浏览器设置**
    - Chrome：启用 "不安全来源的强大功能"
@@ -89,7 +89,7 @@
 
 ### 2. 页面调试信息
 测试页面底部显示完整的状态信息：
-```json
+\`\`\`json
 {
   "isAuthenticated": false,
   "isConnecting": false,
@@ -100,17 +100,17 @@
     "localStorage": true
   }
 }
-```
+\`\`\`
 
 ### 3. 移动端特定检查
-```javascript
+\`\`\`javascript
 // 在浏览器控制台中运行
 console.log('Crypto API:', !!window.crypto?.subtle);
 console.log('HTTPS:', location.protocol === 'https:');
 console.log('User Agent:', navigator.userAgent);
 console.log('LocalStorage:', !!window.localStorage);
 console.log('IndexedDB:', !!window.indexedDB);
-```
+\`\`\`
 
 ## 支持的浏览器
 
