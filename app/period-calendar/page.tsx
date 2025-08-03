@@ -267,7 +267,7 @@ export default function PeriodCalendarPage() {
         // Calculate predicted cycle phases based on cycle stats
         const daysSinceLastPeriod = getDaysSinceLastPeriod(dayDate)
         
-        if (daysSinceLastPeriod >= 0) {
+        if (daysSinceLastPeriod >= 0 && stats.averageCycle > 0) {
           const cycleDay = (daysSinceLastPeriod % stats.averageCycle) + 1
           
           if (cycleDay <= stats.periodDays) {
@@ -410,14 +410,43 @@ export default function PeriodCalendarPage() {
     // Period lengths are the lengths of individual cycles
     const periodLengths = periodCycles.map(cycle => cycle.length)
     
-    const averageCycle = cycleLengths.length > 0 ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length) : 28
-    const periodDays = periodLengths.length > 0 ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length) : 5
-    const ovulationDay = Math.round(averageCycle / 2)
-    
-    // Calculate days to next period using the most recent cycle
+    // Handle irregular cycles (insufficient data)
+    const hasInsufficientData = periodCycles.length < 2
+    const isIrregular = cycleLengths.length < 3 && periodCycles.length > 0
     const lastCycle = periodCycles.length > 0 ? periodCycles[periodCycles.length - 1] : null
-    const daysSinceLastPeriod = lastCycle ? Math.round((new Date().getTime() - lastCycle.start.getTime()) / (1000 * 60 * 60 * 24)) : 0
-    const daysToNext = lastCycle ? Math.max(0, averageCycle - daysSinceLastPeriod) : 0
+    
+    let averageCycle: number
+    let periodDays: number
+    let daysToNext: number
+    let daysSinceLastPeriod: number = 0
+    
+    if (hasInsufficientData) {
+      // Single cycle or no cycles - show data but mark as insufficient
+      averageCycle = 0 // Will display as "?"
+      periodDays = periodLengths.length > 0 ? periodLengths[0] : 0
+      daysToNext = 0 // Will display as "?"
+    } else if (isIrregular) {
+      // Few cycles - show calculated data but may be unreliable
+      averageCycle = cycleLengths.length > 0 ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length) : 0
+      periodDays = Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
+      
+      // For irregular cycles, don't predict next period
+      daysToNext = 0
+    } else {
+      // Regular cycles with sufficient data
+      averageCycle = Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
+      periodDays = Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length)
+      
+      // Calculate days to next period using the most recent cycle
+      if (lastCycle) {
+        daysSinceLastPeriod = Math.round((new Date().getTime() - lastCycle.start.getTime()) / (1000 * 60 * 60 * 24))
+        daysToNext = Math.max(0, averageCycle - daysSinceLastPeriod)
+      } else {
+        daysToNext = 0
+      }
+    }
+    
+    const ovulationDay = averageCycle > 0 ? Math.round(averageCycle / 2) : 14
 
     console.log('🩸 周期统计结果:', {
       periodCycles: periodCycles.length,
@@ -734,21 +763,27 @@ export default function PeriodCalendarPage() {
               <div className="w-7 h-7 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center flex-shrink-0 mb-1">
                 <Calendar className="text-white text-xs" />
               </div>
-              <div className="text-base font-bold text-gray-800 leading-tight">{cycleStats.averageCycle}</div>
+              <div className="text-base font-bold text-gray-800 leading-tight">
+                {cycleStats.averageCycle === 0 ? '?' : cycleStats.averageCycle}
+              </div>
               <div className="text-xs text-gray-600">平均周期</div>
             </div>
             <div className="bg-gradient-to-b from-white to-gray-50 rounded-2xl p-2.5 flex flex-col items-center text-center shadow-lg border border-white/40">
               <div className="w-7 h-7 bg-red-500 rounded-xl flex items-center justify-center flex-shrink-0 mb-1">
                 <Droplets className="text-white text-xs" />
               </div>
-              <div className="text-base font-bold text-gray-800 leading-tight">{cycleStats.periodDays}</div>
+              <div className="text-base font-bold text-gray-800 leading-tight">
+                {cycleStats.periodDays === 0 ? '?' : cycleStats.periodDays}
+              </div>
               <div className="text-xs text-gray-600">经期天数</div>
             </div>
             <div className="bg-gradient-to-b from-white to-gray-50 rounded-2xl p-2.5 flex flex-col items-center text-center shadow-lg border border-white/40">
               <div className="w-7 h-7 bg-gradient-to-br from-orange-500 to-yellow-400 rounded-xl flex items-center justify-center flex-shrink-0 mb-1">
                 <Heart className="text-white text-xs" />
               </div>
-              <div className="text-base font-bold text-gray-800 leading-tight">{cycleStats.daysToNext}</div>
+              <div className="text-base font-bold text-gray-800 leading-tight">
+                {cycleStats.daysToNext === 0 ? '?' : cycleStats.daysToNext}
+              </div>
               <div className="text-xs text-gray-600">距下次</div>
             </div>
             <div className="bg-gradient-to-b from-white to-gray-50 rounded-2xl p-2.5 flex flex-col items-center text-center shadow-lg border border-white/40">
@@ -773,13 +808,13 @@ export default function PeriodCalendarPage() {
                     const today = new Date()
                     if (currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear()) {
                       const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
-                      if (daysSinceLastPeriod >= 0) {
+                      if (daysSinceLastPeriod >= 0 && cycleStats.averageCycle > 0) {
                         const cycleDay = (daysSinceLastPeriod % cycleStats.averageCycle) + 1
                         const phaseInfo = getCyclePhaseInfo()
                         return `第${cycleDay}天 · ${phaseInfo.title}`
                       }
                     }
-                    return '查看您的周期数据'
+                    return cycleStats.averageCycle === 0 ? '需要更多数据来分析周期' : '查看您的周期数据'
                   })()}
                 </p>
               </div>
@@ -1013,6 +1048,17 @@ export default function PeriodCalendarPage() {
                   {(() => {
                     const today = new Date()
                     const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
+                    
+                    // Handle insufficient data case
+                    if (cycleStats.averageCycle === 0) {
+                      return (
+                        <div className="text-center py-4">
+                          <div className="text-sm text-gray-500 mb-2">数据不足</div>
+                          <div className="text-xs text-gray-400">需要更多周期数据来显示进度</div>
+                        </div>
+                      )
+                    }
+                    
                     const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
                     const progressPercentage = Math.min(100, (currentCycleDay / cycleStats.averageCycle) * 100)
                     
@@ -1032,43 +1078,45 @@ export default function PeriodCalendarPage() {
                       </>
                     )
                   })()}
-                  <div className="grid grid-cols-4 gap-2 text-xs">
-                    <div className="text-center">
-                      <div className="w-3 h-3 bg-red-500 rounded-full mx-auto mb-1"></div>
-                      <span className="text-gray-600">月经期</span>
-                      <div className="text-gray-500">1-{cycleStats.periodDays}天</div>
+                  {cycleStats.averageCycle > 0 && (
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                      <div className="text-center">
+                        <div className="w-3 h-3 bg-red-500 rounded-full mx-auto mb-1"></div>
+                        <span className="text-gray-600">月经期</span>
+                        <div className="text-gray-500">1-{cycleStats.periodDays || '?'}天</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mb-1"></div>
+                        <span className="text-gray-600">卵泡期</span>
+                        <div className="text-gray-500">{(cycleStats.periodDays || 5) + 1}-{cycleStats.ovulationDay - 1}天</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`w-3 h-3 bg-orange-500 rounded-full mx-auto mb-1 ${(() => {
+                          const today = new Date()
+                          const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
+                          const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
+                          return currentCycleDay >= cycleStats.ovulationDay - 1 && currentCycleDay <= cycleStats.ovulationDay + 1 ? 'ring-2 ring-orange-300' : ''
+                        })()}`}></div>
+                        <span className={`${(() => {
+                          const today = new Date()
+                          const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
+                          const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
+                          return currentCycleDay >= cycleStats.ovulationDay - 1 && currentCycleDay <= cycleStats.ovulationDay + 1 ? 'text-orange-600 font-semibold' : 'text-gray-600'
+                        })()}`}>排卵期</span>
+                        <div className={`${(() => {
+                          const today = new Date()
+                          const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
+                          const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
+                          return currentCycleDay >= cycleStats.ovulationDay - 1 && currentCycleDay <= cycleStats.ovulationDay + 1 ? 'text-orange-600' : 'text-gray-500'
+                        })()}`}>{cycleStats.ovulationDay - 1}-{cycleStats.ovulationDay + 1}天</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="w-3 h-3 bg-purple-500 rounded-full mx-auto mb-1"></div>
+                        <span className="text-gray-600">黄体期</span>
+                        <div className="text-gray-500">{cycleStats.ovulationDay + 2}-{cycleStats.averageCycle}天</div>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mb-1"></div>
-                      <span className="text-gray-600">卵泡期</span>
-                      <div className="text-gray-500">{cycleStats.periodDays + 1}-{cycleStats.ovulationDay - 1}天</div>
-                    </div>
-                    <div className="text-center">
-                      <div className={`w-3 h-3 bg-orange-500 rounded-full mx-auto mb-1 ${(() => {
-                        const today = new Date()
-                        const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
-                        const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
-                        return currentCycleDay >= cycleStats.ovulationDay - 1 && currentCycleDay <= cycleStats.ovulationDay + 1 ? 'ring-2 ring-orange-300' : ''
-                      })()}`}></div>
-                      <span className={`${(() => {
-                        const today = new Date()
-                        const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
-                        const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
-                        return currentCycleDay >= cycleStats.ovulationDay - 1 && currentCycleDay <= cycleStats.ovulationDay + 1 ? 'text-orange-600 font-semibold' : 'text-gray-600'
-                      })()}`}>排卵期</span>
-                      <div className={`${(() => {
-                        const today = new Date()
-                        const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
-                        const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
-                        return currentCycleDay >= cycleStats.ovulationDay - 1 && currentCycleDay <= cycleStats.ovulationDay + 1 ? 'text-orange-600' : 'text-gray-500'
-                      })()}`}>{cycleStats.ovulationDay - 1}-{cycleStats.ovulationDay + 1}天</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="w-3 h-3 bg-purple-500 rounded-full mx-auto mb-1"></div>
-                      <span className="text-gray-600">黄体期</span>
-                      <div className="text-gray-500">{cycleStats.ovulationDay + 2}-{cycleStats.averageCycle}天</div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
