@@ -762,7 +762,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth())
-  const [showPeriodRecords, setShowPeriodRecords] = useState(true)
+  const [showPeriodRecords, setShowPeriodRecords] = useState(false)
 
   // OneDrive同步状态 - 使用错误边界保护
   // const [oneDriveState, oneDriveActions] = (() => {
@@ -796,6 +796,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     const storedTab = localStorage.getItem('activeTab');
     if (storedTab) {
       setActiveTab(storedTab);
+    }
+
+    const storedShowPeriod = localStorage.getItem('showPeriodRecords');
+    if (storedShowPeriod) {
+      setShowPeriodRecords(storedShowPeriod === 'true' ? true : false);
     }
 
     // 初始化用户数据
@@ -867,6 +872,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       // const activeUser = await userDB.getActiveUser()
       // setUsers(allUsers)
       // setCurrentUser(activeUser)
+      // console.log('refreshUsers: 开始刷新用户数据')
       initializeUsers()
       
     } catch (error) {
@@ -1665,10 +1671,17 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 const syncData = async () => {
   try {
     console.log('开始同步 OneDrive 数据...')
-    oneDriveActions.syncIDBOneDriveUsers();
-    oneDriveActions.syncIDBOneDriveMyRecords();
-    oneDriveActions.syncIDBOneDriveStoolRecords();
+    // oneDriveActions.syncIDBOneDriveUsers();
+    // oneDriveActions.syncIDBOneDriveMyRecords();
+    // oneDriveActions.syncIDBOneDriveStoolRecords();
     // setUsersOneDrive(JSON.stringify(usersFileOneDrive, null, 2));
+
+    await Promise.all([
+      oneDriveActions.syncIDBOneDriveUsers(),
+      oneDriveActions.syncIDBOneDriveMyRecords(),
+      oneDriveActions.syncIDBOneDriveStoolRecords(),
+    ]);
+    console.log('OneDrive 数据同步完成')
     // initializeUsers();
     refreshUsers();
   } catch (err) {
@@ -1963,7 +1976,10 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                         type="checkbox" 
                         className="sr-only peer" 
                         checked={showPeriodRecords}
-                        onChange={(e) => setShowPeriodRecords(e.target.checked)}
+                        onChange={(e) => {
+                          setShowPeriodRecords(e.target.checked);
+                          localStorage.setItem('showPeriodRecords', e.target.checked ? 'true' : 'false');
+                        }}
                       />
                       <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-pink-300 rounded-full peer peer-checked:after:translate-x-4 peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
                     </label>

@@ -543,10 +543,10 @@ export class DataExportService {
           .get();
         // console.log('found file:', fileMetadata);
 
-      if (fileMetadata?.fileName !== fileName) {
-        // throw new Error(`${fileName} file not found on OneDrive`)
-        return defaultReturnData
-      }
+      // if (fileMetadata?.fileName !== fileName) {
+      //   // throw new Error(`${fileName} file not found on OneDrive`)
+      //   return defaultReturnData
+      // }
 
       } catch (err: any) {
         if (err.statusCode === 404) {

@@ -67,7 +67,9 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         isOneDriveAvailable,
         unavailabilityReason,
       }))
-
+      console.log('OneDrive availability:', isOneDriveAvailable, unavailabilityReason)
+      console.log('Checking OneDrive connection...', state)
+  
       if (!isOneDriveAvailable) {
         console.warn('OneDrive not available:', unavailabilityReason)
         return
@@ -109,6 +111,9 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
           userInfo: null,
         }))
       }
+
+      console.log('OneDrive connection...', state)
+  
     } catch (error) {
       console.error('Check connection failed:', error)
       
@@ -141,7 +146,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
 
     setState(prev => ({ ...prev, isConnecting: true, error: null }))
-    
+    console.log('Attempting to connect to OneDrive...',  state)
     try {
       // 先检查浏览器兼容性
       const compatibilityReport = MobileCompatibilityUtils.generateCompatibilityReport()
@@ -178,6 +183,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         isConnecting: false,
         error: friendlyError,
       }))
+      console.warn('OneDrive连接失败:', state)
     }
   }, [])
 
@@ -541,10 +547,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
   // 导入用户数据
   const syncIDBOneDriveUsers = useCallback(async () => {
-    if (!state.isAuthenticated) {
-      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
-      return
-    }
+    // 移除状态检查，由调用方确保已连接
 
     // 检查基本认证状态
     // if (!microsoftAuth.isLoggedIn()) {
@@ -604,14 +607,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         error: errorMessage,
       }))
     }
-  }, [state.isAuthenticated])
+  }, [])
 
     // 导入用户数据
   const syncIDBOneDriveMyRecords = useCallback(async () => {
-    if (!state.isAuthenticated) {
-      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
-      return
-    }
+    // 移除状态检查，由调用方确保已连接
 
     // 检查基本认证状态
     // if (!microsoftAuth.isLoggedIn()) {
@@ -669,14 +669,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         error: errorMessage,
       }))
     }
-  }, [state.isAuthenticated])
+  }, [])
 
     // 导入用户数据
   const syncIDBOneDriveStoolRecords = useCallback(async () => {
-    if (!state.isAuthenticated) {
-      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
-      return
-    }
+    // 移除状态检查，由调用方确保已连接
 
     try {
       const graphClient = microsoftAuth.getGraphClient()!
@@ -721,7 +718,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         error: errorMessage,
       }))
     }
-  }, [state.isAuthenticated])
+  }, [])
 
   // 附件管理方法
   // 上传附件到OneDrive
