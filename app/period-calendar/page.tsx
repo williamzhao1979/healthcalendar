@@ -328,54 +328,96 @@ export default function PeriodCalendarPage() {
       }
     }
 
-    // Group records by period start dates
-    const periodStarts: Date[] = []
-    const periodLengths: number[] = []
+    // Sort all records by date in ascending order
+    const sortedRecords = [...periodRecords].sort((a, b) => 
+      new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+    )
     
-    if (Array.isArray(periodRecords)) {
-      periodRecords.forEach(record => {
-        if (record.status === 'start') {
-          periodStarts.push(new Date(record.dateTime))
+    console.log('🩸 排序后的记录:', sortedRecords.map(r => ({
+      date: r.dateTime,
+      status: r.status
+    })))
+
+    // Group consecutive period days into cycles
+    const periodCycles: { start: Date, end: Date, length: number }[] = []
+    let currentCycleStart: Date | null = null
+    let lastRecordDate: Date | null = null
+
+    for (const record of sortedRecords) {
+      const recordDate = new Date(record.dateTime)
+      const recordDateOnly = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate())
+
+      if (!currentCycleStart) {
+        // Start of first cycle
+        currentCycleStart = recordDateOnly
+        lastRecordDate = recordDateOnly
+      } else {
+        const daysDiff = Math.round((recordDateOnly.getTime() - lastRecordDate!.getTime()) / (1000 * 60 * 60 * 24))
+        
+        if (daysDiff <= 1) {
+          // Consecutive day, continue current cycle
+          lastRecordDate = recordDateOnly
+        } else {
+          // Gap found, end current cycle and start new one
+          const cycleLength = Math.round((lastRecordDate!.getTime() - currentCycleStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+          periodCycles.push({
+            start: new Date(currentCycleStart),
+            end: new Date(lastRecordDate!),
+            length: cycleLength
+          })
+          
+          currentCycleStart = recordDateOnly
+          lastRecordDate = recordDateOnly
         }
+      }
+    }
+
+    // Add the last cycle if exists
+    if (currentCycleStart && lastRecordDate) {
+      const cycleLength = Math.round((lastRecordDate.getTime() - currentCycleStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+      periodCycles.push({
+        start: new Date(currentCycleStart),
+        end: new Date(lastRecordDate),
+        length: cycleLength
       })
     }
-    
-    // Calculate cycle lengths
+
+    console.log('🩸 识别的周期:', periodCycles.map(c => ({
+      start: c.start.toDateString(),
+      end: c.end.toDateString(),
+      length: c.length
+    })))
+
+    // Calculate cycle lengths (time between period starts)
     const cycleLengths: number[] = []
-    for (let i = 1; i < periodStarts.length; i++) {
-      const daysBetween = Math.round((periodStarts[i-1].getTime() - periodStarts[i].getTime()) / (1000 * 60 * 60 * 24))
+    for (let i = 1; i < periodCycles.length; i++) {
+      const daysBetween = Math.round((periodCycles[i].start.getTime() - periodCycles[i-1].start.getTime()) / (1000 * 60 * 60 * 24))
       if (daysBetween > 0 && daysBetween <= 45) { // Reasonable cycle length
         cycleLengths.push(daysBetween)
       }
     }
-    
-    // Calculate period lengths by grouping consecutive days
-    const allPeriodDates = Array.isArray(periodRecords) 
-      ? periodRecords.map(r => new Date(r.dateTime).toDateString()).sort()
-      : []
-    let currentStreak = 1
-    for (let i = 1; i < allPeriodDates.length; i++) {
-      const prevDate = new Date(allPeriodDates[i-1])
-      const currDate = new Date(allPeriodDates[i])
-      const daysDiff = Math.round((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
-      
-      if (daysDiff === 1) {
-        currentStreak++
-      } else {
-        if (currentStreak > 0) periodLengths.push(currentStreak)
-        currentStreak = 1
-      }
-    }
-    if (currentStreak > 0) periodLengths.push(currentStreak)
+
+    // Period lengths are the lengths of individual cycles
+    const periodLengths = periodCycles.map(cycle => cycle.length)
     
     const averageCycle = cycleLengths.length > 0 ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length) : 28
     const periodDays = periodLengths.length > 0 ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length) : 5
     const ovulationDay = Math.round(averageCycle / 2)
     
-    // Calculate days to next period
-    const lastPeriodStart = periodStarts[0] // Most recent (sorted descending)
-    const daysSinceLastPeriod = lastPeriodStart ? Math.round((new Date().getTime() - lastPeriodStart.getTime()) / (1000 * 60 * 60 * 24)) : 0
-    const daysToNext = lastPeriodStart ? Math.max(0, averageCycle - daysSinceLastPeriod) : 0
+    // Calculate days to next period using the most recent cycle
+    const lastCycle = periodCycles.length > 0 ? periodCycles[periodCycles.length - 1] : null
+    const daysSinceLastPeriod = lastCycle ? Math.round((new Date().getTime() - lastCycle.start.getTime()) / (1000 * 60 * 60 * 24)) : 0
+    const daysToNext = lastCycle ? Math.max(0, averageCycle - daysSinceLastPeriod) : 0
+
+    console.log('🩸 周期统计结果:', {
+      periodCycles: periodCycles.length,
+      lastCycle: lastCycle ? { start: lastCycle.start.toDateString(), end: lastCycle.end.toDateString(), length: lastCycle.length } : null,
+      averageCycle,
+      periodDays,
+      daysSinceLastPeriod,
+      daysToNext,
+      ovulationDay
+    })
     
     return {
       averageCycle,
@@ -388,13 +430,56 @@ export default function PeriodCalendarPage() {
   const getDaysSinceLastPeriod = (targetDate: Date): number => {
     if (!Array.isArray(periodRecords) || periodRecords.length === 0) return -1
     
-    const lastPeriodRecord = periodRecords.find(record => 
-      record.status === 'start' && new Date(record.dateTime) <= targetDate
+    // Use the same cycle detection logic as in calculateCycleStats
+    const sortedRecords = [...periodRecords].sort((a, b) => 
+      new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
     )
     
-    if (!lastPeriodRecord) return -1
+    // Find the most recent cycle start that is before or on the target date
+    const periodCycles: { start: Date, end: Date }[] = []
+    let currentCycleStart: Date | null = null
+    let lastRecordDate: Date | null = null
+
+    for (const record of sortedRecords) {
+      const recordDate = new Date(record.dateTime)
+      const recordDateOnly = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate())
+
+      if (!currentCycleStart) {
+        currentCycleStart = recordDateOnly
+        lastRecordDate = recordDateOnly
+      } else {
+        const daysDiff = Math.round((recordDateOnly.getTime() - lastRecordDate!.getTime()) / (1000 * 60 * 60 * 24))
+        
+        if (daysDiff <= 1) {
+          lastRecordDate = recordDateOnly
+        } else {
+          periodCycles.push({
+            start: new Date(currentCycleStart),
+            end: new Date(lastRecordDate!)
+          })
+          
+          currentCycleStart = recordDateOnly
+          lastRecordDate = recordDateOnly
+        }
+      }
+    }
+
+    if (currentCycleStart && lastRecordDate) {
+      periodCycles.push({
+        start: new Date(currentCycleStart),
+        end: new Date(lastRecordDate)
+      })
+    }
+
+    // Find the most recent cycle start before or on target date
+    const targetDateOnly = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate())
+    const relevantCycle = periodCycles
+      .filter(cycle => cycle.start <= targetDateOnly)
+      .sort((a, b) => b.start.getTime() - a.start.getTime())[0]
+
+    if (!relevantCycle) return -1
     
-    return Math.round((targetDate.getTime() - new Date(lastPeriodRecord.dateTime).getTime()) / (1000 * 60 * 60 * 24))
+    return Math.round((targetDateOnly.getTime() - relevantCycle.start.getTime()) / (1000 * 60 * 60 * 24))
   }
 
   // Load period records for current user
@@ -880,7 +965,7 @@ export default function PeriodCalendarPage() {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 mb-6">
             <button 
               onClick={addRecord}
               className="py-3 bg-pink-500 text-white font-semibold rounded-xl hover:bg-pink-600 transition-colors shadow-lg flex items-center justify-center space-x-2"
@@ -895,6 +980,124 @@ export default function PeriodCalendarPage() {
               <Calendar className="w-4 h-4" />
               <span>健康日历</span>
             </button>
+          </div>
+
+          {/* Period Records Timeline */}
+          <div className="bg-white/25 backdrop-blur-md rounded-3xl p-6 shadow-2xl border border-white/30">
+            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+              <Droplets className="text-pink-500 mr-2 w-5 h-5" />
+              生理记录时间线
+            </h3>
+            
+            <div className="timeline-container">
+              <div className="timeline-line"></div>
+              
+              {periodRecords && periodRecords.length > 0 ? (
+                (() => {
+                  // Sort records by dateTime in descending order (most recent first)
+                  const sortedRecords = [...periodRecords].sort((a, b) => 
+                    new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()
+                  )
+
+                  // Group sorted records by date
+                  const groupedRecords = sortedRecords.reduce((groups, record) => {
+                    const date = new Date(record.dateTime)
+                    const dateKey = `${date.getMonth() + 1}月${date.getDate()}日`
+                    
+                    if (!groups[dateKey]) {
+                      groups[dateKey] = []
+                    }
+                    groups[dateKey].push(record)
+                    return groups
+                  }, {} as Record<string, PeriodRecord[]>)
+
+                  // Sort grouped records by date key (most recent dates first)
+                  const sortedEntries = Object.entries(groupedRecords).sort((a, b) => {
+                    const dateA = new Date(groupedRecords[a[0]][0].dateTime)
+                    const dateB = new Date(groupedRecords[b[0]][0].dateTime)
+                    return dateB.getTime() - dateA.getTime()
+                  })
+
+                  return sortedEntries.map(([dateKey, records], groupIndex) => (
+                    <div key={dateKey}>
+                      {/* Date header */}
+                      <div className={`timeline-date ${groupIndex > 0 ? 'past-date' : ''}`}>
+                        {dateKey}
+                      </div>
+
+                      {/* Records for this date - sort by time descending within the same date */}
+                      {records
+                        .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+                        .map((record) => (
+                        <div key={record.id} className={`timeline-item ${groupIndex > 0 ? 'past-item' : ''}`}>
+                          <div className="timeline-time">
+                            {new Date(record.dateTime).toLocaleTimeString('zh-CN', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                          <div className="record-card rounded-xl p-3 shadow-sm transition-all relative bg-gradient-to-br from-pink-50 to-red-50 border border-pink-100">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <Droplets className="w-4 h-4 text-pink-500" />
+                                  <span className="text-sm font-semibold text-gray-800">
+                                    生理记录 - {record.status === 'start' ? '开始' : record.status === 'ongoing' ? '进行中' : '结束'}
+                                  </span>
+                                </div>
+                                
+                                <div className="space-y-1">
+                                  <div className="text-xs text-gray-600">
+                                    流量: {record.flowAmount === 'heavy' ? '重度' : 
+                                          record.flowAmount === 'normal' ? '中度' : 
+                                          record.flowAmount === 'light' ? '轻度' : '点滴'}
+                                  </div>
+                                  <div className="text-xs text-gray-600">
+                                    颜色: {record.color === 'bright-red' ? '鲜红色' : 
+                                          record.color === 'dark-red' ? '暗红色' : 
+                                          record.color === 'deep-red' ? '深红色' : 
+                                          record.color === 'orange-red' ? '橙红色' : '粉色'}
+                                  </div>
+                                  <div className="text-xs text-gray-600">
+                                    心情: {record.mood === 'very-happy' ? '很开心' : 
+                                          record.mood === 'happy' ? '开心' : 
+                                          record.mood === 'neutral' ? '一般' : 
+                                          record.mood === 'sad' ? '难过' : '很难过'}
+                                  </div>
+                                  {record.notes && (
+                                    <div className="text-xs text-gray-700 bg-white/50 rounded px-2 py-1 mt-2">
+                                      {record.notes}
+                                    </div>
+                                  )}
+                                  {record.tags && record.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      {record.tags.map((tag, index) => (
+                                        <span 
+                                          key={index}
+                                          className="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full"
+                                        >
+                                          {tag}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                })()
+              ) : (
+                <div className="text-center py-8">
+                  <Droplets className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm">暂无生理记录</p>
+                  <p className="text-gray-400 text-xs mt-1">点击"添加记录"开始记录您的生理周期</p>
+                </div>
+              )}
+            </div>
           </div>
         </main>
       </div>
@@ -919,6 +1122,110 @@ export default function PeriodCalendarPage() {
         
         .phase-indicator.luteal {
           background: linear-gradient(90deg, #7C3AED 0%, #8B5CF6 100%);
+        }
+        
+        /* Timeline Styles */
+        .timeline-container {
+          position: relative;
+          padding-left: 1rem;
+        }
+        
+        .timeline-line {
+          position: absolute;
+          left: 1.25rem;
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: linear-gradient(to bottom, 
+            rgba(236, 72, 153, 0.3) 0%, 
+            rgba(236, 72, 153, 0.15) 100%);
+        }
+        
+        .timeline-date {
+          position: relative;
+          margin-bottom: 0.75rem;
+          padding-left: 2rem;
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: #ec4899;
+        }
+        
+        .timeline-date::before {
+          content: '';
+          position: absolute;
+          left: 0.25rem;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 1rem;
+          height: 1rem;
+          border-radius: 50%;
+          background-color: #ec4899;
+          border: 2px solid white;
+          z-index: 10;
+          box-shadow: 0 1px 4px rgba(236, 72, 153, 0.3);
+        }
+        
+        .timeline-date.past-date {
+          color: #6b7280;
+        }
+        
+        .timeline-date.past-date::before {
+          background-color: #d1d5db;
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .timeline-item {
+          position: relative;
+          margin-bottom: 1rem;
+          padding-left: 2rem;
+        }
+        
+        .timeline-item::before {
+          content: '';
+          position: absolute;
+          left: 0.75rem;
+          top: 1rem;
+          width: 0.5rem;
+          height: 0.5rem;
+          border-radius: 50%;
+          background-color: #f472b6;
+          border: 1px solid white;
+          z-index: 10;
+          box-shadow: 0 1px 3px rgba(236, 72, 153, 0.3);
+        }
+        
+        .timeline-item.past-item::before {
+          background-color: #9ca3af;
+        }
+        
+        .timeline-time {
+          position: absolute;
+          left: -0.25rem;
+          top: 1rem;
+          background: white;
+          padding: 0.125rem 0.375rem;
+          border-radius: 8px;
+          font-size: 0.65rem;
+          font-weight: 500;
+          color: #6b7280;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+          z-index: 10;
+        }
+        
+        .timeline-item.past-item .timeline-time {
+          color: #6b7280;
+        }
+        
+        .record-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+          border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        
+        .record-card:hover {
+          transform: translateY(-4px) scale(1.02);
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+          border-color: rgba(236, 72, 153, 0.2);
         }
         
         @keyframes pulse {
