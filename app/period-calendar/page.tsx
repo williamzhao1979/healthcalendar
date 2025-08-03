@@ -714,7 +714,7 @@ export default function PeriodCalendarPage() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-800">生理周期日历</h1>
-                <p className="text-xs text-gray-600 font-medium">追踪您的月经周期</p>
+                <p className="text-xs text-gray-600 font-medium">追踪您的生理周期</p>
               </div>
             </div>
             
