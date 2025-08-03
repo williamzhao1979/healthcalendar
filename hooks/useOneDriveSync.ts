@@ -86,6 +86,32 @@ const restoreStateFromStorage = () => {
   }
 }
 
+// URL缓存和请求队列管理
+const urlCache = new Map<string, { url: string; timestamp: number }>()
+const pendingRequests = new Map<string, Promise<string>>()
+const CACHE_DURATION = 5 * 60 * 1000 // 5分钟缓存
+const MAX_CONCURRENT_REQUESTS = 3 // 最大并发请求数
+let activeRequests = 0
+
+// 定期清理过期缓存
+const cleanupCache = () => {
+  const now = Date.now()
+  const keysToDelete: string[] = []
+  
+  urlCache.forEach((value, key) => {
+    if (now - value.timestamp > CACHE_DURATION) {
+      keysToDelete.push(key)
+    }
+  })
+  
+  keysToDelete.forEach(key => urlCache.delete(key))
+}
+
+// 每2分钟清理一次缓存
+if (typeof window !== 'undefined') {
+  setInterval(cleanupCache, 2 * 60 * 1000)
+}
+
 // 初始化时恢复状态
 if (typeof window !== 'undefined') {
   restoreStateFromStorage()
@@ -136,8 +162,6 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         isOneDriveAvailable,
         unavailabilityReason,
       })
-      console.log('OneDrive availability:', isOneDriveAvailable, unavailabilityReason)
-      console.log('Checking OneDrive connection...', state)
   
       if (!isOneDriveAvailable) {
         console.warn('OneDrive not available:', unavailabilityReason)
@@ -149,39 +173,31 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       const isLoggedIn = microsoftAuth.isLoggedIn()
       const userInfo = microsoftAuth.getCurrentUser()
       
-      console.log('🔒 检查Microsoft认证状态:', {
-        isLoggedIn: isLoggedIn,
-        hasUserInfo: !!userInfo,
-        userName: userInfo?.username || userInfo?.displayName
-      })
-      
       if (isLoggedIn) {
-        console.log('✅ 发现现有认证，尝试恢复会话')
-        
+          
         // 尝试静默获取令牌以验证会话有效性
         const token = await microsoftAuth.getTokenSilently()
         
         if (token) {
-          console.log('🎉 认证会话成功恢复')
-          updateState({            isAuthenticated: true,
+          updateState({
+            isAuthenticated: true,
             userInfo: userInfo,
             error: null,
           })
         } else {
-          console.log('⏰ 认证会话已过期，需要重新登录')
-          updateState({            isAuthenticated: false,
+          updateState({
+            isAuthenticated: false,
             userInfo: null,
             error: null,
           })
         }
       } else {
-        console.log('❌ 未找到现有认证')
-        updateState({          isAuthenticated: false,
+        updateState({
+          isAuthenticated: false,
           userInfo: null,
         })
       }
 
-      console.log('OneDrive connection...', state)
   
     } catch (error) {
       console.error('Check connection failed:', error)
@@ -213,7 +229,6 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
 
     updateState({ isConnecting: true, error: null })
-    console.log('Attempting to connect to OneDrive...',  state)
     try {
       // 先检查浏览器兼容性
       const compatibilityReport = MobileCompatibilityUtils.generateCompatibilityReport()
@@ -245,7 +260,6 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         console.warn('Failed to save auth state to localStorage:', error)
       }
       
-      console.log('OneDrive connection successful')
     } catch (error) {
       console.error('OneDrive connection failed:', error)
       
@@ -259,7 +273,6 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         isConnecting: false,
         error: friendlyError,
       })
-      console.warn('OneDrive连接失败:', state)
     }
   }, [])
 
@@ -281,7 +294,6 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         console.warn('Failed to clear auth state from localStorage:', error)
       }
       
-      console.log('OneDrive disconnected')
     } catch (error) {
       console.error('OneDrive disconnect failed:', error)
       updateState({
@@ -646,10 +658,10 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
                   lastSyncTime: authData.lastSyncTime ? new Date(authData.lastSyncTime) : null,
                 })
                 
-                // 延迟执行连接检查，避免阻塞UI
-                setTimeout(() => {
-                  checkConnection()
-                }, 500)
+                // 立即执行连接检查以快速恢复状态
+                checkConnection().catch(err => {
+                  console.warn('快速连接检查失败，但不影响后续操作:', err)
+                })
               } else {
                 console.log('⏰ 认证状态已过期或无效，清除保存的状态')
                 localStorage.removeItem('healthcalendar_auth_state')
@@ -672,20 +684,17 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
   // 导入用户数据
   const syncIDBOneDriveUsers = useCallback(async () => {
-    // 移除状态检查，由调用方确保已连接
+    // 检查认证状态
+    if (!state.isAuthenticated) {
+      updateState({error: '需要先连接OneDrive才能同步' })
+      return
+    }
 
-    // 检查基本认证状态
-    // if (!microsoftAuth.isLoggedIn()) {
-    //   updateState({error: '用户未登录OneDrive，请先连接' }))
-    //   return
-    // }
-
-    // setState(prev => ({ 
-    //   ...prev, 
-    //   syncStatus: 'syncing', 
-    //   error: null,
-    //   exportResult: null 
-    // }))
+    updateState({ 
+      syncStatus: 'syncing', 
+      error: null,
+      exportResult: null 
+    })
     
     try {
       const graphClient = microsoftAuth.getGraphClient()!
@@ -730,32 +739,38 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       let errorMessage = '用户导入失败'
       if (error instanceof Error) {
         errorMessage = error.message
+        // 如果是认证错误，需要特殊处理
+        if (errorMessage.includes('令牌') || errorMessage.includes('access token') || errorMessage.includes('authenticate')) {
+          updateState({
+            syncStatus: 'error',
+            isAuthenticated: false,
+            userInfo: null,
+            error: '认证已过期，请重新连接OneDrive',
+          })
+          return
+        }
       }
       
       updateState({
-
         syncStatus: 'error',
         error: errorMessage,
       })
     }
-  }, [updateSyncTimeInStorage])
+  }, [state.isAuthenticated, updateSyncTimeInStorage])
 
     // 导入用户数据
   const syncIDBOneDriveMyRecords = useCallback(async () => {
-    // 移除状态检查，由调用方确保已连接
+    // 检查认证状态
+    if (!state.isAuthenticated) {
+      updateState({error: '需要先连接OneDrive才能同步' })
+      return
+    }
 
-    // 检查基本认证状态
-    // if (!microsoftAuth.isLoggedIn()) {
-    //   updateState({error: '用户未登录OneDrive，请先连接' }))
-    //   return
-    // }
-
-    // setState(prev => ({ 
-    //   ...prev, 
-    //   syncStatus: 'syncing', 
-    //   error: null,
-    //   exportResult: null 
-    // }))
+    updateState({ 
+      syncStatus: 'syncing', 
+      error: null,
+      exportResult: null 
+    })
     
     try {
       const graphClient = microsoftAuth.getGraphClient()!
@@ -798,19 +813,38 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       let errorMessage = 'MyRecords导入失败'
       if (error instanceof Error) {
         errorMessage = error.message
+        // 如果是认证错误，需要特殊处理
+        if (errorMessage.includes('令牌') || errorMessage.includes('access token') || errorMessage.includes('authenticate')) {
+          updateState({
+            syncStatus: 'error',
+            isAuthenticated: false,
+            userInfo: null,
+            error: '认证已过期，请重新连接OneDrive',
+          })
+          return
+        }
       }
       
       updateState({
-
         syncStatus: 'error',
         error: errorMessage,
       })
     }
-  }, [updateSyncTimeInStorage])
+  }, [state.isAuthenticated, updateSyncTimeInStorage])
 
     // 导入用户数据
   const syncIDBOneDriveStoolRecords = useCallback(async () => {
-    // 移除状态检查，由调用方确保已连接
+    // 检查认证状态
+    if (!state.isAuthenticated) {
+      updateState({error: '需要先连接OneDrive才能同步' })
+      return
+    }
+
+    updateState({ 
+      syncStatus: 'syncing', 
+      error: null,
+      exportResult: null 
+    })
 
     try {
       const graphClient = microsoftAuth.getGraphClient()!
@@ -853,15 +887,24 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       let errorMessage = 'StoolRecords导入失败'
       if (error instanceof Error) {
         errorMessage = error.message
+        // 如果是认证错误，需要特殊处理
+        if (errorMessage.includes('令牌') || errorMessage.includes('access token') || errorMessage.includes('authenticate')) {
+          updateState({
+            syncStatus: 'error',
+            isAuthenticated: false,
+            userInfo: null,
+            error: '认证已过期，请重新连接OneDrive',
+          })
+          return
+        }
       }
       
       updateState({
-
         syncStatus: 'error',
         error: errorMessage,
       })
     }
-  }, [updateSyncTimeInStorage])
+  }, [state.isAuthenticated, updateSyncTimeInStorage])
 
   // 附件管理方法
   // 上传附件到OneDrive
@@ -931,6 +974,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     try {
       const token = await microsoftAuth.getTokenSilently()
       if (!token) {
+        updateState({
+          isAuthenticated: false,
+          userInfo: null,
+          error: '令牌已过期，请重新连接OneDrive'
+        })
         throw new Error('无法获取访问令牌，请重新登录')
       }
 
@@ -954,35 +1002,105 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
   }, [state.isAuthenticated])
 
-  // 获取附件下载URL
+  // 获取附件下载URL - 带缓存和限流
   const getAttachmentUrl = useCallback(async (fileName: string): Promise<string> => {
-    if (!state.isAuthenticated) {
-      throw new Error('需要先连接OneDrive')
+    // 检查缓存
+    const cached = urlCache.get(fileName)
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.url
     }
 
-    try {
-      const token = await microsoftAuth.getTokenSilently()
-      if (!token) {
-        throw new Error('无法获取访问令牌，请重新登录')
+    // 检查是否有正在进行的请求
+    const pendingRequest = pendingRequests.get(fileName)
+    if (pendingRequest) {
+      return pendingRequest
+    }
+
+    // 创建新的请求
+    const requestPromise = (async (): Promise<string> => {
+      // 等待直到有可用的请求槽位
+      while (activeRequests >= MAX_CONCURRENT_REQUESTS) {
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
 
-      const filePath = `/Apps/HealthCalendar/attachments/${fileName}`
-      const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${filePath}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      activeRequests++
+      
+      try {
+        // 首先检查基本的认证状态
+        if (!state.isAuthenticated) {
+          // 尝试从localStorage恢复状态
+          const savedAuthState = localStorage.getItem('healthcalendar_auth_state')
+          if (savedAuthState) {
+            try {
+              const authData = JSON.parse(savedAuthState)
+              const isExpired = Date.now() - authData.timestamp > 24 * 60 * 60 * 1000
+              if (!isExpired && authData.isAuthenticated) {
+                    // 不抛出错误，继续尝试获取token
+              } else {
+                throw new Error('OneDrive连接已过期，请重新连接')
+              }
+            } catch (parseError) {
+              throw new Error('需要先连接OneDrive')
+            }
+          } else {
+            throw new Error('需要先连接OneDrive')
+          }
         }
-      })
 
-      if (!response.ok) {
-        throw new Error(`获取附件信息失败: ${response.statusText}`)
+        const token = await microsoftAuth.getTokenSilently()
+        if (!token) {
+          // 如果令牌获取失败，更新全局认证状态
+          updateState({
+            isAuthenticated: false,
+            userInfo: null,
+            error: '令牌已过期，请重新连接OneDrive'
+          })
+          throw new Error('无法获取访问令牌，请重新登录')
+        }
+
+        const filePath = `/Apps/HealthCalendar/attachments/${fileName}`
+        const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:${filePath}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('认证已过期，请重新登录')
+          } else if (response.status === 404) {
+            throw new Error('附件文件未找到')
+          }
+          throw new Error(`获取附件信息失败: ${response.status} ${response.statusText}`)
+        }
+
+        const fileInfo = await response.json()
+        const downloadUrl = fileInfo['@microsoft.graph.downloadUrl'] || fileInfo.webUrl
+        
+        if (!downloadUrl) {
+          throw new Error('无法获取附件下载链接')
+        }
+        
+        // 缓存结果
+        urlCache.set(fileName, {
+          url: downloadUrl,
+          timestamp: Date.now()
+        })
+        
+        return downloadUrl
+      } catch (error) {
+        console.error('获取附件URL失败:', fileName, error)
+        throw error
+      } finally {
+        activeRequests--
+        pendingRequests.delete(fileName)
       }
+    })()
 
-      const fileInfo = await response.json()
-      return fileInfo['@microsoft.graph.downloadUrl'] || fileInfo.webUrl
-    } catch (error) {
-      console.error('获取附件URL失败:', error)
-      throw error
-    }
+    // 将请求添加到待处理列表
+    pendingRequests.set(fileName, requestPromise)
+    
+    return requestPromise
   }, [state.isAuthenticated])
 
   // 列出附件
@@ -994,6 +1112,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     try {
       const token = await microsoftAuth.getTokenSilently()
       if (!token) {
+        updateState({
+          isAuthenticated: false,
+          userInfo: null,
+          error: '令牌已过期，请重新连接OneDrive'
+        })
         throw new Error('无法获取访问令牌，请重新登录')
       }
 

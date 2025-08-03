@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ChevronLeft,
@@ -193,20 +193,29 @@ const DynamicImage: React.FC<{
   attachment: Attachment;
   onGetUrl: (fileName: string) => Promise<string>;
   onClick: () => void;
-}> = ({ attachment, onGetUrl, onClick }) => {
+  isOneDriveConnected: boolean;
+}> = ({ attachment, onGetUrl, onClick, isOneDriveConnected }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [hasAttempted, setHasAttempted] = useState(false)
 
   useEffect(() => {
+    // 只在OneDrive连接且未尝试过时才加载
+    if (!isOneDriveConnected || hasAttempted) {
+      return
+    }
+
     const loadImage = async () => {
       try {
         setLoading(true)
         setError(false)
+        setHasAttempted(true)
+        
         const url = await onGetUrl(attachment.fileName)
         setImageUrl(url)
       } catch (err) {
-        console.error('Failed to load image:', err)
+        console.error('Failed to load image:', attachment.fileName, err)
         setError(true)
       } finally {
         setLoading(false)
@@ -214,14 +223,24 @@ const DynamicImage: React.FC<{
     }
 
     loadImage()
-  }, [attachment.fileName, onGetUrl])
+  }, [isOneDriveConnected, hasAttempted]) // 移除了会变化的依赖项
+
+  // 重置状态的 effect，只在文件名变化时执行
+  useEffect(() => {
+    setHasAttempted(false)
+    setImageUrl(null)
+    setLoading(true)
+    setError(false)
+  }, [attachment.fileName])
 
   if (loading) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-1"></div>
-          <div className="text-xs text-gray-500">加载中...</div>
+          <div className="text-xs text-gray-500">
+            {!isOneDriveConnected ? '等待连接...' : '加载中...'}
+          </div>
         </div>
       </div>
     )
@@ -232,7 +251,9 @@ const DynamicImage: React.FC<{
       <div className="w-full h-full flex items-center justify-center bg-gray-100">
         <div className="text-center">
           <FileImage className="w-8 h-8 text-gray-400 mx-auto mb-1" />
-          <div className="text-xs text-gray-500">图片加载失败</div>
+          <div className="text-xs text-gray-500">
+            {!isOneDriveConnected ? 'OneDrive未连接' : '图片加载失败'}
+          </div>
         </div>
       </div>
     )
@@ -471,9 +492,6 @@ function MyRecordPageContent() {
       await loadUsers()
       initializeDateTime()
       
-      // 检查OneDrive连接状态
-      await oneDriveActions.checkConnection()
-      
       // 检查是否为编辑模式
       const editId = searchParams.get('edit')
       if (editId) {
@@ -483,7 +501,12 @@ function MyRecordPageContent() {
     }
     
     initializeData()
-  }, [searchParams, oneDriveActions])
+  }, [searchParams])
+  
+  // 单独的OneDrive初始化，只执行一次
+  useEffect(() => {
+    oneDriveActions.checkConnection()
+  }, [])
 
   // 当用户加载完成且处于编辑模式时，加载记录
   useEffect(() => {
@@ -593,9 +616,9 @@ function MyRecordPageContent() {
     await oneDriveActions.deleteAttachment(fileName)
   }
 
-  const handleAttachmentGetUrl = async (fileName: string): Promise<string> => {
+  const handleAttachmentGetUrl = useCallback(async (fileName: string): Promise<string> => {
     return await oneDriveActions.getAttachmentUrl(fileName)
-  }
+  }, [oneDriveActions.getAttachmentUrl])
 
   const handleViewFullImage = (imageUrl: string) => {
     setSelectedImage(imageUrl)
@@ -841,6 +864,7 @@ function MyRecordPageContent() {
                               <DynamicImage
                                 attachment={attachment}
                                 onGetUrl={handleAttachmentGetUrl}
+                                isOneDriveConnected={oneDriveState.isAuthenticated}
                                 onClick={async () => {
                                   try {
                                     const imageUrl = await handleAttachmentGetUrl(attachment.fileName);

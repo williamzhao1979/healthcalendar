@@ -479,12 +479,11 @@ export class DataExportService {
       //   }
       // })
 
-      // 使用更安全的方式获取文件内容
-      const authState = microsoftAuth.getAuthState()
-      if (!authState || !authState.accessToken) {
+      // 使用更安全的方式获取文件内容，尝试刷新令牌
+      const accessToken = await microsoftAuth.getTokenSilently()
+      if (!accessToken) {
         throw new Error('No valid access token available. Please re-authenticate.')
       }
-      const accessToken = authState.accessToken
       const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileMetadata.id}/content`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -562,7 +561,11 @@ export class DataExportService {
       // const content = await graphClient
       //   .api(`/me/drive/items/${fileMetadata.id}/content`)
       //   .get()
-      const accessToken = microsoftAuth.getAuthState()!.accessToken
+      // 使用更安全的方式获取令牌，自动刷新过期令牌
+      const accessToken = await microsoftAuth.getTokenSilently()
+      if (!accessToken) {
+        throw new Error('No valid access token available. Please re-authenticate.')
+      }
       const response = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${fileMetadata.id}/content`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
