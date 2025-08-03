@@ -50,6 +50,8 @@ interface CycleDay {
   tooltip: string
   isToday?: boolean
   flowAmount?: 'heavy' | 'normal' | 'light'
+  isCurrentMonth?: boolean
+  fullDate?: Date
 }
 
 interface CycleStats {
@@ -209,28 +211,28 @@ export default function PeriodCalendarPage() {
     const month = currentDate.getMonth()
     const daysInMonth = new Date(year, month + 1, 0).getDate()
     
-    // Get period records for the current month
-    const monthStart = new Date(year, month, 1)
-    const monthEnd = new Date(year, month + 1, 0)
+    // Get extended period records (previous, current, and next month)
+    const extendedStart = new Date(year, month - 1, 1)
+    const extendedEnd = new Date(year, month + 2, 0)
     
-    const monthPeriodRecords = Array.isArray(periodRecords) 
+    const extendedPeriodRecords = Array.isArray(periodRecords) 
       ? periodRecords.filter(record => {
           const recordDate = new Date(record.dateTime)
-          return recordDate >= monthStart && recordDate <= monthEnd
+          return recordDate >= extendedStart && recordDate <= extendedEnd
         })
       : []
     
     // Calculate cycle stats from all records
     const stats = calculateCycleStats()
     
-    for (let i = 1; i <= daysInMonth; i++) {
-      const currentDayDate = new Date(year, month, i)
-      const isToday = currentDayDate.toDateString() === today.toDateString()
+    // Helper function to create a day entry
+    const createDayEntry = (dayDate: Date, isCurrentMonth: boolean): CycleDay => {
+      const isToday = dayDate.toDateString() === today.toDateString()
       
       // Check if this day has a period record
-      const dayRecord = monthPeriodRecords.find(record => {
+      const dayRecord = extendedPeriodRecords.find(record => {
         const recordDate = new Date(record.dateTime)
-        return recordDate.getDate() === i
+        return recordDate.toDateString() === dayDate.toDateString()
       })
       
       let type: DayType = 'safe'
@@ -257,13 +259,13 @@ export default function PeriodCalendarPage() {
             break
         }
         
-        tooltip = `月经第${i}天 · ${flowAmount === 'heavy' ? '重度' : flowAmount === 'normal' ? '中度' : '轻度'}流量`
+        tooltip = `月经 · ${flowAmount === 'heavy' ? '重度' : flowAmount === 'normal' ? '中度' : '轻度'}流量`
         if (dayRecord.notes) {
           tooltip += ` · ${dayRecord.notes}`
         }
       } else {
         // Calculate predicted cycle phases based on cycle stats
-        const daysSinceLastPeriod = getDaysSinceLastPeriod(currentDayDate)
+        const daysSinceLastPeriod = getDaysSinceLastPeriod(dayDate)
         
         if (daysSinceLastPeriod >= 0) {
           const cycleDay = (daysSinceLastPeriod % stats.averageCycle) + 1
@@ -300,14 +302,22 @@ export default function PeriodCalendarPage() {
         tooltip = `今天 · ${tooltip}`
       }
 
-      days.push({
-        date: i,
+      return {
+        date: dayDate.getDate(),
         type: isToday ? 'today' : type,
         phase,
         tooltip,
         isToday,
-        flowAmount
-      })
+        flowAmount,
+        isCurrentMonth,
+        fullDate: new Date(dayDate)
+      }
+    }
+    
+    // Generate current month days
+    for (let i = 1; i <= daysInMonth; i++) {
+      const currentDayDate = new Date(year, month, i)
+      days.push(createDayEntry(currentDayDate, true))
     }
 
     return days
@@ -811,15 +821,69 @@ export default function PeriodCalendarPage() {
                 <div key={day} className="text-center text-sm font-semibold text-gray-500 py-3">{day}</div>
               ))}
 
-              {/* Empty cells for proper alignment */}
+              {/* Previous month's trailing days */}
               {(() => {
-                const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay()
-                return Array.from({ length: firstDay }, (_, i) => (
-                  <div key={`empty-${i}`}></div>
+                const year = currentDate.getFullYear()
+                const month = currentDate.getMonth()
+                const firstDay = new Date(year, month, 1).getDay()
+                const prevMonth = month === 0 ? 11 : month - 1
+                const prevYear = month === 0 ? year - 1 : year
+                const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate()
+                
+                const prevMonthDays: CycleDay[] = []
+                for (let i = firstDay - 1; i >= 0; i--) {
+                  const dayNumber = daysInPrevMonth - i
+                  const dayDate = new Date(prevYear, prevMonth, dayNumber)
+                  
+                  // Use the helper to create day entry for previous month
+                  const extendedStart = new Date(year, month - 1, 1)
+                  const extendedEnd = new Date(year, month + 2, 0)
+                  const extendedPeriodRecords = Array.isArray(periodRecords) 
+                    ? periodRecords.filter(record => {
+                        const recordDate = new Date(record.dateTime)
+                        return recordDate >= extendedStart && recordDate <= extendedEnd
+                      })
+                    : []
+                  
+                  const dayRecord = extendedPeriodRecords.find(record => {
+                    const recordDate = new Date(record.dateTime)
+                    return recordDate.toDateString() === dayDate.toDateString()
+                  })
+                  
+                  let type: DayType = 'safe'
+                  let tooltip = '安全期'
+                  
+                  if (dayRecord) {
+                    type = 'period'
+                    tooltip = '月经'
+                  }
+                  
+                  prevMonthDays.push({
+                    date: dayNumber,
+                    type,
+                    phase: 'follicular',
+                    tooltip,
+                    isCurrentMonth: false,
+                    fullDate: new Date(dayDate)
+                  })
+                }
+                
+                return prevMonthDays.map((day, i) => (
+                  <div
+                    key={`prev-${i}`}
+                    className={`cycle-day w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold transition-all cursor-pointer m-0.5 relative opacity-40 ${
+                      day.type === 'period' 
+                        ? 'bg-gradient-to-br from-red-600 to-red-400 text-white shadow-lg hover:scale-110' 
+                        : 'bg-gray-50 text-gray-400 hover:bg-gray-100 hover:scale-105'
+                    }`}
+                    title={day.tooltip}
+                  >
+                    {day.date}
+                  </div>
                 ))
               })()}
               
-              {/* Calendar Days */}
+              {/* Current month days */}
               {cycleDays.map((day) => (
                 <div
                   key={day.date}
@@ -833,6 +897,71 @@ export default function PeriodCalendarPage() {
                   {day.date}
                 </div>
               ))}
+
+              {/* Next month's leading days */}
+              {(() => {
+                const year = currentDate.getFullYear()
+                const month = currentDate.getMonth()
+                const daysInMonth = new Date(year, month + 1, 0).getDate()
+                const firstDay = new Date(year, month, 1).getDay()
+                const totalCells = 42 // 6 weeks * 7 days
+                const cellsUsed = firstDay + daysInMonth
+                const nextMonthDays = totalCells - cellsUsed
+                
+                const nextMonth = month === 11 ? 0 : month + 1
+                const nextYear = month === 11 ? year + 1 : year
+                
+                const nextDays: CycleDay[] = []
+                for (let i = 1; i <= nextMonthDays; i++) {
+                  const dayDate = new Date(nextYear, nextMonth, i)
+                  
+                  // Use the helper to create day entry for next month
+                  const extendedStart = new Date(year, month - 1, 1)
+                  const extendedEnd = new Date(year, month + 2, 0)
+                  const extendedPeriodRecords = Array.isArray(periodRecords) 
+                    ? periodRecords.filter(record => {
+                        const recordDate = new Date(record.dateTime)
+                        return recordDate >= extendedStart && recordDate <= extendedEnd
+                      })
+                    : []
+                  
+                  const dayRecord = extendedPeriodRecords.find(record => {
+                    const recordDate = new Date(record.dateTime)
+                    return recordDate.toDateString() === dayDate.toDateString()
+                  })
+                  
+                  let type: DayType = 'safe'
+                  let tooltip = '安全期'
+                  
+                  if (dayRecord) {
+                    type = 'period'
+                    tooltip = '月经'
+                  }
+                  
+                  nextDays.push({
+                    date: i,
+                    type,
+                    phase: 'follicular',
+                    tooltip,
+                    isCurrentMonth: false,
+                    fullDate: new Date(dayDate)
+                  })
+                }
+                
+                return nextDays.map((day, i) => (
+                  <div
+                    key={`next-${i}`}
+                    className={`cycle-day w-11 h-11 rounded-full flex items-center justify-center text-sm font-semibold transition-all cursor-pointer m-0.5 relative opacity-40 ${
+                      day.type === 'period' 
+                        ? 'bg-gradient-to-br from-red-600 to-red-400 text-white shadow-lg hover:scale-110' 
+                        : 'bg-gray-50 text-gray-400 hover:bg-gray-100 hover:scale-105'
+                    }`}
+                    title={day.tooltip}
+                  >
+                    {day.date}
+                  </div>
+                ))
+              })()}
             </div>
 
             {/* Legend */}
