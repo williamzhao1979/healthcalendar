@@ -314,10 +314,12 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
   }
 
   if (!oneDriveConnected) {
+    console.log('⚠️ AttachmentUploader: OneDrive未连接，显示连接提示')
     return (
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
         <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
         <p className="text-sm text-gray-600 mb-3">需要连接OneDrive才能上传附件</p>
+        <p className="text-xs text-gray-500 mb-3">附件将安全存储在您的OneDrive云端</p>
         <button
           onClick={onConnect}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"

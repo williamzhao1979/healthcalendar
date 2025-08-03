@@ -163,20 +163,23 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         
         if (token) {
           console.log('🎉 认证会话成功恢复')
-          updateState({            isAuthenticated: true,
+          updateState({
+            isAuthenticated: true,
             userInfo: userInfo,
             error: null,
           })
         } else {
           console.log('⏰ 认证会话已过期，需要重新登录')
-          updateState({            isAuthenticated: false,
+          updateState({
+            isAuthenticated: false,
             userInfo: null,
             error: null,
           })
         }
       } else {
         console.log('❌ 未找到现有认证')
-        updateState({          isAuthenticated: false,
+        updateState({
+          isAuthenticated: false,
           userInfo: null,
         })
       }
@@ -254,11 +257,12 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         ? MobileCompatibilityUtils.getUserFriendlyErrorMessage(error)
         : '连接失败'
       
-      updateState({
+      setState(prev => ({
+        ...prev,
         isAuthenticated: false,
         isConnecting: false,
         error: friendlyError,
-      })
+      }))
       console.warn('OneDrive连接失败:', state)
     }
   }, [])
@@ -267,12 +271,13 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
   const disconnect = useCallback(async () => {
     try {
       await microsoftAuth.logout()
-      updateState({
+      setState(prev => ({
+        ...prev,
         isAuthenticated: false,
         userInfo: null,
         error: null,
         lastSyncTime: null,
-      })
+      }))
       
       // 清除保存的认证状态
       try {
@@ -284,23 +289,24 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       console.log('OneDrive disconnected')
     } catch (error) {
       console.error('OneDrive disconnect failed:', error)
-      updateState({
+      setState(prev => ({
+        ...prev,
         error: error instanceof Error ? error.message : '断开连接失败',
-      })
+      }))
     }
   }, [])
 
   // 开始同步
   const startSync = useCallback(async (userId: string) => {
     if (!state.isAuthenticated) {
-      updateState({error: '未连接到OneDrive' })
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
       return
     }
       // await dataExportService.syncFromOneDrive()
       // await dataExportService.readusers()
       // // 这里可以添加更多的同步逻辑，例如导入数据等
       // return
-    updateState({syncStatus: 'syncing', error: null })
+    setState(prev => ({ ...prev, syncStatus: 'syncing', error: null }))
     
     try {
       // 导入所有表数据
@@ -308,10 +314,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       
       if (result.success) {
         const syncTime = new Date()
-        updateState({
+        setState(prev => ({
+          ...prev,
           syncStatus: 'success',
           lastSyncTime: syncTime,
-        })
+        }))
         
         // 更新localStorage中的同步时间
         updateSyncTimeInStorage(syncTime)
@@ -323,50 +330,52 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
           ? result.errors.join('; ') 
           : '同步过程中出现未知错误'
           
-        updateState({
+        setState(prev => ({
+          ...prev,
           syncStatus: result.importedTables.length > 0 ? 'success' : 'error',
-          lastSyncTime: result.importedTables.length > 0 ? new Date() : globalState.lastSyncTime,
+          lastSyncTime: result.importedTables.length > 0 ? new Date() : prev.lastSyncTime,
           error: result.importedTables.length > 0 ? `部分导入成功，错误: ${errorMessage}` : errorMessage,
-        })
+        }))
         
         console.warn(`Sync completed with errors. Imported: ${result.importedTables.join(', ')}, Errors: ${result.errors.join(', ')}`)
       }
     } catch (error) {
       console.error('Sync failed:', error)
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         syncStatus: 'error',
         error: error instanceof Error ? error.message : '同步失败',
-      })
+      }))
     }
   }, [state.isAuthenticated, updateSyncTimeInStorage])
 
   // 导出所有数据
   const exportData = useCallback(async (userId: string) => {
     if (!state.isAuthenticated) {
-      updateState({error: '未连接到OneDrive' })
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
       return
     }
 
-    updateState({ 
+    setState(prev => ({ 
+      ...prev, 
       isExporting: true, 
       error: null,
       exportResult: null 
-    })
+    }))
     
     try {
       console.log(`Starting data export for user: ${userId}`)
       const result = await dataExportService.exportAllTables(userId)
       
       const syncTime = new Date()
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         isExporting: false,
         exportResult: result,
         lastSyncTime: syncTime,
         syncStatus: result.success ? 'success' : 'error',
         error: result.success ? null : result.errors.join(', ')
-      })
+      }))
       
       // 更新localStorage中的同步时间
       if (result.success) {
@@ -376,41 +385,42 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       console.log('Data export completed:', result)
     } catch (error) {
       console.error('Data export failed:', error)
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         isExporting: false,
         syncStatus: 'error',
         error: error instanceof Error ? error.message : '数据导出失败',
-      })
+      }))
     }
   }, [state.isAuthenticated, updateSyncTimeInStorage])
 
   // 导出单个表
   const exportTable = useCallback(async (tableName: string, userId: string) => {
     if (!state.isAuthenticated) {
-      updateState({error: '未连接到OneDrive' })
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
       return
     }
 
-    updateState({ 
+    setState(prev => ({ 
+      ...prev, 
       isExporting: true, 
       error: null,
       exportResult: null 
-    })
+    }))
     
     try {
       console.log(`Exporting table: ${tableName} for user: ${userId}`)
       const result = await dataExportService.exportTable(tableName, userId)
       
       const syncTime = new Date()
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         isExporting: false,
         exportResult: result,
         lastSyncTime: syncTime,
         syncStatus: result.success ? 'success' : 'error',
         error: result.success ? null : result.errors.join(', ')
-      })
+      }))
       
       // 更新localStorage中的同步时间
       if (result.success) {
@@ -420,34 +430,35 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       console.log('Table export completed:', result)
     } catch (error) {
       console.error('Table export failed:', error)
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         isExporting: false,
         syncStatus: 'error',
         error: error instanceof Error ? error.message : '表导出失败',
-      })
+      }))
     }
   }, [state.isAuthenticated, updateSyncTimeInStorage])
 
   // 导入用户数据
   const importUsers = useCallback(async () => {
     if (!state.isAuthenticated) {
-      updateState({error: '未连接到OneDrive' })
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
       return
     }
 
-    updateState({ 
+    setState(prev => ({ 
+      ...prev, 
       syncStatus: 'syncing', 
       error: null,
       exportResult: null 
-    })
+    }))
     
     try {
       console.log('Starting users import from OneDrive...')
       const result = await dataExportService.importUsersFromOneDrive()
       
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         syncStatus: result.success ? 'success' : 'error',
         lastSyncTime: new Date(),
         error: result.success ? null : result.errors.join(', '),
@@ -463,32 +474,32 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
             tables: ['users']
           }
         } : null
-      })
+      }))
       
       console.log('Users import completed:', result)
     } catch (error) {
       console.error('Users import failed:', error)
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         syncStatus: 'error',
         error: error instanceof Error ? error.message : '用户导入失败',
-      })
+      }))
     }
   }, [state.isAuthenticated])
 
   // 清除错误
   const clearError = useCallback(() => {
-    updateState({error: null })
+    setState(prev => ({ ...prev, error: null }))
   }, [])
 
   // 加载文件列表
   const loadFiles = useCallback(async () => {
     if (!state.isAuthenticated) {
-      updateState({error: '未连接到OneDrive' })
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
       return
     }
 
-    updateState({isLoadingFiles: true, error: null })
+    setState(prev => ({ ...prev, isLoadingFiles: true, error: null }))
     
     try {
       const graphClient = microsoftAuth.getGraphClient()!
@@ -497,41 +508,41 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       // 获取 Apps/HealthCalendar 目录内容
       const response = await graphClient.api('/me/drive/root:/Apps/HealthCalendar:/children').get()
       
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         isLoadingFiles: false,
         files: response.value || []
-      })
+      }))
       
       console.log(`Loaded ${response.value?.length || 0} files`)
       // console.log('Files:', state.files.values)
     } catch (error) {
       console.error('Failed to load files:', error)
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         isLoadingFiles: false,
         error: error instanceof Error ? error.message : '加载文件列表失败'
-      })
+      }))
     }
   }, [state.isAuthenticated])
 
   // 加载文件内容
   const loadFileContent = useCallback(async (fileId: string, fileName: string, isFolder: boolean = false) => {
     if (!state.isAuthenticated) {
-      updateState({error: '未连接到OneDrive' })
+      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
       return
     }
 
     // 如果是文件夹，不尝试加载内容
     if (isFolder) {
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         selectedFileContent: `无法显示文件夹内容: ${fileName}\n\n这是一个文件夹，无法显示文本内容。`
-      })
+      }))
       return
     }
 
-    updateState({isLoadingFileContent: true, error: null })
+    setState(prev => ({ ...prev, isLoadingFileContent: true, error: null }))
     
     try {
       const graphClient = microsoftAuth.getGraphClient()!
@@ -577,11 +588,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         fileContent = `二进制文件: ${fileName}\n文件大小: ${(size / 1024).toFixed(2)} KB\n\n无法显示二进制文件内容。`
       }
       
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         isLoadingFileContent: false,
         selectedFileContent: fileContent
-      })
+      }))
       
       console.log(`Loaded content for ${fileName}`)
       // console.log('File content:', fileContent.slice(0, 1000)) // 只打印前1000个字符以避免过多日志
@@ -599,12 +610,12 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         errorMessage = error.message
       }
       
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         isLoadingFileContent: false,
         selectedFileContent: `加载失败: ${errorMessage}\n\n文件: ${fileName}\n错误详情: ${error.message || '未知错误'}`,
         error: errorMessage
-      })
+      }))
     }
   }, [state.isAuthenticated])
 
@@ -641,10 +652,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
               if (!isExpired && authData.isAuthenticated) {
                 console.log('✅ 找到有效的认证状态，恢复连接')
                 // 先设置基本状态
-                updateState({
+                setState(prev => ({
+                  ...prev,
                   userInfo: authData.userInfo,
                   lastSyncTime: authData.lastSyncTime ? new Date(authData.lastSyncTime) : null,
-                })
+                }))
                 
                 // 延迟执行连接检查，避免阻塞UI
                 setTimeout(() => {
@@ -676,7 +688,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
     // 检查基本认证状态
     // if (!microsoftAuth.isLoggedIn()) {
-    //   updateState({error: '用户未登录OneDrive，请先连接' }))
+    //   setState(prev => ({ ...prev, error: '用户未登录OneDrive，请先连接' }))
     //   return
     // }
 
@@ -693,8 +705,8 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       const result = await dataExportService.importUsersFromOneDrive()
       
       const syncTime = new Date()
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         syncStatus: result.success ? 'success' : 'error',
         lastSyncTime: syncTime,
         error: result.success ? null : result.errors.join(', '),
@@ -710,7 +722,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
             tables: ['users']
           }
         } : null
-      })
+      }))
       
       // 更新localStorage中的同步时间
       if (result.success) {
@@ -732,11 +744,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         errorMessage = error.message
       }
       
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         syncStatus: 'error',
         error: errorMessage,
-      })
+      }))
     }
   }, [updateSyncTimeInStorage])
 
@@ -746,7 +758,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
     // 检查基本认证状态
     // if (!microsoftAuth.isLoggedIn()) {
-    //   updateState({error: '用户未登录OneDrive，请先连接' }))
+    //   setState(prev => ({ ...prev, error: '用户未登录OneDrive，请先连接' }))
     //   return
     // }
 
@@ -763,8 +775,8 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       const result = await dataExportService.importMyRecordsFromOneDrive()
       
       const syncTime = new Date()
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         syncStatus: result.success ? 'success' : 'error',
         lastSyncTime: syncTime,
         error: result.success ? null : result.errors.join(', '),
@@ -780,7 +792,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
             tables: ['myRecords']
           }
         } : null
-      })
+      }))
       
       // 更新localStorage中的同步时间
       if (result.success) {
@@ -800,11 +812,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         errorMessage = error.message
       }
       
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         syncStatus: 'error',
         error: errorMessage,
-      })
+      }))
     }
   }, [updateSyncTimeInStorage])
 
@@ -818,8 +830,8 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       const result = await dataExportService.importStoolRecordsFromOneDrive()
       
       const syncTime = new Date()
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         syncStatus: result.success ? 'success' : 'error',
         lastSyncTime: syncTime,
         error: result.success ? null : result.errors.join(', '),
@@ -835,7 +847,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
             tables: ['stoolRecords']
           }
         } : null
-      })
+      }))
       
       // 更新localStorage中的同步时间
       if (result.success) {
@@ -855,11 +867,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         errorMessage = error.message
       }
       
-      updateState({
-
+      setState(prev => ({
+        ...prev,
         syncStatus: 'error',
         error: errorMessage,
-      })
+      }))
     }
   }, [updateSyncTimeInStorage])
 

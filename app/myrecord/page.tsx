@@ -443,6 +443,17 @@ function MyRecordPageContent() {
   // OneDrive 同步状态
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
   
+  // 监听OneDrive状态变化（调试用）
+  useEffect(() => {
+    console.log('🌐 MyRecord页面 - OneDrive状态变化:', {
+      isAuthenticated: oneDriveState.isAuthenticated,
+      isConnecting: oneDriveState.isConnecting,
+      userInfo: oneDriveState.userInfo,
+      error: oneDriveState.error,
+      lastSyncTime: oneDriveState.lastSyncTime
+    })
+  }, [oneDriveState.isAuthenticated, oneDriveState.isConnecting, oneDriveState.error])
+  
   // 表单状态
   const [dateTime, setDateTime] = useState('')
   const [content, setContent] = useState('')
@@ -460,6 +471,9 @@ function MyRecordPageContent() {
       await loadUsers()
       initializeDateTime()
       
+      // 检查OneDrive连接状态
+      await oneDriveActions.checkConnection()
+      
       // 检查是否为编辑模式
       const editId = searchParams.get('edit')
       if (editId) {
@@ -469,7 +483,7 @@ function MyRecordPageContent() {
     }
     
     initializeData()
-  }, [searchParams])
+  }, [searchParams, oneDriveActions])
 
   // 当用户加载完成且处于编辑模式时，加载记录
   useEffect(() => {
