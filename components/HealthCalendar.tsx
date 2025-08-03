@@ -1735,6 +1735,8 @@ const handleDataSync = useCallback(async () => {
       oneDriveActions.syncIDBOneDriveUsers(),
       oneDriveActions.syncIDBOneDriveMyRecords(),
       oneDriveActions.syncIDBOneDriveStoolRecords(),
+      oneDriveActions.syncIDBOneDrivePeriodRecords(),
+      oneDriveActions.syncIDBOneDriveMealRecords()
     ])
     
     console.log('数据同步完成')

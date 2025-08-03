@@ -34,6 +34,8 @@ export interface OneDriveSyncActions {
   syncIDBOneDriveUsers: () => Promise<void>
   syncIDBOneDriveMyRecords: () => Promise<void>
   syncIDBOneDriveStoolRecords: () => Promise<void>
+  syncIDBOneDrivePeriodRecords: () => Promise<void>
+  syncIDBOneDriveMealRecords: () => Promise<void>
   // 附件相关方法
   uploadAttachment: (file: File, recordType: string, recordId: string) => Promise<string>
   deleteAttachment: (fileName: string) => Promise<void>
@@ -906,6 +908,153 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     }
   }, [state.isAuthenticated, updateSyncTimeInStorage])
 
+    // 导入用户数据
+  const syncIDBOneDrivePeriodRecords = useCallback(async () => {
+    // 检查认证状态
+    if (!state.isAuthenticated) {
+      updateState({error: '需要先连接OneDrive才能同步' })
+      return
+    }
+
+    updateState({ 
+      syncStatus: 'syncing', 
+      error: null,
+      exportResult: null 
+    })
+
+    try {
+      const graphClient = microsoftAuth.getGraphClient()!
+      console.log('Starting periodRecords import from OneDrive...')
+      const result = await dataExportService.importPeriodRecordsFromOneDrive()
+      
+      const syncTime = new Date()
+      updateState({
+
+        syncStatus: result.success ? 'success' : 'error',
+        lastSyncTime: syncTime,
+        error: result.success ? null : result.errors.join(', '),
+        exportResult: result.success ? {
+          success: true,
+          exportedFiles: [`已导入 ${result.importedCount} 个记录`],
+          errors: result.errors,
+          metadata: {
+            version: '1.0',
+            exportTime: syncTime.toISOString(),
+            userId: 'import',
+            appVersion: '1.0',
+            tables: ['stoolRecords']
+          }
+        } : null
+      })
+      
+      // 更新localStorage中的同步时间
+      if (result.success) {
+        updateSyncTimeInStorage(syncTime)
+      }
+      
+      console.log('PeriodRecords import completed:', result)
+      if (result.success) {
+        const exportResult = await dataExportService.exportTable('periodRecords', 'dummy')
+      }
+
+    } catch (error) {
+      console.error('PeriodRecords import failed:', error)
+
+      let errorMessage = 'PeriodRecords导入失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+        // 如果是认证错误，需要特殊处理
+        if (errorMessage.includes('令牌') || errorMessage.includes('access token') || errorMessage.includes('authenticate')) {
+          updateState({
+            syncStatus: 'error',
+            isAuthenticated: false,
+            userInfo: null,
+            error: '认证已过期，请重新连接OneDrive',
+          })
+          return
+        }
+      }
+      
+      updateState({
+        syncStatus: 'error',
+        error: errorMessage,
+      })
+    }
+  }, [state.isAuthenticated, updateSyncTimeInStorage])
+
+  const syncIDBOneDriveMealRecords = useCallback(async () => {
+    // 检查认证状态
+    if (!state.isAuthenticated) {
+      updateState({error: '需要先连接OneDrive才能同步' })
+      return
+    }
+
+    updateState({ 
+      syncStatus: 'syncing', 
+      error: null,
+      exportResult: null 
+    })
+
+    try {
+      const graphClient = microsoftAuth.getGraphClient()!
+      console.log('Starting mealRecords import from OneDrive...')
+      const result = await dataExportService.importMealRecordsFromOneDrive()
+
+      const syncTime = new Date()
+      updateState({
+
+        syncStatus: result.success ? 'success' : 'error',
+        lastSyncTime: syncTime,
+        error: result.success ? null : result.errors.join(', '),
+        exportResult: result.success ? {
+          success: true,
+          exportedFiles: [`已导入 ${result.importedCount} 个记录`],
+          errors: result.errors,
+          metadata: {
+            version: '1.0',
+            exportTime: syncTime.toISOString(),
+            userId: 'import',
+            appVersion: '1.0',
+            tables: ['stoolRecords']
+          }
+        } : null
+      })
+      
+      // 更新localStorage中的同步时间
+      if (result.success) {
+        updateSyncTimeInStorage(syncTime)
+      }
+      
+      console.log('MealRecords import completed:', result)
+      if (result.success) {
+        const exportResult = await dataExportService.exportTable('mealRecords', 'dummy')
+      }
+
+    } catch (error) {
+      console.error('MealRecords import failed:', error)
+
+      let errorMessage = 'MealRecords导入失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+        // 如果是认证错误，需要特殊处理
+        if (errorMessage.includes('令牌') || errorMessage.includes('access token') || errorMessage.includes('authenticate')) {
+          updateState({
+            syncStatus: 'error',
+            isAuthenticated: false,
+            userInfo: null,
+            error: '认证已过期，请重新连接OneDrive',
+          })
+          return
+        }
+      }
+      
+      updateState({
+        syncStatus: 'error',
+        error: errorMessage,
+      })
+    }
+  }, [state.isAuthenticated, updateSyncTimeInStorage])
+
   // 附件管理方法
   // 上传附件到OneDrive
   const uploadAttachment = useCallback(async (file: File, recordType: string, recordId: string): Promise<string> => {
@@ -1206,6 +1355,8 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     syncIDBOneDriveUsers,
     syncIDBOneDriveMyRecords,
     syncIDBOneDriveStoolRecords,
+    syncIDBOneDrivePeriodRecords,
+    syncIDBOneDriveMealRecords,
     uploadAttachment,
     deleteAttachment,
     getAttachmentUrl,

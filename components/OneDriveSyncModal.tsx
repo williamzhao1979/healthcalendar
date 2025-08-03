@@ -207,6 +207,8 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
           oneDriveActions.syncIDBOneDriveUsers(),
           oneDriveActions.syncIDBOneDriveMyRecords(),
           oneDriveActions.syncIDBOneDriveStoolRecords(),
+          oneDriveActions.syncIDBOneDrivePeriodRecords(),
+          oneDriveActions.syncIDBOneDriveMealRecords(),
         ])
         updateStepStatus('sync', 'completed')
       } else {
@@ -222,6 +224,14 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
         updateStepStatus('stool', 'in_progress')
         await oneDriveActions.syncIDBOneDriveStoolRecords()
         updateStepStatus('stool', 'completed')
+
+        updateStepStatus('period', 'in_progress')
+        await oneDriveActions.syncIDBOneDrivePeriodRecords()
+        updateStepStatus('period', 'completed')
+
+        updateStepStatus('meal', 'in_progress')
+        await oneDriveActions.syncIDBOneDriveMealRecords()
+        updateStepStatus('meal', 'completed')
       }
       
       setSyncProgress(100)
