@@ -988,13 +988,15 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   // 获取特定日期的记录圆点
   const getRecordDotsForDate = (date: Date) => {
+    if (!currentUser) return []
+    
     const dateStr = date.toISOString().split('T')[0] // YYYY-MM-DD format
     const dots = []
 
     // 检查是否有MyRecord记录
     const hasMyRecord = myRecords.some(record => {
       const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag
+      return recordDate === dateStr && !record.delFlag && record.userId === currentUser.id
     })
     if (hasMyRecord) {
       dots.push({
@@ -1006,7 +1008,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     // 检查是否有Stool记录
     const hasStoolRecord = stoolRecords.some(record => {
       const recordDate = new Date(record.date).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag
+      return recordDate === dateStr && !record.delFlag && record.userId === currentUser.id
     })
     if (hasStoolRecord) {
       dots.push({
@@ -1018,7 +1020,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     // 检查是否有Period记录
     const hasPeriodRecord = showPeriodRecords && periodRecords.some(record => {
       const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag
+      return recordDate === dateStr && !record.delFlag && record.userId === currentUser.id
     })
     if (hasPeriodRecord) {
       dots.push({
@@ -1030,7 +1032,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     // 检查是否有Meal记录
     const hasMealRecord = mealRecords.some(record => {
       const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag
+      return recordDate === dateStr && !record.delFlag && record.userId === currentUser.id
     })
     if (hasMealRecord) {
       dots.push({
@@ -1136,7 +1138,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   // 获取选中日期的所有记录
   const getRecordsForSelectedDate = () => {
-    if (!selectedDate) return []
+    if (!selectedDate || !currentUser) return []
     
     const dateStr = selectedDate.toISOString().split('T')[0]
     const allRecords: any[] = []
@@ -1144,7 +1146,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     // MyRecords
     myRecords.forEach(record => {
       const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      if (recordDate === dateStr && !record.delFlag) {
+      if (recordDate === dateStr && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'myRecord',
@@ -1156,7 +1158,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     // Stool Records
     stoolRecords.forEach(record => {
       const recordDate = new Date(record.date).toISOString().split('T')[0]
-      if (recordDate === dateStr && !record.delFlag) {
+      if (recordDate === dateStr && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'stool',
@@ -1169,7 +1171,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     if (showPeriodRecords) {
       periodRecords.forEach(record => {
         const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-        if (recordDate === dateStr && !record.delFlag) {
+        if (recordDate === dateStr && !record.delFlag && record.userId === currentUser.id) {
           allRecords.push({
             ...record,
             type: 'period',
@@ -1182,7 +1184,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     // Meal Records
     mealRecords.forEach(record => {
       const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      if (recordDate === dateStr && !record.delFlag) {
+      if (recordDate === dateStr && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'meal',
