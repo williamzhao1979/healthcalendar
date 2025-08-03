@@ -628,7 +628,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     
     try {
       const graphClient = microsoftAuth.getGraphClient()!
-      console.log('Starting users import from OneDrive...')
+      console.log('Starting myRecords import from OneDrive...')
       const result = await dataExportService.importMyRecordsFromOneDrive()
       
       setState(prev => ({
@@ -680,7 +680,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
     try {
       const graphClient = microsoftAuth.getGraphClient()!
-      console.log('Starting users import from OneDrive...')
+      console.log('Starting stoolRecords import from OneDrive...')
       const result = await dataExportService.importStoolRecordsFromOneDrive()
       
       setState(prev => ({

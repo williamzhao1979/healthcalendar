@@ -844,7 +844,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       
       // 获取所有用户
       const allUsers = await adminService.getAllUsers()
-
+      console.log('获取到的所有用户:', allUsers)
       // 初始化默认用户（如果没有用户）
       // const defaultUser = await userDB.initializeDefaultUser()
       const defaultUser = await adminService.getDefaultUser()
@@ -1859,19 +1859,7 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                     <Flower2 className="text-white text-sm" />
                   </button>
                   
-                  {/* 生理记录显示切换 */}
-                  <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
-                    <span className="text-xs font-medium text-gray-700">生理</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
-                        checked={showPeriodRecords}
-                        onChange={(e) => setShowPeriodRecords(e.target.checked)}
-                      />
-                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-pink-300 rounded-full peer peer-checked:after:translate-x-4 peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
-                    </label>
-                  </div>
+
                 </div>
               </div>
               <div className="flex items-center space-x-1">
@@ -1966,7 +1954,22 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                 <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-sm"></div>
                 <span className="text-xs font-medium text-gray-700">记录</span>
               </div>
+
+                  {/* 生理记录显示切换 */}
+                  <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
+                    <span className="text-xs font-medium text-gray-700">生理</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={showPeriodRecords}
+                        onChange={(e) => setShowPeriodRecords(e.target.checked)}
+                      />
+                      <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-pink-300 rounded-full peer peer-checked:after:translate-x-4 peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
+                    </label>
+                  </div>
             </div>
+            
           </div>
 
           {/* Recent Records */}
