@@ -33,6 +33,8 @@ import { useOneDriveSync, formatSyncTime } from '../hooks/useOneDriveSync'
 import { adminService } from '@/lib/adminService'
 import { AttachmentViewer } from './AttachmentViewer'
 import { Attachment } from '../types/attachment'
+import { OneDriveSyncModal } from './OneDriveSyncModal'
+import { OneDriveSyncToggle } from './OneDriveSyncToggle'
 import { set } from 'react-hook-form'
 
 // 简单的类型定义 - 避免复杂的语法
@@ -755,7 +757,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // 编辑用户相关状态
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
+  // OneDrive同步状态和模态框
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
+  const [showOneDriveSyncModal, setShowOneDriveSyncModal] = useState(false)
   // const [activeTab, setActiveTab] = useState<'stool' | 'myrecord' | 'personal' | 'physical'>('stool')
 
   // 日历状态
@@ -2507,80 +2511,15 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                           </div>
                           <ChevronRight className="text-gray-400" />
                         </button> */}
-                        {/* OneDrive同步 */}
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 flex items-center">
-                              OneDrive同步
-                              {oneDriveState.isAuthenticated && (
-                                <CheckCircle className="w-3 h-3 text-green-500 ml-1" />
-                              )}
-                              {oneDriveState.error && (
-                                <AlertCircle className="w-3 h-3 text-red-500 ml-1" />
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {oneDriveState.isAuthenticated 
-                                ? `已连接 · 最后同步: ${formatSyncTime(oneDriveState.lastSyncTime)}`
-                                : '自动备份到OneDrive云端'
-                              }
-                            </div>
-                            {oneDriveState.userInfo && (
-                              <div className="text-xs text-health-primary mt-0.5">
-                                {oneDriveState.userInfo.username}
-                              </div>
-                            )}
-                            {oneDriveState.error && (
-                              <div className="text-xs text-red-500 mt-0.5">
-                                {oneDriveState.error}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {/* {oneDriveState.isAuthenticated && (
-                              <button
-                                onClick={() => {
-                                  if (currentUser) {
-                                    oneDriveActions.exportData(currentUser.id)
-                                  }
-                                }}
-                                disabled={oneDriveState.syncStatus === 'syncing' || oneDriveState.isConnecting || oneDriveState.isExporting || !currentUser}
-                                className="px-2 py-1 text-xs text-health-primary hover:bg-health-primary/10 rounded-md transition-colors disabled:opacity-50"
-                              >
-                                {oneDriveState.isExporting ? '导出中...' : oneDriveState.syncStatus === 'syncing' ? '同步中...' : '导出数据'}
-                              </button>
-                            )} */}
-                            {/* {oneDriveState.isAuthenticated && (
-                              <button
-                                onClick={() => currentUser && oneDriveActions.startSync(currentUser.id)}
-                                disabled={!currentUser || oneDriveState.syncStatus === 'syncing' || oneDriveState.isConnecting || oneDriveState.isExporting}
-                                className="px-2 py-1 text-xs text-health-primary hover:bg-health-primary/10 rounded-md transition-colors disabled:opacity-50"
-                              >
-                                {oneDriveState.syncStatus === 'syncing' ? '同步中...' : '立即同步'}
-                              </button>
-                            )} */}
-                            <label className="relative inline-flex items-center cursor-pointer">
-                              <input 
-                                type="checkbox" 
-                                className="sr-only peer" 
-                                checked={oneDriveState.isAuthenticated}
-                                onChange={async (e) => {
-                                  if (e.target.checked) {
-                                    await oneDriveActions.connect()
-                                    await oneDriveActions.checkConnection()
-                                    await syncData()
-                                  } else {
-                                    await oneDriveActions.disconnect()
-                                  }
-                                }}
-                                disabled={oneDriveState.isConnecting}
-                              />
-                              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary peer-disabled:opacity-50"></div>
-                            </label>
-                          </div>
-                        </div>
+                        {/* OneDrive同步 - 使用新的同步组件 */}
+                        <OneDriveSyncToggle
+                          oneDriveState={oneDriveState}
+                          oneDriveActions={oneDriveActions}
+                          currentUser={currentUser}
+                          onOpenModal={() => setShowOneDriveSyncModal(true)}
+                        />
 
-                        <button onClick={syncData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                        {/* <button onClick={syncData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
                             <Download className="text-blue-500" />
                             <div className="text-left">
@@ -2589,9 +2528,9 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                             </div>
                           </div>
                           <ChevronRight className="text-gray-400" />
-                        </button>
+                        </button> */}
 
-                        <button onClick={gotoOneDriveStatus} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                        {/* <button onClick={gotoOneDriveStatus} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
                             <Upload className="text-green-500" />
                             <div className="text-left">
@@ -2600,7 +2539,7 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                             </div>
                           </div>
                           <ChevronRight className="text-gray-400" />
-                        </button>
+                        </button> */}
 
                         {/* <button onClick={exportData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
@@ -3417,6 +3356,15 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
           </div>
         </div>
       )}
+
+      {/* OneDrive同步模态框 */}
+      <OneDriveSyncModal
+        isOpen={showOneDriveSyncModal}
+        onClose={() => setShowOneDriveSyncModal(false)}
+        oneDriveState={oneDriveState}
+        oneDriveActions={oneDriveActions}
+        currentUser={currentUser}
+      />
     </div>
   )
 }
