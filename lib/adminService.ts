@@ -537,7 +537,11 @@ export class IndexedDBAdminService {
     // 删除数据库
     await new Promise<void>((resolve, reject) => {
       const deleteRequest = indexedDB.deleteDatabase(this.dbName)
-      deleteRequest.onsuccess = () => resolve()
+      deleteRequest.onsuccess = () => {
+        console.log('Database deleted successfully')
+        this.db = null // 清除当前数据库引用
+        resolve()
+      }
       deleteRequest.onerror = () => reject(deleteRequest.error)
       deleteRequest.onblocked = () => reject(new Error('数据库删除被阻止，请关闭其他标签页'))
     })
@@ -761,79 +765,97 @@ export class IndexedDBAdminService {
   }
 
   async ensureIDB() {
-      const db = await this.getDB()
+    // let db: IDBDatabase;
+    // let currentStores: string[] = [];
+    // try {
+    //   console.log('Ensuring IndexedDB is initialized...')
+    //   db = await this.getDB()
+    //   currentStores = Array.from(db.objectStoreNames)
+    // } catch (error) { 
+    //       console.error('获取数据库失败:', error)
+    // }
 
-      const currentStores = Array.from(db.objectStoreNames)
-      if (!(currentStores.includes('users') && 
-        currentStores.includes('stoolRecords') && currentStores.includes('myRecords') && 
-        currentStores.includes('mealRecords') && currentStores.includes('periodRecords'))) {
-        console.log('需要初始化对象存储')
-        try {
-            const newVersion = db.version + 1
-            console.log(`Upgrading DB: ${db.version} → ${newVersion}`)
-            db.close()
+    console.log('Ensuring IndexedDB is initialized...')
+    const db = await this.getDB()
+    const currentStores = Array.from(db.objectStoreNames)
+    console.log('Current stores:', currentStores)
 
-            const request = indexedDB.open(this.dbName, newVersion)
+    if (!(currentStores.includes('users') && 
+      currentStores.includes('stoolRecords') && currentStores.includes('myRecords') && 
+      currentStores.includes('mealRecords') && currentStores.includes('periodRecords'))) {
+      console.log('需要初始化对象存储')
+      try {
+          const newVersion = db.version + 1
+          console.log(`Upgrading DB: ${db.version} → ${newVersion}`)
+          db.close()
 
-            request.onerror = (event) => {
-                console.error('打开数据库失败:', (event.target as IDBOpenDBRequest).error)
-            }
-            request.onsuccess = (event) => {
-                this.db = (event.target as IDBOpenDBRequest).result
-                console.log(`数据库 ${this.dbName} 已升级到版本 ${this.dbVersion}`)
-                console.log('Initialized IDB, current stores:', Array.from(this.db!.objectStoreNames))
-            }
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result
-                const transaction = (event.target as IDBOpenDBRequest).transaction!
-                const oldVersion = event.oldVersion
-                const newVersion = event.newVersion || this.dbVersion
-                console.log('Initializing IDB, current stores:', Array.from(db.objectStoreNames))
-                console.log(`当前数据库版本: ${oldVersion}, 新版本: ${newVersion}`)
+          const request = indexedDB.open(this.dbName, newVersion)
 
-                if (!db.objectStoreNames.contains('users')) {
-                    const userStore = db.createObjectStore('users', { keyPath: 'id' })
-                    userStore.createIndex('name', 'name', { unique: false })
-                    // userStore.createIndex('isActive', 'isActive', { unique: false })
-                    console.log('Created users object store')
-                }
-                
-                if (!db.objectStoreNames.contains('stoolRecords')) {
-                    const store = db.createObjectStore('stoolRecords', { keyPath: 'id' })
-                    store.createIndex('userId', 'userId', { unique: false })
-                    store.createIndex('dateTime', 'dateTime', { unique: false })
-                    console.log('Created stoolRecords object store')
-                }
+          request.onerror = (event) => {
+              console.error('打开数据库失败:', (event.target as IDBOpenDBRequest).error)
+          }
+          request.onsuccess = (event) => {
+              this.db = (event.target as IDBOpenDBRequest).result
+              console.log(`数据库 ${this.dbName} 已升级到版本 ${this.dbVersion}`)
+              console.log('Initialized IDB, current stores:', Array.from(this.db!.objectStoreNames))
+          }
+          request.onupgradeneeded = (event) => {
+              const db = (event.target as IDBOpenDBRequest).result
+              const transaction = (event.target as IDBOpenDBRequest).transaction!
+              const oldVersion = event.oldVersion
+              const newVersion = event.newVersion || this.dbVersion
+              console.log('Initializing IDB, current stores:', Array.from(db.objectStoreNames))
+              console.log(`当前数据库版本: ${oldVersion}, 新版本: ${newVersion}`)
 
-                if (!db.objectStoreNames.contains('myRecords')) {
-                    const store = db.createObjectStore('myRecords', { keyPath: 'id' })
-                    store.createIndex('userId', 'userId', { unique: false })
-                    store.createIndex('dateTime', 'dateTime', { unique: false })
-                    console.log('Created myRecords object store')
-                }
+              if (!db.objectStoreNames.contains('users')) {
+                  const userStore = db.createObjectStore('users', { keyPath: 'id' })
+                  userStore.createIndex('name', 'name', { unique: false })
+                  // userStore.createIndex('isActive', 'isActive', { unique: false })
+                  console.log('Created users object store')
+              }
+              
+              if (!db.objectStoreNames.contains('stoolRecords')) {
+                  const store = db.createObjectStore('stoolRecords', { keyPath: 'id' })
+                  store.createIndex('userId', 'userId', { unique: false })
+                  store.createIndex('dateTime', 'dateTime', { unique: false })
+                  console.log('Created stoolRecords object store')
+              }
 
-                if (!db.objectStoreNames.contains('mealRecords')) {
-                    const store = db.createObjectStore('mealRecords', { keyPath: 'id' })
-                    store.createIndex('userId', 'userId', { unique: false })
-                    store.createIndex('dateTime', 'dateTime', { unique: false })
-                    console.log('Created mealRecords object store')
-                }
+              if (!db.objectStoreNames.contains('myRecords')) {
+                  const store = db.createObjectStore('myRecords', { keyPath: 'id' })
+                  store.createIndex('userId', 'userId', { unique: false })
+                  store.createIndex('dateTime', 'dateTime', { unique: false })
+                  console.log('Created myRecords object store')
+              }
 
-                if (!db.objectStoreNames.contains('periodRecords')) {
-                    const store = db.createObjectStore('periodRecords', { keyPath: 'id' })
-                    store.createIndex('userId', 'userId', { unique: false })
-                    store.createIndex('dateTime', 'dateTime', { unique: false })
-                    console.log('Created periodRecords object store')
-                }
-            }
-        } finally {
-            // db.close()
-        }
+              if (!db.objectStoreNames.contains('mealRecords')) {
+                  const store = db.createObjectStore('mealRecords', { keyPath: 'id' })
+                  store.createIndex('userId', 'userId', { unique: false })
+                  store.createIndex('dateTime', 'dateTime', { unique: false })
+                  console.log('Created mealRecords object store')
+              }
+
+              if (!db.objectStoreNames.contains('periodRecords')) {
+                  const store = db.createObjectStore('periodRecords', { keyPath: 'id' })
+                  store.createIndex('userId', 'userId', { unique: false })
+                  store.createIndex('dateTime', 'dateTime', { unique: false })
+                  console.log('Created periodRecords object store')
+              }
+          }
+      } catch (error) {
+          console.error('Error initializing IDB:', error)
+      } finally {
+          // db.close()
       }
+  }
+    
+    try {
+      console.log('Checking users store count...')
       const db2 = await this.getDB()
       const tx = db2.transaction('users', 'readwrite');
       const usersStore = tx.objectStore('users');
       const usersCount = usersStore.count();
+      console.log('Checking users store count...', usersCount)  
       usersCount.onsuccess = () => {
         if (usersCount.result === 0) {
           console.log('Users store is empty, initializing default user')
@@ -869,36 +891,43 @@ export class IndexedDBAdminService {
       usersCount.onerror = () => {
         console.error('Failed to count users:', usersCount.error);
       };
-
+    } catch (error) {
+      console.error('Error checking users store:', error);
+    }
   }
 
   // 获取所有用户
   async getAllUsers(): Promise<User[]> {
-    await this.ensureIDB();
-    const db = await this.getDB();
+    try {
+      await this.ensureIDB();
+      const db = await this.getDB();
 
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(['users'], 'readonly');
-      const store = transaction.objectStore('users');
-      const request = store.getAll();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['users'], 'readonly');
+        const store = transaction.objectStore('users');
+        const request = store.getAll();
 
-      request.onsuccess = () => {
-        // this.allUsers = request.result as User[];
-        this.allUsers = request.result.filter(user => !user.delFlag) as User[];
-        this.defaultUser = this.allUsers.find(user => user.id === 'user_self') || null;
-        this.activeUser = this.allUsers.find(user => user.isActive) || null;
-        console.log('获取所有用户:', this.allUsers);
-        resolve(this.allUsers || []);
-      };
+        request.onsuccess = () => {
+          // this.allUsers = request.result as User[];
+          this.allUsers = request.result.filter(user => !user.delFlag) as User[];
+          this.defaultUser = this.allUsers.find(user => user.id === 'user_self') || null;
+          this.activeUser = this.allUsers.find(user => user.isActive) || null;
+          console.log('获取所有用户:', this.allUsers);
+          resolve(this.allUsers || []);
+        };
 
-      request.onerror = () => {
-        reject(new Error('Failed to get users'));
-      };
+        request.onerror = () => {
+          reject(new Error('Failed to get users'));
+        };
 
-      // transaction.oncomplete = () => {
-      //   db.close();
-      // };
-    });
+        // transaction.oncomplete = () => {
+        //   db.close();
+        // };
+      });
+    } catch (error) {
+      console.error('获取所有用户失败:', error);
+      throw new Error('无法获取用户数据，请稍后再试');
+    }
   }
 
   // 获取所有用户

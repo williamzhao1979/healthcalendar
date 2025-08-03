@@ -498,7 +498,7 @@ export class DataExportService {
       const jsonString = await response.text(); // 👈 这里拿到原始 JSON 字符串
       // 如果你需要解析成对象，可以再用 JSON.parse
       const data = JSON.parse(jsonString);
-      console.log(`File content: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`);
+      // console.log(`File content: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`);
       console.log('Successfully read users.json file')
       return data;
     } catch (error) {
@@ -516,7 +516,7 @@ export class DataExportService {
     }
   }
 
-  // 从OneDrive读取users.json文件
+  // 从OneDrive读取json文件
   async readFile(fileName: string): Promise<any> {
     const graphClient = microsoftAuth.getGraphClient()
     if (!graphClient) {
@@ -527,13 +527,36 @@ export class DataExportService {
       if (!microsoftAuth.isLoggedIn()) {
         throw new Error('User not authenticated with OneDrive')
       }
-
+      const defaultReturnData = {
+        "dbName": "HealthCalendarDB",
+        "tableName": fileName.replace('.json', ''),
+        "data": []
+      }
       const filePath = `${this.APP_FOLDER_PATH}/${fileName}`
 
+      
       // 获取文件元数据
-      const fileMetadata = await graphClient
-        .api(`/me/drive/root:/${filePath}`)
-        .get()
+      let fileMetadata: any
+      try {
+        fileMetadata = await graphClient
+          .api(`/me/drive/root:/${filePath}`)
+          .get();
+        // console.log('found file:', fileMetadata);
+
+      if (fileMetadata?.fileName !== fileName) {
+        // throw new Error(`${fileName} file not found on OneDrive`)
+        return defaultReturnData
+      }
+
+      } catch (err: any) {
+        if (err.statusCode === 404) {
+          console.log(`${fileName} file not found!`);
+          return defaultReturnData
+        } else {
+          console.error(`Failed to read ${fileName} file:`, err);
+        }
+      }
+
 
       // 下载文件内容
       // const content = await graphClient
@@ -552,19 +575,19 @@ export class DataExportService {
       const jsonString = await response.text(); // 👈 这里拿到原始 JSON 字符串
       // 如果你需要解析成对象，可以再用 JSON.parse
       const data = JSON.parse(jsonString);
-      console.log(`File content: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`);
+      // console.log(`File content: ${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}`);
       console.log(`Successfully read ${fileName} file`)
       return data;
     } catch (error) {
       if (error instanceof Error) {
         // 检查是否是文件不存在的错误
         if (error.message.includes('404') || error.message.includes('NotFound')) {
-          console.warn('users.json file not found on OneDrive')
+          console.warn(`${fileName} file not found on OneDrive`)
           return null
         }
-        console.error('Failed to read users.json file:', error.message)
+        console.error(`Failed to read ${fileName} file error message:`, error.message)
       } else {
-        console.error('Failed to read users.json file:', error)
+        console.error(`Failed to read ${fileName} file error:`, error)
       }
       throw error
     }
@@ -584,7 +607,7 @@ export class DataExportService {
 
             // 获取文件内容
       const content = await graphClient.api(`/me/drive/items/${fileMetadata.id}/content`).get()
-      console.log(`File content: ${typeof content === 'string' ? content : JSON.stringify(content, null, 2)}`)
+      // console.log(`File content: ${typeof content === 'string' ? content : JSON.stringify(content, null, 2)}`)
       
       // const dataPackage = typeof content === 'string' ? JSON.parse(content) : content
 
@@ -624,7 +647,7 @@ console.log('microsoftAuth', microsoftAuth)
       const content = await graphClient
         .api(`/me/drive/items/${fileMetadata.id}/content`)
         .get();
-      console.log(`File content: ${typeof content === 'string' ? content : JSON.stringify(content, null, 2)}`);
+      // console.log(`File content: ${typeof content === 'string' ? content : JSON.stringify(content, null, 2)}`);
       // 解析JSON内容
       const data = typeof content === 'string' ? JSON.parse(content) : content;
 
@@ -806,7 +829,8 @@ console.log('microsoftAuth', microsoftAuth)
       console.log('Starting users import from OneDrive...')
       
       // 从OneDrive读取users.json文件
-      const oneDriveUsers = await this.readUsersFile()
+      // const oneDriveUsers = await this.readUsersFile()
+      const oneDriveUsers = await this.readFile('users.json')
       
       if (!oneDriveUsers) {
         return {
@@ -932,6 +956,7 @@ console.log('microsoftAuth', microsoftAuth)
 
       // 从OneDrive读取myRecords.json文件
       const oneDriveFile = await this.readFile('myRecords.json')
+      // console.log('oneDriveFile:', oneDriveFile)
 
       if (!oneDriveFile) {
         return {
@@ -946,7 +971,7 @@ console.log('microsoftAuth', microsoftAuth)
 
       if (dataArray.length === 0) {
         return {
-          success: false,
+          success: true,
           importedCount: 0,
           errors: ['OneDrive文件中未找到用户数据']
         }
@@ -1253,7 +1278,7 @@ console.log('microsoftAuth', microsoftAuth)
 
       if (dataArray.length === 0) {
         return {
-          success: false,
+          success: true,
           importedCount: 0,
           errors: ['OneDrive文件中未找到用户数据']
         }
