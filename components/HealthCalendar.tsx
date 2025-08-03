@@ -33,6 +33,8 @@ import { useOneDriveSync, formatSyncTime } from '../hooks/useOneDriveSync'
 import { adminService } from '@/lib/adminService'
 import { AttachmentViewer } from './AttachmentViewer'
 import { Attachment } from '../types/attachment'
+import { OneDriveSyncModal } from './OneDriveSyncModal'
+import { OneDriveSyncToggle } from './OneDriveSyncToggle'
 import { set } from 'react-hook-form'
 
 // 简单的类型定义 - 避免复杂的语法
@@ -755,14 +757,16 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // 编辑用户相关状态
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserType | null>(null)
+  // OneDrive同步状态和模态框
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
+  const [showOneDriveSyncModal, setShowOneDriveSyncModal] = useState(false)
   // const [activeTab, setActiveTab] = useState<'stool' | 'myrecord' | 'personal' | 'physical'>('stool')
 
   // 日历状态
   const [currentDate, setCurrentDate] = useState(new Date())
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth())
-  const [showPeriodRecords, setShowPeriodRecords] = useState(false)
+  const [showPeriodRecords, setShowPeriodRecords] = useState(true)
 
   // OneDrive同步状态 - 使用错误边界保护
   // const [oneDriveState, oneDriveActions] = (() => {
@@ -799,8 +803,12 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
 
     const storedShowPeriod = localStorage.getItem('showPeriodRecords');
-    if (storedShowPeriod) {
-      setShowPeriodRecords(storedShowPeriod === 'true' ? true : false);
+    if (storedShowPeriod !== null) {
+      setShowPeriodRecords(storedShowPeriod === 'true');
+    } else {
+      // 如果没有存储值，默认显示生理记录
+      setShowPeriodRecords(true);
+      localStorage.setItem('showPeriodRecords', 'true');
     }
 
     // 初始化用户数据
@@ -1286,7 +1294,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const goToPrivacyCalendar = () => {
     console.log('跳转到隐私日历')
-    window.location.href = 'period_calendar.html'
+    // window.location.href = 'period_calendar.html'
+    router.push(`/period-calendar`)
   }
 
   const editStoolRecord = (recordId: string) => {
@@ -1714,15 +1723,46 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
   }
 }, [oneDriveActions])
 
+// 处理数据同步
+const handleDataSync = useCallback(async () => {
+  if (!currentUser || !oneDriveState.isAuthenticated) {
+    return
+  }
+
+  try {
+    // 执行与OneDriveSyncModal相同的同步操作
+    await Promise.all([
+      oneDriveActions.syncIDBOneDriveUsers(),
+      oneDriveActions.syncIDBOneDriveMyRecords(),
+      oneDriveActions.syncIDBOneDriveStoolRecords(),
+      oneDriveActions.syncIDBOneDrivePeriodRecords(),
+      oneDriveActions.syncIDBOneDriveMealRecords()
+    ])
+    
+    console.log('数据同步完成')
+    
+    // 刷新所有数据显示
+    await Promise.all([
+      loadStoolRecords(),
+      loadMyRecords(),
+      loadMealRecords(),
+      loadPeriodRecords()
+    ])
+  } catch (error) {
+    console.error('数据同步失败:', error)
+    alert('数据同步失败: ' + (error instanceof Error ? error.message : '未知错误'))
+  }
+}, [currentUser, oneDriveState.isAuthenticated, oneDriveActions, loadStoolRecords, loadMyRecords, loadMealRecords, loadPeriodRecords])
+
   return (
-    <div className="overflow-x-hidden">
+    <div className="min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 hero-gradient"></div>
       <div className="fixed inset-0 bg-white/10"></div>
       
       <div className="relative min-h-screen">
         {/* Header */}
-        <header className="glass-morphism sticky top-0 z-50 px-3 py-2 animate-fade-in">
+        <header className="sticky top-0 z-50 px-6 py-3 bg-white/25 backdrop-blur-md border-b border-white/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="relative">
@@ -1745,7 +1785,7 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                     {/* User Button */}
                     <button 
                       onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                      className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-lg hover:bg-white/40 transition-all border border-white/20"
+                      className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20"
                     >
                       <SafeAvatar
                         src={currentUser.avatarUrl}
@@ -1754,51 +1794,31 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                         fallbackClassName="w-5 h-5"
                       />
                       <span className="text-xs font-semibold text-gray-800">{currentUser.name}</span>
-                      <ChevronLeft className={`text-gray-500 text-xs transition-transform ${isUserMenuOpen ? 'rotate-180' : 'rotate-90'}`} />
+                      <ChevronLeft className={`w-3 h-3 text-gray-500 transform transition-transform ${isUserMenuOpen ? 'rotate-90' : '-rotate-90'}`} />
                     </button>
 
                     {/* User Dropdown Menu */}
                     {isUserMenuOpen && (
-                      <div className="absolute top-full right-0 mt-1.5 w-56 bg-white/95 backdrop-blur-lg rounded-xl shadow-2xl border border-white/30 z-50 p-1.5">
-                        {/* Current User Section */}
-                        <div className="px-2 py-1.5 border-b border-gray-100 mb-1.5">
-                          <div className="flex items-center space-x-2">
-                            <SafeAvatar
-                              src={currentUser.avatarUrl}
-                              alt={currentUser.name}
-                              className="w-6 h-6 rounded-full ring-1 ring-health-primary/30 object-cover"
-                              fallbackClassName="w-6 h-6"
-                            />
-                            <div>
-                              <div className="text-xs font-semibold text-gray-900">{currentUser.name}</div>
-                              <div className="text-xs text-health-primary flex items-center">
-                                <CheckCircle className="w-2 h-2 mr-1" />
-                                当前用户
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Other Users */}
-                        <div className="max-h-32 overflow-y-auto">
-                          {users.filter(user => user.id !== currentUser.id).map((user) => (
+                      <div className="absolute top-full right-0 mt-1 w-48 bg-white/90 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg z-50">
+                        <div className="p-2">
+                          {users.map((user) => (
                             <button
                               key={user.id}
                               onClick={() => {
                                 switchUser(user.id)
                                 setIsUserMenuOpen(false)
                               }}
-                              className="w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg hover:bg-health-primary/10 transition-colors text-left"
+                              className={`w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg text-left hover:bg-white/50 transition-colors ${
+                                currentUser?.id === user.id ? 'bg-green-100/80 text-green-800' : 'text-gray-700'
+                              }`}
                             >
                               <SafeAvatar
                                 src={user.avatarUrl}
                                 alt={user.name}
-                                className="w-6 h-6 rounded-full ring-1 ring-gray-200 object-cover"
-                                fallbackClassName="w-6 h-6"
+                                className="w-4 h-4 rounded-full object-cover"
+                                fallbackClassName="w-4 h-4"
                               />
-                              <div className="flex-1">
-                                <div className="text-xs font-medium text-gray-900">{user.name}</div>
-                              </div>
+                              <span className="text-xs font-medium">{user.name}</span>
                             </button>
                           ))}
                         </div>
@@ -1807,7 +1827,7 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                   </div>
                 )}
                 {isLoading && (
-                  <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-lg border border-white/20">
+                  <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
                     <div className="w-5 h-5 rounded-full bg-gray-300 animate-pulse"></div>
                     <div className="w-10 h-3 bg-gray-300 rounded animate-pulse"></div>
                   </div>
@@ -2390,6 +2410,8 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                                       deleteMyRecord(record.id)
                                     } else if (record.type === 'meal') {
                                       deleteMealRecord(record.id)
+                                    } else if (record.type === 'physical') {
+                                      deletePeriodRecord(record.id)
                                     }
                                   }}
                                   title="删除记录"
@@ -2507,80 +2529,41 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                           </div>
                           <ChevronRight className="text-gray-400" />
                         </button> */}
-                        {/* OneDrive同步 */}
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 flex items-center">
-                              OneDrive同步
-                              {oneDriveState.isAuthenticated && (
-                                <CheckCircle className="w-3 h-3 text-green-500 ml-1" />
-                              )}
-                              {oneDriveState.error && (
-                                <AlertCircle className="w-3 h-3 text-red-500 ml-1" />
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {oneDriveState.isAuthenticated 
-                                ? `已连接 · 最后同步: ${formatSyncTime(oneDriveState.lastSyncTime)}`
-                                : '自动备份到OneDrive云端'
-                              }
-                            </div>
-                            {oneDriveState.userInfo && (
-                              <div className="text-xs text-health-primary mt-0.5">
-                                {oneDriveState.userInfo.username}
-                              </div>
-                            )}
-                            {oneDriveState.error && (
-                              <div className="text-xs text-red-500 mt-0.5">
-                                {oneDriveState.error}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {/* {oneDriveState.isAuthenticated && (
-                              <button
-                                onClick={() => {
-                                  if (currentUser) {
-                                    oneDriveActions.exportData(currentUser.id)
-                                  }
-                                }}
-                                disabled={oneDriveState.syncStatus === 'syncing' || oneDriveState.isConnecting || oneDriveState.isExporting || !currentUser}
-                                className="px-2 py-1 text-xs text-health-primary hover:bg-health-primary/10 rounded-md transition-colors disabled:opacity-50"
-                              >
-                                {oneDriveState.isExporting ? '导出中...' : oneDriveState.syncStatus === 'syncing' ? '同步中...' : '导出数据'}
-                              </button>
-                            )} */}
-                            {/* {oneDriveState.isAuthenticated && (
-                              <button
-                                onClick={() => currentUser && oneDriveActions.startSync(currentUser.id)}
-                                disabled={!currentUser || oneDriveState.syncStatus === 'syncing' || oneDriveState.isConnecting || oneDriveState.isExporting}
-                                className="px-2 py-1 text-xs text-health-primary hover:bg-health-primary/10 rounded-md transition-colors disabled:opacity-50"
-                              >
-                                {oneDriveState.syncStatus === 'syncing' ? '同步中...' : '立即同步'}
-                              </button>
-                            )} */}
-                            <label className="relative inline-flex items-center cursor-pointer">
-                              <input 
-                                type="checkbox" 
-                                className="sr-only peer" 
-                                checked={oneDriveState.isAuthenticated}
-                                onChange={async (e) => {
-                                  if (e.target.checked) {
-                                    await oneDriveActions.connect()
-                                    await oneDriveActions.checkConnection()
-                                    await syncData()
-                                  } else {
-                                    await oneDriveActions.disconnect()
-                                  }
-                                }}
-                                disabled={oneDriveState.isConnecting}
-                              />
-                              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary peer-disabled:opacity-50"></div>
-                            </label>
-                          </div>
-                        </div>
+                        {/* OneDrive同步 - 使用新的同步组件 */}
+                        <OneDriveSyncToggle
+                          oneDriveState={oneDriveState}
+                          oneDriveActions={oneDriveActions}
+                          currentUser={currentUser}
+                          onOpenModal={() => setShowOneDriveSyncModal(true)}
+                        />
 
-                        <button onClick={syncData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                        {/* 数据同步按钮 - 仅在OneDrive已登录时显示 */}
+                        {oneDriveState.isAuthenticated && (
+                          <button 
+                            onClick={handleDataSync}
+                            disabled={oneDriveState.syncStatus === 'syncing' || !currentUser}
+                            className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <div className="flex items-center space-x-3">
+                              {oneDriveState.syncStatus === 'syncing' ? (
+                                <RefreshCw className="text-blue-500 animate-spin" />
+                              ) : (
+                                <RefreshCw className="text-blue-500" />
+                              )}
+                              <div className="text-left">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {oneDriveState.syncStatus === 'syncing' ? '同步中...' : '数据同步'}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {oneDriveState.syncStatus === 'syncing' ? '正在同步数据到OneDrive' : '立即同步所有数据到OneDrive'}
+                                </div>
+                              </div>
+                            </div>
+                            <ChevronRight className="text-gray-400" />
+                          </button>
+                        )}
+
+                        {/* <button onClick={syncData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
                             <Download className="text-blue-500" />
                             <div className="text-left">
@@ -2589,9 +2572,9 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                             </div>
                           </div>
                           <ChevronRight className="text-gray-400" />
-                        </button>
+                        </button> */}
 
-                        <button onClick={gotoOneDriveStatus} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                        {/* <button onClick={gotoOneDriveStatus} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
                             <Upload className="text-green-500" />
                             <div className="text-left">
@@ -2600,7 +2583,7 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                             </div>
                           </div>
                           <ChevronRight className="text-gray-400" />
-                        </button>
+                        </button> */}
 
                         {/* <button onClick={exportData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
@@ -3417,6 +3400,16 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
           </div>
         </div>
       )}
+
+      {/* OneDrive同步模态框 */}
+      <OneDriveSyncModal
+        isOpen={showOneDriveSyncModal}
+        onClose={() => setShowOneDriveSyncModal(false)}
+        oneDriveState={oneDriveState}
+        oneDriveActions={oneDriveActions}
+        currentUser={currentUser}
+        onSyncComplete={refreshUsers}
+      />
     </div>
   )
 }

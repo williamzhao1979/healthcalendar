@@ -850,12 +850,10 @@ export class IndexedDBAdminService {
   }
     
     try {
-      console.log('Checking users store count...')
       const db2 = await this.getDB()
       const tx = db2.transaction('users', 'readwrite');
       const usersStore = tx.objectStore('users');
-      const usersCount = usersStore.count();
-      console.log('Checking users store count...', usersCount)  
+      const usersCount = usersStore.count();  
       usersCount.onsuccess = () => {
         if (usersCount.result === 0) {
           console.log('Users store is empty, initializing default user')
@@ -912,7 +910,6 @@ export class IndexedDBAdminService {
           this.allUsers = request.result.filter(user => !user.delFlag) as User[];
           this.defaultUser = this.allUsers.find(user => user.id === 'user_self') || null;
           this.activeUser = this.allUsers.find(user => user.isActive) || null;
-          console.log('获取所有用户:', this.allUsers);
           resolve(this.allUsers || []);
         };
 
@@ -969,7 +966,6 @@ export class IndexedDBAdminService {
 
   public async getCurrentUser(): Promise<User | null> {
     const currentUserId  = localStorage.getItem('currentUserId')? localStorage.getItem('currentUserId') : 'user_self';
-    console.log('当前用户ID:', currentUserId);
     if (!this.allUsers) {
       this.allUsers = await this.getAllUsers();
     }

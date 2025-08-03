@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ChevronLeft,
@@ -28,6 +28,10 @@ import { userDB, User as UserType } from '../../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
 import { adminService } from '@/lib/adminService'
 import { BaseRecord } from '@/type/baserecord'
+import { useOneDriveSync } from '../../hooks/useOneDriveSync'
+import { AttachmentUploader } from '../../components/AttachmentUploader'
+import { AttachmentViewer } from '../../components/AttachmentViewer'
+import { Attachment } from '../../types/attachment'
 
 // Period record types
 type PeriodStatus = 'start' | 'ongoing' | 'end'
@@ -43,7 +47,7 @@ interface PeriodRecord extends BaseRecord {
   mood: MoodType
   notes: string
   tags: string[]
-  attachments: string[]
+  attachments: Attachment[]
 }
 
 // Simplified database interface
@@ -201,6 +205,88 @@ class PeriodDB {
 }
 
 const periodDB = new PeriodDB()
+
+// 动态图片组件
+const DynamicImage: React.FC<{
+  attachment: Attachment;
+  onGetUrl: (fileName: string) => Promise<string>;
+  onClick: () => void;
+  isOneDriveConnected: boolean;
+}> = ({ attachment, onGetUrl, onClick, isOneDriveConnected }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const [hasAttempted, setHasAttempted] = useState(false)
+
+  useEffect(() => {
+    // 只在OneDrive连接且未尝试过时才加载
+    if (!isOneDriveConnected || hasAttempted) {
+      return
+    }
+
+    const loadImage = async () => {
+      try {
+        setLoading(true)
+        setError(false)
+        setHasAttempted(true)
+        
+        const url = await onGetUrl(attachment.fileName)
+        setImageUrl(url)
+      } catch (err) {
+        console.error('Failed to load image:', attachment.fileName, err)
+        setError(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadImage()
+  }, [isOneDriveConnected, hasAttempted]) // 移除了会变化的依赖项
+
+  // 重置状态的 effect，只在文件名变化时执行
+  useEffect(() => {
+    setHasAttempted(false)
+    setImageUrl(null)
+    setLoading(true)
+    setError(false)
+  }, [attachment.fileName])
+
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-1"></div>
+          <div className="text-xs text-gray-500">
+            {!isOneDriveConnected ? '等待连接...' : '加载中...'}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !imageUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <FileImage className="w-8 h-8 text-gray-400 mx-auto mb-1" />
+          <div className="text-xs text-gray-500">
+            {!isOneDriveConnected ? 'OneDrive未连接' : '图片加载失败'}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={attachment.fileName}
+      className="w-full h-full object-cover cursor-pointer"
+      onClick={onClick}
+      onError={() => setError(true)}
+    />
+  )
+}
 
 // User switcher component
 const UserSwitcher: React.FC<{
@@ -400,25 +486,52 @@ function PeriodPageContent() {
   const [mood, setMood] = useState<MoodType>('neutral')
   const [notes, setNotes] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>(['正常'])
-  const [attachments, setAttachments] = useState<string[]>([])
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [compressImages, setCompressImages] = useState(true) // 默认开启图片压缩
+  
+  // OneDrive 同步状态
+  const [oneDriveState, oneDriveActions] = useOneDriveSync()
   
   // UI state
   const [showFullImageModal, setShowFullImageModal] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string>('')
 
-  // Initialize
+  // Initialize users and basic data
   useEffect(() => {
-    loadUsers()
-    initializeDateTime()
+    const initializeData = async () => {
+      await loadUsers()
+      initializeDateTime()
+    }
     
-    // Check if editing mode
+    initializeData()
+  }, [])
+  
+  // 单独的OneDrive初始化，只执行一次
+  useEffect(() => {
+    oneDriveActions.checkConnection()
+  }, [])
+  
+  // 监听OneDrive状态变化（调试用）
+  useEffect(() => {
+    console.log('🩸 Period页面 - OneDrive状态变化:', {
+      isAuthenticated: oneDriveState.isAuthenticated,
+      isConnecting: oneDriveState.isConnecting,
+      userInfo: oneDriveState.userInfo,
+      error: oneDriveState.error,
+      lastSyncTime: oneDriveState.lastSyncTime
+    })
+  }, [oneDriveState.isAuthenticated, oneDriveState.isConnecting, oneDriveState.error])
+
+  // Handle edit mode when user is loaded
+  useEffect(() => {
     const editId = searchParams.get('edit')
-    if (editId) {
+    if (editId && currentUser && !isEditing) {
       setIsEditing(true)
       setEditingId(editId)
       loadRecordForEdit(editId)
     }
-  }, [searchParams])
+  }, [currentUser, searchParams, isEditing])
+
 
   // Keyboard event handling
   useEffect(() => {
@@ -441,14 +554,17 @@ function PeriodPageContent() {
 
   const loadUsers = async () => {
     try {
+      console.log('Period page: Loading users...')
       const allUsers = await adminService.getAllUsers()
       const defaultUser = await adminService.getDefaultUser()
+      const currentUserData = await adminService.getCurrentUser() || defaultUser
         
+      console.log('Period page: Users loaded, current user:', currentUserData?.name)
       setUsers(allUsers)
-      setCurrentUser(await adminService.getCurrentUser() || defaultUser)
+      setCurrentUser(currentUserData)
       setLoading(false)
     } catch (error) {
-      console.error('Failed to load users:', error)
+      console.error('Period page: Failed to load users:', error)
       setLoading(false)
     }
   }
@@ -461,12 +577,25 @@ function PeriodPageContent() {
 
   const loadRecordForEdit = async (id: string) => {
     try {
+      console.log('Period page: Loading record for edit:', id)
+      console.log('Period page: Current user:', currentUser?.name || 'null')
+      
       if (!currentUser?.id) {
-        console.error('No current user available')
+        console.error('Period page: No current user available for loading record')
+        // 如果用户还没加载完成，可以选择等待一下
+        setTimeout(() => {
+          if (currentUser?.id) {
+            loadRecordForEdit(id)
+          }
+        }, 500)
         return
       }
+      
+      console.log('Period page: Fetching record with userId:', currentUser.id, 'recordId:', id)
       const record = await adminService.getUserRecord('periodRecords', currentUser.id, id)
+      
       if (record) {
+        console.log('Period page: Record loaded successfully:', record)
         setDateTime(record.dateTime)
         setStatus(record.status)
         setFlowAmount(record.flowAmount)
@@ -475,9 +604,14 @@ function PeriodPageContent() {
         setNotes(record.notes)
         setSelectedTags(record.tags)
         setAttachments(record.attachments)
+      } else {
+        console.warn('Period page: No record found with id:', id)
+        alert('未找到要编辑的记录')
+        router.push('/health-calendar')
       }
     } catch (error) {
-      console.error('Failed to load record for edit:', error)
+      console.error('Period page: Failed to load record for edit:', error)
+      alert('加载记录失败，请重试')
     }
   }
 
@@ -485,55 +619,32 @@ function PeriodPageContent() {
     setCurrentUser(user)
   }
 
+  // 新的附件处理方法
+  const handleAttachmentsChange = (newAttachments: Attachment[]) => {
+    setAttachments(newAttachments)
+  }
+
+  const handleAttachmentUpload = async (file: File, recordType: string, recordId: string): Promise<string> => {
+    return await oneDriveActions.uploadAttachment(file, recordType, recordId)
+  }
+
+  const handleAttachmentDelete = async (fileName: string): Promise<void> => {
+    await oneDriveActions.deleteAttachment(fileName)
+  }
+
+  const handleAttachmentGetUrl = useCallback(async (fileName: string): Promise<string> => {
+    return await oneDriveActions.getAttachmentUrl(fileName)
+  }, [oneDriveActions.getAttachmentUrl])
+
+  // 保留旧的方法名以保持兼容性，但现在由 AttachmentUploader 组件处理
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files) return
-
-    const maxFiles = 5
-    const maxSize = 5 * 1024 * 1024 // 5MB
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-
-    const processFiles = async () => {
-      const newAttachments: string[] = []
-      const filesToProcess = Array.from(files).slice(0, maxFiles - attachments.length)
-
-      for (const file of filesToProcess) {
-        if (file.size > maxSize) {
-          alert(`文件 ${file.name} 太大，请选择小于5MB的文件`)
-          continue
-        }
-
-        if (!allowedTypes.includes(file.type)) {
-          alert(`文件 ${file.name} 格式不支持，请选择图片文件`)
-          continue
-        }
-
-        try {
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = (e) => resolve(e.target?.result as string)
-            reader.onerror = reject
-            reader.readAsDataURL(file)
-          })
-
-          newAttachments.push(dataUrl)
-        } catch (error) {
-          console.error('读取文件失败:', error)
-          alert(`读取文件 ${file.name} 失败`)
-        }
-      }
-
-      if (newAttachments.length > 0) {
-        setAttachments(prev => [...prev, ...newAttachments])
-      }
-    }
-
-    processFiles()
-    event.target.value = ''
+    // 这个函数现在由 AttachmentUploader 组件处理
+    // 保留以避免破坏现有引用，但不再使用
   }
 
   const handleRemoveAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index))
+    // 这个函数现在由 AttachmentUploader 组件处理
+    // 保留以避免破坏现有引用，但不再使用
   }
 
   const handleViewFullImage = (imageUrl: string) => {
@@ -837,7 +948,7 @@ function PeriodPageContent() {
             {/* Divider */}
             <hr className="border-gray-200 mb-3" />
 
-            {/* File upload */}
+            {/* 文件上传 */}
             <div>
               <h3 className="text-sm font-semibold text-gray-800 mb-2 flex items-center">
                 <Paperclip className="w-4 h-4 text-pink-500 mr-1.5" />
@@ -849,132 +960,141 @@ function PeriodPageContent() {
                 )}
               </h3>
 
-              {/* Upload Area */}
-              {attachments.length < 5 && (
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center mb-3 hover:border-pink-500 transition-colors">
-                  <div className="w-8 h-8 bg-gray-100 rounded-lg mx-auto mb-2 flex items-center justify-center">
-                    <CloudUpload className="w-5 h-5 text-gray-400" />
-                  </div>
-                  <div className="text-xs font-medium text-gray-700 mb-1">点击上传或拖拽图片</div>
-                  <div className="text-xs text-gray-500 mb-2">支持 JPG, PNG, GIF, WebP 格式，单个文件不超过5MB</div>
+              {/* 图片压缩选项 */}
+              <div className="mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                <label className="flex items-center space-x-2 cursor-pointer">
                   <input
-                    type="file"
-                    onChange={handleFileUpload}
-                    multiple
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    className="hidden"
-                    id="fileInput"
+                    type="checkbox"
+                    checked={compressImages}
+                    onChange={(e) => setCompressImages(e.target.checked)}
+                    className="w-4 h-4 text-pink-600 bg-gray-100 border-gray-300 rounded focus:ring-pink-500 focus:ring-2"
                   />
-                  <button
-                    onClick={() => document.getElementById('fileInput')?.click()}
-                    className="px-3 py-1.5 bg-pink-500 text-white text-xs rounded-lg hover:bg-pink-600 transition-colors"
-                  >
-                    选择图片
-                  </button>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-sm text-gray-700 font-medium">压缩图片</span>
+                    <span className="text-xs text-gray-500">(推荐开启以节省存储空间)</span>
+                  </div>
+                </label>
+                <div className="text-xs text-gray-500 mt-1 ml-6">
+                  {compressImages 
+                    ? "✓ 图片将被压缩至较小尺寸，减少存储空间占用" 
+                    : "⚠️ 图片将保持原始大小，可能占用较多存储空间"
+                  }
                 </div>
-              )}
+              </div>
 
-              {/* Attached Images Preview */}
+              {/* 使用新的 AttachmentUploader 组件 */}
+              <AttachmentUploader
+                oneDriveConnected={oneDriveState.isAuthenticated}
+                onConnect={oneDriveActions.connect}
+                attachments={attachments}
+                onAttachmentsChange={handleAttachmentsChange}
+                onUpload={handleAttachmentUpload}
+                onDelete={handleAttachmentDelete}
+                onGetUrl={handleAttachmentGetUrl}
+                recordType="period"
+                recordId={editingId || 'new'}
+                compressImages={compressImages}
+              />
+
+              {/* Existing Attachments Display */}
               {attachments.length > 0 && (
-                <div>
+                <div className="mt-3">
                   <div className="text-xs text-gray-600 mb-2 flex items-center justify-between">
                     <div className="flex items-center">
                       <FileImage className="w-3 h-3 mr-1" />
-                      已上传的图片 ({attachments.length})
+                      已上传的附件 ({attachments.length})
                     </div>
                     <div className="text-xs text-gray-400">
-                      悬停图片显示删除按钮
+                      点击查看大图
                     </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {attachments.map((attachment, index) => (
-                      <div key={index} className="relative group">
-                        <div 
-                          className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer border-2 border-transparent hover:border-pink-500 transition-all transform hover:scale-105 shadow-sm"
-                          onClick={() => handleViewFullImage(attachment)}
-                        >
-                          <img
-                            src={attachment}
-                            alt={`附件 ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                            onError={(e) => {
-                              console.error('图片加载失败:', attachment.substring(0, 50))
-                              e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0yMCAyNkM3LjI1IDI2IDIgMTUuMjUgMiAxNS4yNUMyIDE1LjI1IDcuMjUgNC41IDIwIDQuNUMzMi43NSA0LjUgMzggMTUuMjUgMzggMTUuMjVDMzggMTUuMjUgMzIuNzUgMjYgMjAgMjZaIiBzdHJva2U9IiM5Q0EzQUYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxjaXJjbGUgY3g9IjIwIiBjeT0iMTUuMjUiIHI9IjMuNzUiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+Cg=='
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-all flex items-center justify-center">
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              <div className="w-8 h-8 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
-                                <FileImage className="w-4 h-4 text-gray-700" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Delete Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (confirm('确定要删除这张图片吗？')) {
-                              handleRemoveAttachment(index)
-                            }
-                          }}
-                          className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-all shadow-lg border-2 border-white opacity-80 hover:opacity-100 group-hover:scale-110"
-                          title="删除图片"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-
-                        {/* Image Index */}
-                        <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-full backdrop-blur-sm font-medium">
-                          {index + 1}
-                        </div>
-
-                        {/* Image Size Info */}
-                        <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded-full backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                          {Math.round(attachment.length / 1024)} KB
-                        </div>
-                      </div>
-                    ))}
                   </div>
                   
-                  {/* Batch delete button */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-500">共 {attachments.length} 张图片</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (confirm(`确定要删除所有 ${attachments.length} 张图片吗？`)) {
-                          setAttachments([])
-                        }
-                      }}
-                      className="px-2 py-1 bg-red-50 text-red-600 text-xs rounded-md hover:bg-red-100 transition-colors border border-red-200 flex items-center space-x-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>全部删除</span>
-                    </button>
+                  {/* Image Preview Grid */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {attachments.map((attachment, index) => {
+                      const isImage = attachment.mimeType?.startsWith('image/') || 
+                                    attachment.fileName?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+                      
+                      return (
+                        <div key={attachment.id || index} className="relative group">
+                          {isImage ? (
+                            <div 
+                              className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 border border-gray-200"
+                              onClick={async () => {
+                                try {
+                                  const imageUrl = await handleAttachmentGetUrl(attachment.fileName);
+                                  handleViewFullImage(imageUrl);
+                                } catch (error) {
+                                  console.error('Failed to get image URL:', error);
+                                }
+                              }}
+                            >
+                              <DynamicImage
+                                attachment={attachment}
+                                onGetUrl={handleAttachmentGetUrl}
+                                isOneDriveConnected={oneDriveState.isAuthenticated}
+                                onClick={async () => {
+                                  try {
+                                    const imageUrl = await handleAttachmentGetUrl(attachment.fileName);
+                                    handleViewFullImage(imageUrl);
+                                  } catch (error) {
+                                    console.error('Failed to get image URL:', error);
+                                  }
+                                }}
+                              />
+                              
+                              {/* Overlay with zoom indicator */}
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
+                                <div className="bg-white/90 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                  <FileImage className="w-4 h-4 text-gray-700" />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center border border-gray-200">
+                              <div className="text-center">
+                                <File className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                                <div className="text-xs text-gray-500 truncate px-1">
+                                  {attachment.fileName}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Delete button */}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm('确定要删除这个附件吗？')) {
+                                try {
+                                  await handleAttachmentDelete(attachment.fileName);
+                                  // Remove from local state
+                                  setAttachments(prev => prev.filter((_, i) => i !== index));
+                                } catch (error) {
+                                  console.error('Failed to delete attachment:', error);
+                                }
+                              }
+                            }}
+                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
+                            title="删除附件"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          
+                          {/* File name tooltip */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 truncate">
+                            {attachment.fileName}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
+                  
+                  <AttachmentViewer
+                    attachments={attachments}
+                  />
                 </div>
               )}
-
-              {/* Upload Tips */}
-              <div className="bg-pink-50 rounded-lg p-2 border border-pink-200">
-                <div className="flex items-center space-x-1.5 mb-1">
-                  <div className="w-3 h-3 bg-pink-500 rounded-full flex items-center justify-center">
-                    <div className="w-1 h-1 bg-white rounded-full"></div>
-                  </div>
-                  <span className="text-xs font-medium text-pink-700">使用说明</span>
-                </div>
-                <div className="text-xs text-pink-600 space-y-0.5">
-                  <div>• 最多可上传5张图片，每张不超过5MB</div>
-                  <div>• 支持JPG、PNG、GIF、WebP格式</div>
-                  <div>• 点击图片可查看大图</div>
-                  <div>• <strong>删除图片</strong>：将鼠标悬停在图片上，点击右上角红色 × 按钮</div>
-                  <div>• 或使用"全部删除"按钮清除所有图片</div>
-                </div>
-              </div>
             </div>
           </div>
 
