@@ -766,7 +766,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth())
-  const [showPeriodRecords, setShowPeriodRecords] = useState(false)
+  const [showPeriodRecords, setShowPeriodRecords] = useState(true)
 
   // OneDrive同步状态 - 使用错误边界保护
   // const [oneDriveState, oneDriveActions] = (() => {
@@ -803,8 +803,12 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
 
     const storedShowPeriod = localStorage.getItem('showPeriodRecords');
-    if (storedShowPeriod) {
-      setShowPeriodRecords(storedShowPeriod === 'true' ? true : false);
+    if (storedShowPeriod !== null) {
+      setShowPeriodRecords(storedShowPeriod === 'true');
+    } else {
+      // 如果没有存储值，默认显示生理记录
+      setShowPeriodRecords(true);
+      localStorage.setItem('showPeriodRecords', 'true');
     }
 
     // 初始化用户数据
@@ -1290,7 +1294,8 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const goToPrivacyCalendar = () => {
     console.log('跳转到隐私日历')
-    window.location.href = 'period_calendar.html'
+    // window.location.href = 'period_calendar.html'
+    router.push(`/period-calendar`)
   }
 
   const editStoolRecord = (recordId: string) => {
@@ -2423,6 +2428,8 @@ const handleDataSync = useCallback(async () => {
                                       deleteMyRecord(record.id)
                                     } else if (record.type === 'meal') {
                                       deleteMealRecord(record.id)
+                                    } else if (record.type === 'physical') {
+                                      deletePeriodRecord(record.id)
                                     }
                                   }}
                                   title="删除记录"
