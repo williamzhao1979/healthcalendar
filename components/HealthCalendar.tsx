@@ -1718,6 +1718,35 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
   }
 }, [oneDriveActions])
 
+// 处理数据同步
+const handleDataSync = useCallback(async () => {
+  if (!currentUser || !oneDriveState.isAuthenticated) {
+    return
+  }
+
+  try {
+    // 执行与OneDriveSyncModal相同的同步操作
+    await Promise.all([
+      oneDriveActions.syncIDBOneDriveUsers(),
+      oneDriveActions.syncIDBOneDriveMyRecords(),
+      oneDriveActions.syncIDBOneDriveStoolRecords(),
+    ])
+    
+    console.log('数据同步完成')
+    
+    // 刷新所有数据显示
+    await Promise.all([
+      loadStoolRecords(),
+      loadMyRecords(),
+      loadMealRecords(),
+      loadPeriodRecords()
+    ])
+  } catch (error) {
+    console.error('数据同步失败:', error)
+    alert('数据同步失败: ' + (error instanceof Error ? error.message : '未知错误'))
+  }
+}, [currentUser, oneDriveState.isAuthenticated, oneDriveActions, loadStoolRecords, loadMyRecords, loadMealRecords, loadPeriodRecords])
+
   return (
     <div className="overflow-x-hidden">
       {/* Background */}
@@ -2518,6 +2547,32 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
                           currentUser={currentUser}
                           onOpenModal={() => setShowOneDriveSyncModal(true)}
                         />
+
+                        {/* 数据同步按钮 - 仅在OneDrive已登录时显示 */}
+                        {oneDriveState.isAuthenticated && (
+                          <button 
+                            onClick={handleDataSync}
+                            disabled={oneDriveState.syncStatus === 'syncing' || !currentUser}
+                            className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <div className="flex items-center space-x-3">
+                              {oneDriveState.syncStatus === 'syncing' ? (
+                                <RefreshCw className="text-blue-500 animate-spin" />
+                              ) : (
+                                <RefreshCw className="text-blue-500" />
+                              )}
+                              <div className="text-left">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {oneDriveState.syncStatus === 'syncing' ? '同步中...' : '数据同步'}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {oneDriveState.syncStatus === 'syncing' ? '正在同步数据到OneDrive' : '立即同步所有数据到OneDrive'}
+                                </div>
+                              </div>
+                            </div>
+                            <ChevronRight className="text-gray-400" />
+                          </button>
+                        )}
 
                         {/* <button onClick={syncData} className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                           <div className="flex items-center space-x-3">
@@ -3364,6 +3419,7 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
         oneDriveState={oneDriveState}
         oneDriveActions={oneDriveActions}
         currentUser={currentUser}
+        onSyncComplete={refreshUsers}
       />
     </div>
   )

@@ -25,6 +25,7 @@ interface OneDriveSyncModalProps {
   oneDriveState: OneDriveSyncState
   oneDriveActions: OneDriveSyncActions
   currentUser: any
+  onSyncComplete?: () => void
 }
 
 interface SyncStep {
@@ -40,7 +41,8 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
   onClose,
   oneDriveState,
   oneDriveActions,
-  currentUser
+  currentUser,
+  onSyncComplete
 }) => {
   const [syncSteps, setSyncSteps] = useState<SyncStep[]>([])
   const [isInitialSetup, setIsInitialSetup] = useState(false)
@@ -223,6 +225,11 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
       }
       
       setSyncProgress(100)
+      
+      // 同步完成后调用回调函数刷新HealthCalendar的数据
+      if (onSyncComplete) {
+        onSyncComplete()
+      }
     } catch (error) {
       console.error('同步失败:', error)
     }
