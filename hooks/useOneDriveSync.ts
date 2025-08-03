@@ -547,10 +547,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
   // 导入用户数据
   const syncIDBOneDriveUsers = useCallback(async () => {
-    if (!state.isAuthenticated) {
-      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
-      return
-    }
+    // 移除状态检查，由调用方确保已连接
 
     // 检查基本认证状态
     // if (!microsoftAuth.isLoggedIn()) {
@@ -610,14 +607,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         error: errorMessage,
       }))
     }
-  }, [state.isAuthenticated])
+  }, [])
 
     // 导入用户数据
   const syncIDBOneDriveMyRecords = useCallback(async () => {
-    if (!state.isAuthenticated) {
-      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
-      return
-    }
+    // 移除状态检查，由调用方确保已连接
 
     // 检查基本认证状态
     // if (!microsoftAuth.isLoggedIn()) {
@@ -675,14 +669,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         error: errorMessage,
       }))
     }
-  }, [state.isAuthenticated])
+  }, [])
 
     // 导入用户数据
   const syncIDBOneDriveStoolRecords = useCallback(async () => {
-    if (!state.isAuthenticated) {
-      setState(prev => ({ ...prev, error: '未连接到OneDrive' }))
-      return
-    }
+    // 移除状态检查，由调用方确保已连接
 
     try {
       const graphClient = microsoftAuth.getGraphClient()!
@@ -727,7 +718,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         error: errorMessage,
       }))
     }
-  }, [state.isAuthenticated])
+  }, [])
 
   // 附件管理方法
   // 上传附件到OneDrive
