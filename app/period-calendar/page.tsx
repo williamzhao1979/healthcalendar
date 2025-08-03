@@ -18,6 +18,26 @@ import {
 } from 'lucide-react'
 import { userDB, User as UserType } from '../../lib/userDatabase'
 import { adminService } from '@/lib/adminService'
+import { HEALTH_CALENDAR_DB_VERSION } from '../../lib/dbVersion'
+import { BaseRecord } from '@/type/baserecord'
+import { Attachment } from '../../types/attachment'
+
+// Period record types
+type PeriodStatus = 'start' | 'ongoing' | 'end'
+type FlowAmount = 'spotting' | 'light' | 'normal' | 'heavy'
+type PeriodColor = 'bright-red' | 'dark-red' | 'deep-red' | 'orange-red' | 'pink'
+type MoodType = 'very-sad' | 'sad' | 'neutral' | 'happy' | 'very-happy'
+
+interface PeriodRecord extends BaseRecord {
+  dateTime: string
+  status: PeriodStatus
+  flowAmount: FlowAmount
+  color: PeriodColor
+  mood: MoodType
+  notes: string
+  tags: string[]
+  attachments: Attachment[]
+}
 
 // Period cycle types
 type CyclePhase = 'menstrual' | 'follicular' | 'ovulation' | 'luteal'
@@ -38,6 +58,67 @@ interface CycleStats {
   daysToNext: number
   ovulationDay: number
 }
+
+// Database class for period records
+class PeriodDB {
+  private dbName = 'HealthCalendarDB'
+  private version = HEALTH_CALENDAR_DB_VERSION
+  private db: IDBDatabase | null = null
+
+  async ensureInitialized(): Promise<void> {
+    if (this.db) return
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version)
+
+      request.onerror = () => {
+        console.error('PeriodDB IndexedDB error:', request.error)
+        reject(request.error)
+      }
+      
+      request.onsuccess = () => {
+        this.db = request.result
+        resolve()
+      }
+
+      request.onupgradeneeded = (event) => {
+        const db = (event.target as IDBOpenDBRequest).result
+        
+        if (!db.objectStoreNames.contains('periodRecords')) {
+          const store = db.createObjectStore('periodRecords', { keyPath: 'id' })
+          store.createIndex('userId', 'userId', { unique: false })
+          store.createIndex('dateTime', 'dateTime', { unique: false })
+        }
+      }
+    })
+  }
+
+  async getAllRecordsByUser(userId: string): Promise<PeriodRecord[]> {
+    await this.ensureInitialized()
+    if (!this.db) throw new Error('Database not initialized')
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['periodRecords'], 'readonly')
+      const store = transaction.objectStore('periodRecords')
+      const index = store.index('userId')
+      const request = index.getAll(userId)
+
+      request.onsuccess = () => {
+        const records = request.result || []
+        // Sort by dateTime descending
+        records.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+        resolve(records)
+      }
+
+      request.onerror = () => {
+        console.error('Failed to get period records:', request.error)
+        reject(request.error)
+      }
+    })
+  }
+}
+
+const periodDB = new PeriodDB()
 
 // User switcher component
 const UserSwitcher: React.FC<{
@@ -108,6 +189,8 @@ export default function PeriodCalendarPage() {
   const [users, setUsers] = useState<UserType[]>([])
   const [currentUser, setCurrentUser] = useState<UserType | null>(null)
   const [loading, setLoading] = useState(true)
+  const [periodRecords, setPeriodRecords] = useState<PeriodRecord[]>([])
+  const [loadingPeriods, setLoadingPeriods] = useState(false)
   
   // Calendar state
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -118,73 +201,111 @@ export default function PeriodCalendarPage() {
     ovulationDay: 14
   })
 
-  // Mock cycle data - in a real app this would come from the database
-  const generateCycleDays = (): CycleDay[] => {
+  // Calculate cycle data from real period records
+  const calculateCycleDays = (): CycleDay[] => {
     const days: CycleDay[] = []
     const today = new Date()
-    const currentDay = today.getDate()
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
     
-    // Generate calendar days for July 2025
-    const daysInMonth = 31
+    // Get period records for the current month
+    const monthStart = new Date(year, month, 1)
+    const monthEnd = new Date(year, month + 1, 0)
+    
+    const monthPeriodRecords = Array.isArray(periodRecords) 
+      ? periodRecords.filter(record => {
+          const recordDate = new Date(record.dateTime)
+          return recordDate >= monthStart && recordDate <= monthEnd
+        })
+      : []
+    
+    // Calculate cycle stats from all records
+    const stats = calculateCycleStats()
     
     for (let i = 1; i <= daysInMonth; i++) {
+      const currentDayDate = new Date(year, month, i)
+      const isToday = currentDayDate.toDateString() === today.toDateString()
+      
+      // Check if this day has a period record
+      const dayRecord = monthPeriodRecords.find(record => {
+        const recordDate = new Date(record.dateTime)
+        return recordDate.getDate() === i
+      })
+      
       let type: DayType = 'safe'
       let phase: CyclePhase = 'follicular'
       let tooltip = '安全期'
       let flowAmount: 'heavy' | 'normal' | 'light' | undefined
-
-      // Period days (1-5)
-      if (i >= 1 && i <= 5) {
+      
+      if (dayRecord) {
+        // Actual period record exists
         type = 'period'
         phase = 'menstrual'
-        if (i === 1) {
-          flowAmount = 'heavy'
-          tooltip = '月经第1天 · 重度流量'
-        } else if (i <= 3) {
-          flowAmount = 'normal'
-          tooltip = `月经第${i}天 · 中度流量`
-        } else {
-          flowAmount = 'light'
-          tooltip = `月经第${i}天 · 轻度流量`
+        
+        // Map flow amount
+        switch (dayRecord.flowAmount) {
+          case 'heavy':
+            flowAmount = 'heavy'
+            break
+          case 'normal':
+            flowAmount = 'normal'
+            break
+          case 'light':
+          case 'spotting':
+            flowAmount = 'light'
+            break
+        }
+        
+        tooltip = `月经第${i}天 · ${flowAmount === 'heavy' ? '重度' : flowAmount === 'normal' ? '中度' : '轻度'}流量`
+        if (dayRecord.notes) {
+          tooltip += ` · ${dayRecord.notes}`
+        }
+      } else {
+        // Calculate predicted cycle phases based on cycle stats
+        const daysSinceLastPeriod = getDaysSinceLastPeriod(currentDayDate)
+        
+        if (daysSinceLastPeriod >= 0) {
+          const cycleDay = (daysSinceLastPeriod % stats.averageCycle) + 1
+          
+          if (cycleDay <= stats.periodDays) {
+            type = 'predicted'
+            phase = 'menstrual'
+            tooltip = `预测月经第${cycleDay}天`
+          } else if (cycleDay >= stats.ovulationDay - 2 && cycleDay <= stats.ovulationDay + 2) {
+            if (cycleDay === stats.ovulationDay) {
+              type = 'ovulation'
+              phase = 'ovulation'
+              tooltip = '预测排卵日 · 最佳受孕时机'
+            } else {
+              type = 'fertile'
+              phase = cycleDay < stats.ovulationDay ? 'follicular' : 'luteal'
+              tooltip = '易孕期 · 受孕几率较高'
+            }
+          } else if (cycleDay >= stats.averageCycle - 4) {
+            type = 'pms'
+            phase = 'luteal'
+            tooltip = '经前期 · 可能出现PMS症状'
+          } else if (cycleDay <= stats.ovulationDay) {
+            phase = 'follicular'
+            tooltip = '卵泡期'
+          } else {
+            phase = 'luteal'
+            tooltip = '黄体期'
+          }
         }
       }
-      // Fertile period (11-17)
-      else if (i >= 11 && i <= 17) {
-        if (i === 14) {
-          type = 'ovulation'
-          phase = 'ovulation'
-          tooltip = '排卵日 · 最佳受孕时机'
-        } else {
-          type = 'fertile'
-          phase = i < 14 ? 'follicular' : 'luteal'
-          tooltip = i < 14 ? '易孕期 · 受孕几率增加' : '易孕期 · 受孕几率递减'
-        }
-      }
-      // PMS period (24-27)
-      else if (i >= 24 && i <= 27) {
-        type = 'pms'
-        phase = 'luteal'
-        tooltip = '经前期 · 可能出现PMS症状'
-      }
-      // Predicted next period (28-31)
-      else if (i >= 28) {
-        type = 'predicted'
-        phase = 'menstrual'
-        tooltip = `预测月经第${i - 27}天`
-      }
-
-      // Mark today
-      if (i === currentDay) {
-        type = 'today'
-        tooltip = '排卵日 · 今天 · 最佳受孕时机'
+      
+      if (isToday) {
+        tooltip = `今天 · ${tooltip}`
       }
 
       days.push({
         date: i,
-        type,
+        type: isToday ? 'today' : type,
         phase,
         tooltip,
-        isToday: i === currentDay,
+        isToday,
         flowAmount
       })
     }
@@ -192,12 +313,133 @@ export default function PeriodCalendarPage() {
     return days
   }
 
-  const [cycleDays] = useState<CycleDay[]>(generateCycleDays())
+  const [cycleDays, setCycleDays] = useState<CycleDay[]>([])
+
+  // Helper functions for cycle calculations
+  const calculateCycleStats = (): CycleStats => {
+    console.log('🩸 计算周期统计 - periodRecords:', periodRecords, 'isArray:', Array.isArray(periodRecords))
+    
+    if (!Array.isArray(periodRecords) || periodRecords.length === 0) {
+      return {
+        averageCycle: 28,
+        periodDays: 5,
+        daysToNext: 0,
+        ovulationDay: 14
+      }
+    }
+
+    // Group records by period start dates
+    const periodStarts: Date[] = []
+    const periodLengths: number[] = []
+    
+    if (Array.isArray(periodRecords)) {
+      periodRecords.forEach(record => {
+        if (record.status === 'start') {
+          periodStarts.push(new Date(record.dateTime))
+        }
+      })
+    }
+    
+    // Calculate cycle lengths
+    const cycleLengths: number[] = []
+    for (let i = 1; i < periodStarts.length; i++) {
+      const daysBetween = Math.round((periodStarts[i-1].getTime() - periodStarts[i].getTime()) / (1000 * 60 * 60 * 24))
+      if (daysBetween > 0 && daysBetween <= 45) { // Reasonable cycle length
+        cycleLengths.push(daysBetween)
+      }
+    }
+    
+    // Calculate period lengths by grouping consecutive days
+    const allPeriodDates = Array.isArray(periodRecords) 
+      ? periodRecords.map(r => new Date(r.dateTime).toDateString()).sort()
+      : []
+    let currentStreak = 1
+    for (let i = 1; i < allPeriodDates.length; i++) {
+      const prevDate = new Date(allPeriodDates[i-1])
+      const currDate = new Date(allPeriodDates[i])
+      const daysDiff = Math.round((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      if (daysDiff === 1) {
+        currentStreak++
+      } else {
+        if (currentStreak > 0) periodLengths.push(currentStreak)
+        currentStreak = 1
+      }
+    }
+    if (currentStreak > 0) periodLengths.push(currentStreak)
+    
+    const averageCycle = cycleLengths.length > 0 ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length) : 28
+    const periodDays = periodLengths.length > 0 ? Math.round(periodLengths.reduce((a, b) => a + b, 0) / periodLengths.length) : 5
+    const ovulationDay = Math.round(averageCycle / 2)
+    
+    // Calculate days to next period
+    const lastPeriodStart = periodStarts[0] // Most recent (sorted descending)
+    const daysSinceLastPeriod = lastPeriodStart ? Math.round((new Date().getTime() - lastPeriodStart.getTime()) / (1000 * 60 * 60 * 24)) : 0
+    const daysToNext = lastPeriodStart ? Math.max(0, averageCycle - daysSinceLastPeriod) : 0
+    
+    return {
+      averageCycle,
+      periodDays,
+      daysToNext,
+      ovulationDay
+    }
+  }
+
+  const getDaysSinceLastPeriod = (targetDate: Date): number => {
+    if (!Array.isArray(periodRecords) || periodRecords.length === 0) return -1
+    
+    const lastPeriodRecord = periodRecords.find(record => 
+      record.status === 'start' && new Date(record.dateTime) <= targetDate
+    )
+    
+    if (!lastPeriodRecord) return -1
+    
+    return Math.round((targetDate.getTime() - new Date(lastPeriodRecord.dateTime).getTime()) / (1000 * 60 * 60 * 24))
+  }
+
+  // Load period records for current user
+  const loadPeriodRecords = async (userId: string) => {
+    if (!userId) return
+    
+    setLoadingPeriods(true)
+    try {
+      const records = await adminService.getUserRecords('periodRecords', userId)
+      console.log('🩸 Period Calendar - 加载的记录:', records, typeof records)
+      
+      // Ensure records is always an array
+      const safeRecords = Array.isArray(records) ? records : []
+      setPeriodRecords(safeRecords)
+      
+      console.log('🩸 Period Calendar - 设置的记录数组:', safeRecords)
+    } catch (error) {
+      console.error('Failed to load period records:', error)
+      setPeriodRecords([]) // Set empty array on error
+    } finally {
+      setLoadingPeriods(false)
+    }
+  }
 
   // Initialize
   useEffect(() => {
     loadUsers()
   }, [])
+
+  // Load period records when user changes
+  useEffect(() => {
+    if (currentUser) {
+      loadPeriodRecords(currentUser.id)
+    }
+  }, [currentUser])
+
+  // Update cycle days when period records or current date changes
+  useEffect(() => {
+    const newCycleDays = calculateCycleDays()
+    setCycleDays(newCycleDays)
+    
+    // Update cycle stats
+    const newStats = calculateCycleStats()
+    setCycleStats(newStats)
+  }, [periodRecords, currentDate])
 
   const loadUsers = async () => {
     try {
@@ -215,7 +457,7 @@ export default function PeriodCalendarPage() {
 
   const handleUserChange = async (user: UserType) => {
     setCurrentUser(user)
-    // TODO: Load user's cycle data from database
+    await loadPeriodRecords(user.id)
   }
 
   const handleBack = () => {
@@ -238,6 +480,7 @@ export default function PeriodCalendarPage() {
       newDate.setMonth(newDate.getMonth() + 1)
     }
     setCurrentDate(newDate)
+    // Cycle days will be recalculated in useEffect
   }
 
   const getCyclePhaseInfo = () => {
@@ -339,12 +582,12 @@ export default function PeriodCalendarPage() {
     return cycleDays.find(day => day.date === today)?.phase || 'follicular'
   }
 
-  if (loading) {
+  if (loading || loadingPeriods) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto"></div>
-          <p className="mt-2 text-white">加载中...</p>
+          <p className="mt-2 text-white">{loading ? '加载用户中...' : '加载周期数据中...'}</p>
         </div>
       </div>
     )
@@ -430,7 +673,20 @@ export default function PeriodCalendarPage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-800">{formatDate(currentDate)}</h2>
-                <p className="text-sm text-gray-600 mt-1">第14天 · 排卵期</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  {(() => {
+                    const today = new Date()
+                    if (currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear()) {
+                      const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
+                      if (daysSinceLastPeriod >= 0) {
+                        const cycleDay = (daysSinceLastPeriod % cycleStats.averageCycle) + 1
+                        const phaseInfo = getCyclePhaseInfo()
+                        return `第${cycleDay}天 · ${phaseInfo.title}`
+                      }
+                    }
+                    return '查看您的周期数据'
+                  })()}
+                </p>
               </div>
               <div className="flex items-center space-x-2">
                 <button 
@@ -448,8 +704,9 @@ export default function PeriodCalendarPage() {
               </div>
             </div>
 
+            {/* Do not delete, will be used for future features */}
             {/* Current Phase Indicator */}
-            <div className={`mb-6 p-4 bg-gradient-to-r ${phaseInfo.gradient} rounded-2xl border ${phaseInfo.border}`}>
+            {/* <div className={`mb-6 p-4 bg-gradient-to-r ${phaseInfo.gradient} rounded-2xl border ${phaseInfo.border}`}>
               <div className="flex items-center space-x-3">
                 <div className={`w-12 h-12 bg-gradient-to-r ${phaseInfo.iconBg} rounded-full flex items-center justify-center shadow-lg`}>
                   <phaseInfo.icon className="text-white text-lg" />
@@ -460,7 +717,7 @@ export default function PeriodCalendarPage() {
                 </div>
               </div>
               <div className={`mt-3 h-1 rounded-full bg-gradient-to-r phase-indicator ${phaseInfo.phaseClass}`}></div>
-            </div>
+            </div> */}
 
             {/* Calendar Grid */}
             <div className="grid grid-cols-7 gap-1 mb-6">
@@ -470,7 +727,12 @@ export default function PeriodCalendarPage() {
               ))}
 
               {/* Empty cells for proper alignment */}
-              <div></div> {/* July 1st starts on Monday */}
+              {(() => {
+                const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay()
+                return Array.from({ length: firstDay }, (_, i) => (
+                  <div key={`empty-${i}`}></div>
+                ))
+              })()}
               
               {/* Calendar Days */}
               {cycleDays.map((day) => (
@@ -480,6 +742,7 @@ export default function PeriodCalendarPage() {
                   title={day.tooltip}
                   onClick={() => {
                     console.log(`点击了第${day.date}天: ${day.tooltip}`)
+                    // TODO: Show day details or navigate to add/edit record
                   }}
                 >
                   {day.date}
@@ -503,6 +766,7 @@ export default function PeriodCalendarPage() {
                   <span className="text-sm font-medium text-gray-700">排卵日</span>
                 </div>
               </div>
+              {/* Do not delete, will be used for future features */}
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 bg-gradient-to-r from-purple-400 to-purple-500 rounded-full shadow-sm"></div>
@@ -532,34 +796,63 @@ export default function PeriodCalendarPage() {
               <div className="bg-white rounded-2xl p-4 border border-gray-100">
                 <h4 className="text-base font-semibold text-gray-800 mb-3">本周期进程</h4>
                 <div className="relative">
-                  <div className="flex justify-between text-xs text-gray-500 mb-2">
-                    <span>第1天</span>
-                    <span>第14天 (今天)</span>
-                    <span>第28天</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
-                    <div className="bg-gradient-to-r from-pink-500 to-orange-400 h-2 rounded-full" style={{width: '50%'}}></div>
-                  </div>
+                  {(() => {
+                    const today = new Date()
+                    const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
+                    const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
+                    const progressPercentage = Math.min(100, (currentCycleDay / cycleStats.averageCycle) * 100)
+                    
+                    return (
+                      <>
+                        <div className="flex justify-between text-xs text-gray-500 mb-2">
+                          <span>第1天</span>
+                          <span>第{currentCycleDay}天 (今天)</span>
+                          <span>第{cycleStats.averageCycle}天</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+                          <div 
+                            className="bg-gradient-to-r from-pink-500 to-orange-400 h-2 rounded-full transition-all duration-300" 
+                            style={{width: `${progressPercentage}%`}}
+                          ></div>
+                        </div>
+                      </>
+                    )
+                  })()}
                   <div className="grid grid-cols-4 gap-2 text-xs">
                     <div className="text-center">
                       <div className="w-3 h-3 bg-red-500 rounded-full mx-auto mb-1"></div>
                       <span className="text-gray-600">月经期</span>
-                      <div className="text-gray-500">1-5天</div>
+                      <div className="text-gray-500">1-{cycleStats.periodDays}天</div>
                     </div>
                     <div className="text-center">
                       <div className="w-3 h-3 bg-green-500 rounded-full mx-auto mb-1"></div>
                       <span className="text-gray-600">卵泡期</span>
-                      <div className="text-gray-500">6-13天</div>
+                      <div className="text-gray-500">{cycleStats.periodDays + 1}-{cycleStats.ovulationDay - 1}天</div>
                     </div>
                     <div className="text-center">
-                      <div className="w-3 h-3 bg-orange-500 rounded-full mx-auto mb-1 ring-2 ring-orange-300"></div>
-                      <span className="text-orange-600 font-semibold">排卵期</span>
-                      <div className="text-orange-600">14-16天</div>
+                      <div className={`w-3 h-3 bg-orange-500 rounded-full mx-auto mb-1 ${(() => {
+                        const today = new Date()
+                        const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
+                        const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
+                        return currentCycleDay >= cycleStats.ovulationDay - 1 && currentCycleDay <= cycleStats.ovulationDay + 1 ? 'ring-2 ring-orange-300' : ''
+                      })()}`}></div>
+                      <span className={`${(() => {
+                        const today = new Date()
+                        const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
+                        const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
+                        return currentCycleDay >= cycleStats.ovulationDay - 1 && currentCycleDay <= cycleStats.ovulationDay + 1 ? 'text-orange-600 font-semibold' : 'text-gray-600'
+                      })()}`}>排卵期</span>
+                      <div className={`${(() => {
+                        const today = new Date()
+                        const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
+                        const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
+                        return currentCycleDay >= cycleStats.ovulationDay - 1 && currentCycleDay <= cycleStats.ovulationDay + 1 ? 'text-orange-600' : 'text-gray-500'
+                      })()}`}>{cycleStats.ovulationDay - 1}-{cycleStats.ovulationDay + 1}天</div>
                     </div>
                     <div className="text-center">
                       <div className="w-3 h-3 bg-purple-500 rounded-full mx-auto mb-1"></div>
                       <span className="text-gray-600">黄体期</span>
-                      <div className="text-gray-500">17-28天</div>
+                      <div className="text-gray-500">{cycleStats.ovulationDay + 2}-{cycleStats.averageCycle}天</div>
                     </div>
                   </div>
                 </div>
