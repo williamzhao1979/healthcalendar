@@ -13,6 +13,7 @@ import {
   ExternalLink
 } from 'lucide-react'
 import { OneDriveSyncState, OneDriveSyncActions, formatSyncTime } from '../hooks/useOneDriveSync'
+import { OneDriveDisconnectModal } from './OneDriveDisconnectModal'
 import MobileCompatibilityUtils from '../lib/mobileCompatibility'
 
 interface OneDriveSyncToggleProps {
@@ -32,6 +33,7 @@ export const OneDriveSyncToggle: React.FC<OneDriveSyncToggleProps> = ({
 }) => {
   const [isToggling, setIsToggling] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false)
   const [deviceInfo, setDeviceInfo] = useState<any>(null)
 
   useEffect(() => {
@@ -63,14 +65,26 @@ export const OneDriveSyncToggle: React.FC<OneDriveSyncToggleProps> = ({
           }
         }
       } else {
-        // 禁用同步
-        await oneDriveActions.disconnect()
+        // 禁用同步 - 显示确认对话框
+        setShowDisconnectModal(true)
       }
     } catch (error) {
       console.error('同步开关操作失败:', error)
     } finally {
       setIsToggling(false)
     }
+  }
+
+  // 处理断开连接确认
+  const handleDisconnectConfirm = () => {
+    setShowDisconnectModal(false)
+    // 这里不需要做额外操作，因为OneDriveDisconnectModal内部会调用disconnect
+  }
+
+  // 处理断开连接取消
+  const handleDisconnectCancel = () => {
+    setShowDisconnectModal(false)
+    // 取消时不做任何操作，保持连接状态
   }
 
   // 获取开关状态
@@ -290,6 +304,16 @@ export const OneDriveSyncToggle: React.FC<OneDriveSyncToggleProps> = ({
           )}
         </div>
       )}
+      
+      {/* 断开连接确认模态框 */}
+      <OneDriveDisconnectModal
+        isOpen={showDisconnectModal}
+        onClose={handleDisconnectCancel}
+        onConfirm={handleDisconnectConfirm}
+        oneDriveState={oneDriveState}
+        oneDriveActions={oneDriveActions}
+        currentUser={currentUser}
+      />
     </div>
   )
 }

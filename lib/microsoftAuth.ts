@@ -271,7 +271,7 @@ export class MicrosoftAuthService {
                   state: '',
                   cloudGraphHostName: '',
                   msGraphHost: '',
-                } as AuthenticationResult
+                } as unknown as AuthenticationResult
               } else {
                 throw new Error('Silent token acquisition failed')
               }
@@ -473,17 +473,23 @@ if (redirectError instanceof Error && redirectError.message.includes('Redirectin
       
       const deviceInfo = getDeviceInfo()
       
-      // Mobile和移动端使用重定向登出
+      // Android Edge和移动端使用重定向登出
       if (deviceInfo.isAndroidEdge || deviceInfo.isMobile) {
-        console.log('Using redirect logout for mobile/Mobile')
+        console.log('Using redirect logout for mobile/Android Edge')
+        console.log('Redirect window.location.origin:', window.location.origin)
+        console.log('Redirect URI:', getRedirectUri())
         await this.msalInstance.logoutRedirect({
-          // console.log('redirecting to health-calendar after logout')
-          postLogoutRedirectUri: window.location.origin + '/health-calendar'
+          // postLogoutRedirectUri: window.location.origin + '/health-calendar'
+          postLogoutRedirectUri: window.location.origin
         })
       } else {
         // 桌面端使用弹窗登出
+        console.log('Using popup logout for desktop')
+        console.log('Redirect window.location.origin:', window.location.origin)
+        console.log('Redirect URI:', getRedirectUri())
         await this.msalInstance.logoutPopup({
-          postLogoutRedirectUri: window.location.origin + '/health-calendar'
+          // postLogoutRedirectUri: window.location.origin + '/health-calendar'
+          postLogoutRedirectUri: window.location.origin
         })
       }
       
