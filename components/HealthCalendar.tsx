@@ -35,6 +35,7 @@ import { AttachmentViewer } from './AttachmentViewer'
 import { Attachment } from '../types/attachment'
 import { OneDriveSyncModal } from './OneDriveSyncModal'
 import { OneDriveSyncToggle } from './OneDriveSyncToggle'
+import { getLocalDateString, isRecordOnLocalDate, formatLocalDateTime } from '../lib/dateUtils'
 import { set } from 'react-hook-form'
 
 // 简单的类型定义 - 避免复杂的语法
@@ -990,13 +991,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const getRecordDotsForDate = (date: Date) => {
     if (!currentUser) return []
     
-    const dateStr = date.toISOString().split('T')[0] // YYYY-MM-DD format
     const dots = []
 
-    // 检查是否有MyRecord记录
+    // 检查是否有MyRecord记录 - 使用时区安全的日期比较
     const hasMyRecord = myRecords.some(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag && record.userId === currentUser.id
+      return isRecordOnLocalDate(record.dateTime, date) && !record.delFlag && record.userId === currentUser.id
     })
     if (hasMyRecord) {
       dots.push({
@@ -1005,10 +1004,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       })
     }
 
-    // 检查是否有Stool记录
+    // 检查是否有Stool记录 - 使用时区安全的日期比较
     const hasStoolRecord = stoolRecords.some(record => {
-      const recordDate = new Date(record.date).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag && record.userId === currentUser.id
+      return isRecordOnLocalDate(record.date, date) && !record.delFlag && record.userId === currentUser.id
     })
     if (hasStoolRecord) {
       dots.push({
@@ -1017,10 +1015,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       })
     }
 
-    // 检查是否有Period记录
+    // 检查是否有Period记录 - 使用时区安全的日期比较
     const hasPeriodRecord = showPeriodRecords && periodRecords.some(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag && record.userId === currentUser.id
+      return isRecordOnLocalDate(record.dateTime, date) && !record.delFlag && record.userId === currentUser.id
     })
     if (hasPeriodRecord) {
       dots.push({
@@ -1029,10 +1026,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       })
     }
 
-    // 检查是否有Meal记录
+    // 检查是否有Meal记录 - 使用时区安全的日期比较
     const hasMealRecord = mealRecords.some(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag && record.userId === currentUser.id
+      return isRecordOnLocalDate(record.dateTime, date) && !record.delFlag && record.userId === currentUser.id
     })
     if (hasMealRecord) {
       dots.push({
@@ -1140,13 +1136,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const getRecordsForSelectedDate = () => {
     if (!selectedDate || !currentUser) return []
     
-    const dateStr = selectedDate.toISOString().split('T')[0]
     const allRecords: any[] = []
 
-    // MyRecords
+    // MyRecords - 使用时区安全的日期比较
     myRecords.forEach(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      if (recordDate === dateStr && !record.delFlag && record.userId === currentUser.id) {
+      if (isRecordOnLocalDate(record.dateTime, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'myRecord',
@@ -1155,10 +1149,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       }
     })
 
-    // Stool Records
+    // Stool Records - 使用时区安全的日期比较
     stoolRecords.forEach(record => {
-      const recordDate = new Date(record.date).toISOString().split('T')[0]
-      if (recordDate === dateStr && !record.delFlag && record.userId === currentUser.id) {
+      if (isRecordOnLocalDate(record.date, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'stool',
@@ -1167,11 +1160,10 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       }
     })
 
-    // Period Records (根据toggle状态)
+    // Period Records (根据toggle状态) - 使用时区安全的日期比较
     if (showPeriodRecords) {
       periodRecords.forEach(record => {
-        const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-        if (recordDate === dateStr && !record.delFlag && record.userId === currentUser.id) {
+        if (isRecordOnLocalDate(record.dateTime, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
           allRecords.push({
             ...record,
             type: 'period',
@@ -1181,10 +1173,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       })
     }
 
-    // Meal Records
+    // Meal Records - 使用时区安全的日期比较
     mealRecords.forEach(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      if (recordDate === dateStr && !record.delFlag && record.userId === currentUser.id) {
+      if (isRecordOnLocalDate(record.dateTime, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'meal',
@@ -1377,8 +1368,13 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   // 添加辅助函数
   const formatRecordTime = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    return formatLocalDateTime(dateStr, { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      year: undefined,
+      month: undefined,
+      day: undefined
+    })
   }
 
   const formatRecordDate = (dateStr: string) => {
@@ -3301,7 +3297,7 @@ const handleDataSync = useCallback(async () => {
                         <Calendar className="w-8 h-8 text-gray-400" />
                       </div>
                       <p className="text-gray-500 mb-4">这一天还没有记录</p>
-                      <div className="space-y-2">
+                      {/* <div className="space-y-2">
                         <button
                           onClick={() => {
                             setShowDateModal(false)
@@ -3311,7 +3307,7 @@ const handleDataSync = useCallback(async () => {
                         >
                           添加记录
                         </button>
-                      </div>
+                      </div> */}
                     </div>
                   )
                 }
@@ -3331,10 +3327,7 @@ const handleDataSync = useCallback(async () => {
                             </span>
                           </div>
                           <span className="text-xs text-gray-500">
-                            {new Date(record.dateTime || record.date).toLocaleTimeString('zh-CN', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
+                            {formatRecordTime(record.dateTime || record.date)}
                           </span>
                         </div>
                         
@@ -3388,7 +3381,7 @@ const handleDataSync = useCallback(async () => {
                 >
                   关闭
                 </button>
-                <button
+                {/* <button
                   onClick={() => {
                     setShowDateModal(false)
                     // 这里可以添加跳转到该日期记录详情的逻辑
@@ -3396,6 +3389,15 @@ const handleDataSync = useCallback(async () => {
                   className="px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
                 >
                   查看详情
+                </button> */}
+                <button
+                  onClick={() => {
+                    setShowDateModal(false)
+                    // 可以在这里添加跳转到记录页面的逻辑
+                  }}
+                  className="w-full px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                >
+                  添加记录
                 </button>
               </div>
             </div>
