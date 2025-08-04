@@ -2017,8 +2017,8 @@ useEffect(() => {
                 const isCurrentMonth = cellDate.getMonth() === calendarMonth
                 const displayDay = cellDate.getDate()
                 
-                // 获取该日期的记录圆点
-                const recordDots = isCurrentMonth ? getRecordDotsForDate(cellDate) : []
+                // 获取该日期的记录圆点 - 支持跨月份显示
+                const recordDots = getRecordDotsForDate(cellDate)
                 
                 return (
                   <div 
