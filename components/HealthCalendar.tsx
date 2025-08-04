@@ -3316,7 +3316,7 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* 记录列表 */}
+            {/* 记录列表 - 使用时间线UI */}
             <div className="p-4 max-h-96 overflow-y-auto">
               {(() => {
                 const records = getRecordsForSelectedDate()
@@ -3327,74 +3327,127 @@ useEffect(() => {
                         <Calendar className="w-8 h-8 text-gray-400" />
                       </div>
                       <p className="text-gray-500 mb-4">这一天还没有记录</p>
-                      {/* <div className="space-y-2">
-                        <button
-                          onClick={() => {
-                            setShowDateModal(false)
-                            // 可以在这里添加跳转到记录页面的逻辑
-                          }}
-                          className="w-full px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-                        >
-                          添加记录
-                        </button>
-                      </div> */}
                     </div>
                   )
                 }
 
+                // 按时间排序记录
+                const sortedRecords = records.sort((a, b) => {
+                  const dateA = new Date(a.dateTime || a.date)
+                  const dateB = new Date(b.dateTime || b.date)
+                  return dateB.getTime() - dateA.getTime()
+                })
+
                 return (
-                  <div className="space-y-3">
-                    {records.map((record, index) => (
-                      <div key={`${record.type}-${index}`} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            {record.type === 'myRecord' && <Heart className="w-4 h-4 text-blue-500" />}
-                            {record.type === 'stool' && <Sprout className="w-4 h-4 text-green-500" />}
-                            {record.type === 'period' && <Flower2 className="w-4 h-4 text-pink-500" />}
-                            {record.type === 'meal' && <Utensils className="w-4 h-4 text-orange-500" />}
-                            <span className="text-sm font-medium text-gray-900">
-                              {record.typeName}
-                            </span>
+                  <div className="timeline-container">
+                    <div className="timeline-line"></div>
+                    {sortedRecords.map((record, index) => (
+                      <div key={`${record.type}-${index}`} className="timeline-item">
+                        <div className="timeline-time">{formatRecordTime(record.dateTime || record.date)}</div>
+                        <div className="record-card rounded-xl p-2.5 shadow-sm transition-all relative">
+                          {/* 删除按钮 */}
+                          {(record.type === 'stool' || record.type === 'myRecord' || record.type === 'meal' || record.type === 'period') && (
+                            <button
+                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center transition-colors z-10"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (record.type === 'stool') {
+                                  deleteStoolRecord(record.id)
+                                } else if (record.type === 'myRecord') {
+                                  deleteMyRecord(record.id)
+                                } else if (record.type === 'meal') {
+                                  deleteMealRecord(record.id)
+                                } else if (record.type === 'period') {
+                                  deletePeriodRecord(record.id)
+                                }
+                              }}
+                              title="删除记录"
+                            >
+                              <Trash2 className="text-red-500 w-3 h-3" />
+                            </button>
+                          )}
+                          
+                          <div 
+                            className={`flex items-start ${
+                              record.type === 'stool' || record.type === 'myRecord' || record.type === 'meal' || record.type === 'period' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
+                            }`}
+                            onClick={() => {
+                              if (record.type === 'stool') {
+                                editStoolRecord(record.id)
+                              } else if (record.type === 'myRecord') {
+                                editMyRecord(record.id)
+                              } else if (record.type === 'meal') {
+                                editMealRecord(record.id)
+                              } else if (record.type === 'period') {
+                                editPeriodRecord(record.id)
+                              }
+                              setShowDateModal(false) // 编辑时关闭模态框
+                            }}
+                          >
+                            {/* Icon based on record type */}
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              record.type === 'meal' ? 'bg-orange-100' :
+                              record.type === 'stool' ? 'bg-green-100' :
+                              record.type === 'myRecord' ? 'bg-blue-100' :
+                              record.type === 'period' ? 'bg-pink-100' : 'bg-gray-100'
+                            }`}>
+                              {record.type === 'meal' && <Utensils className="text-orange-500 w-4 h-4" />}
+                              {record.type === 'stool' && <Sprout className="text-green-500 w-4 h-4" />}
+                              {record.type === 'myRecord' && <Heart className="text-blue-500 w-4 h-4" />}
+                              {record.type === 'period' && <Heart className="text-pink-500 w-4 h-4" />}
+                            </div>
+                            
+                            <div className="ml-2 flex-1 pr-8">
+                              <div className="flex justify-between items-start">
+                                <div className="text-sm font-semibold text-gray-900">
+                                  {record.typeName}
+                                </div>
+                                {(record.type === 'stool' || record.type === 'myRecord' || record.type === 'meal' || record.type === 'period') && (
+                                  <div className="text-xs text-gray-400">点击编辑</div>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-600 mt-0.5">
+                                {record.notes || record.content || '无备注'}
+                              </div>
+                              
+                              {/* 标签 */}
+                              {record.tags && record.tags.length > 0 && (
+                                <div className="flex items-center space-x-1.5 mt-1.5 flex-wrap gap-1">
+                                  {record.tags.slice(0, 3).map((tag: string, tagIndex: number) => (
+                                    <span 
+                                      key={tagIndex} 
+                                      className={`px-1.5 py-0.5 text-xs rounded-md ${
+                                        record.type === 'stool' ? 'bg-green-100 text-green-600' :
+                                        record.type === 'meal' ? 'bg-orange-100 text-orange-600' :
+                                        record.type === 'myRecord' ? 'bg-blue-100 text-blue-600' :
+                                        record.type === 'period' ? 'bg-pink-100 text-pink-600' :
+                                        'bg-gray-100 text-gray-600'
+                                      }`}
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {record.tags.length > 3 && (
+                                    <span className="px-1.5 py-0.5 text-xs rounded-md bg-gray-100 text-gray-600">
+                                      +{record.tags.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* 附件显示 */}
+                              {record.attachments && record.attachments.length > 0 && (
+                                <div className="mt-2">
+                                  <AttachmentViewer 
+                                    attachments={record.attachments}
+                                    onDownload={handleAttachmentDownload}
+                                    compact={true}
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <span className="text-xs text-gray-500">
-                            {formatRecordTime(record.dateTime || record.date)}
-                          </span>
                         </div>
-                        
-                        {/* 记录内容预览 */}
-                        <div className="text-sm text-gray-600">
-                          {record.notes || record.content || '无备注'}
-                        </div>
-                        
-                        {/* 标签 */}
-                        {record.tags && record.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {record.tags.slice(0, 3).map((tag: string, tagIndex: number) => (
-                              <span 
-                                key={tagIndex}
-                                className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            {record.tags.length > 3 && (
-                              <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">
-                                +{record.tags.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* 附件显示 */}
-                        {record.attachments && record.attachments.length > 0 && (
-                          <div className="mt-2">
-                            <AttachmentViewer 
-                              attachments={record.attachments}
-                              onDownload={handleAttachmentDownload}
-                              compact={true}
-                            />
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
