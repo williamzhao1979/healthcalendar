@@ -584,9 +584,11 @@ function MyRecordPageContent() {
   }
 
   const handleUserChange = async (user: UserType) => {
+    await adminService.setCurrentUser(user.id)
     // 更新用户活跃状态
     // await userDB.setActiveUser(user.id)
-    setCurrentUser(user)
+    // setCurrentUser(user)
+    setCurrentUser(users.find(u => u.id === user.id) || null)
     
     // 重新加载用户列表以更新活跃状态
     // const updatedUsers = await userDB.getAllUsers()

@@ -616,7 +616,9 @@ function PeriodPageContent() {
   }
 
   const handleUserChange = async (user: UserType) => {
-    setCurrentUser(user)
+    await adminService.setCurrentUser(user.id)
+    // setCurrentUser(user)
+    setCurrentUser(users.find(u => u.id === user.id) || null)
   }
 
   // 新的附件处理方法
