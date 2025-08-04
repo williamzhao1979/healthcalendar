@@ -24,7 +24,9 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
-  Calendar
+  Calendar,
+  Moon,
+  Sun
 } from 'lucide-react'
 import { userDB, User as UserType, UserUtils } from '../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../lib/dbVersion'
@@ -37,6 +39,7 @@ import { OneDriveSyncModal } from './OneDriveSyncModal'
 import { OneDriveSyncToggle } from './OneDriveSyncToggle'
 import { OneDriveDisconnectModal } from './OneDriveDisconnectModal'
 import { getLocalDateString, isRecordOnLocalDate, formatLocalDateTime } from '../lib/dateUtils'
+import { useTheme } from '../hooks/useTheme'
 import { set } from 'react-hook-form'
 
 // 简单的类型定义 - 避免复杂的语法
@@ -771,6 +774,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const [showOneDriveSyncModal, setShowOneDriveSyncModal] = useState(false)
   const [showOneDriveDisconnectModal, setShowOneDriveDisconnectModal] = useState(false)
   // const [activeTab, setActiveTab] = useState<'stool' | 'myrecord' | 'personal' | 'physical'>('stool')
+  
+  // 主题管理
+  const { resolvedTheme, toggleTheme } = useTheme()
 
   // 日历状态
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -1781,14 +1787,18 @@ useEffect(() => {
 }, [oneDriveState.isAuthenticated])
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen theme-bg-primary">
       {/* Background */}
-      <div className="fixed inset-0 hero-gradient"></div>
-      <div className="fixed inset-0 bg-white/10"></div>
+      <div className="fixed inset-0 header-gradient"></div>
+      <div className={`fixed inset-0 ${resolvedTheme === 'dark' ? 'bg-black/10' : 'bg-white/10'}`}></div>
       
       <div className="relative min-h-screen">
         {/* Header */}
-        <header className="sticky top-0 z-50 px-6 py-3 bg-white/25 backdrop-blur-md border-b border-white/20">
+        <header className={`sticky top-0 z-50 px-6 py-3 backdrop-blur-md border-b ${
+          resolvedTheme === 'dark' 
+            ? 'bg-gray-800/25 border-gray-600/20' 
+            : 'bg-white/25 border-white/20'
+        }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="relative">
@@ -1798,34 +1808,61 @@ useEffect(() => {
                 <div className="absolute inset-0 pulse-ring bg-green-500 bg-opacity-20 rounded-xl"></div>
               </div>
               <div>
-                <h1 className="text-base font-bold text-gray-800">健康日历</h1>
-                <p className="text-xs text-gray-600 font-medium">生活离不开吃喝拉撒</p>
+                <h1 className="text-base font-bold theme-text-primary">健康日历</h1>
+                <p className="text-xs theme-text-secondary font-medium">生活离不开吃喝拉撒</p>
               </div>
             </div>
             
             {/* User Profile */}
-            <div className="flex items-center">
+            <div className="flex items-center space-x-2">
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleTheme}
+                className={`flex items-center px-2 py-1 backdrop-blur-sm rounded-xl transition-all border ${
+                  resolvedTheme === 'dark' 
+                    ? 'bg-gray-700/30 hover:bg-gray-600/40 border-gray-600/20' 
+                    : 'bg-white/30 hover:bg-white/40 border-white/20'
+                }`}
+                title={resolvedTheme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
+              >
+                {resolvedTheme === 'dark' ? (
+                  <Sun className="w-4 h-4 theme-text-primary" />
+                ) : (
+                  <Moon className="w-4 h-4 theme-text-primary" />
+                )}
+              </button>
+              
               <div className="relative user-menu-container">
                 {currentUser && !isLoading && (
                   <div className="relative">
                     {/* User Button */}
                     <button 
                       onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                      className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20"
+                      className={`flex items-center space-x-1.5 px-2 py-1 backdrop-blur-sm rounded-xl transition-all border ${
+                        resolvedTheme === 'dark' 
+                          ? 'bg-gray-700/30 hover:bg-gray-600/40 border-gray-600/20' 
+                          : 'bg-white/30 hover:bg-white/40 border-white/20'
+                      }`}
                     >
                       <SafeAvatar
                         src={currentUser.avatarUrl}
                         alt="用户头像"
-                        className="w-5 h-5 rounded-full ring-1 ring-white/50 object-cover"
+                        className={`w-5 h-5 rounded-full ring-1 object-cover ${
+                          resolvedTheme === 'dark' ? 'ring-gray-400/50' : 'ring-white/50'
+                        }`}
                         fallbackClassName="w-5 h-5"
                       />
-                      <span className="text-xs font-semibold text-gray-800">{currentUser.name}</span>
-                      <ChevronLeft className={`w-3 h-3 text-gray-500 transform transition-transform ${isUserMenuOpen ? 'rotate-90' : '-rotate-90'}`} />
+                      <span className="text-xs font-semibold theme-text-primary">{currentUser.name}</span>
+                      <ChevronLeft className={`w-3 h-3 theme-text-tertiary transform transition-transform ${isUserMenuOpen ? 'rotate-90' : '-rotate-90'}`} />
                     </button>
 
                     {/* User Dropdown Menu */}
                     {isUserMenuOpen && (
-                      <div className="absolute top-full right-0 mt-1 w-48 bg-white/90 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg z-50">
+                      <div className={`absolute top-full right-0 mt-1 w-48 backdrop-blur-sm rounded-xl border shadow-lg z-50 user-menu ${
+                        resolvedTheme === 'dark' 
+                          ? 'bg-gray-800/90 border-gray-600/30' 
+                          : 'bg-white/90 border-white/30'
+                      }`}>
                         <div className="p-2">
                           {users.map((user) => (
                             <button
@@ -1834,8 +1871,10 @@ useEffect(() => {
                                 switchUser(user.id)
                                 setIsUserMenuOpen(false)
                               }}
-                              className={`w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg text-left hover:bg-white/50 transition-colors ${
-                                currentUser?.id === user.id ? 'bg-green-100/80 text-green-800' : 'text-gray-700'
+                              className={`w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                                currentUser?.id === user.id 
+                                  ? (resolvedTheme === 'dark' ? 'bg-green-800/50 text-green-300' : 'bg-green-100/80 text-green-800')
+                                  : `theme-text-secondary ${resolvedTheme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-white/50'}`
                               }`}
                             >
                               <SafeAvatar
@@ -1853,9 +1892,17 @@ useEffect(() => {
                   </div>
                 )}
                 {isLoading && (
-                  <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
-                    <div className="w-5 h-5 rounded-full bg-gray-300 animate-pulse"></div>
-                    <div className="w-10 h-3 bg-gray-300 rounded animate-pulse"></div>
+                  <div className={`flex items-center space-x-1.5 px-2 py-1 backdrop-blur-sm rounded-xl border ${
+                    resolvedTheme === 'dark' 
+                      ? 'bg-gray-700/30 border-gray-600/20' 
+                      : 'bg-white/30 border-white/20'
+                  }`}>
+                    <div className={`w-5 h-5 rounded-full animate-pulse ${
+                      resolvedTheme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'
+                    }`}></div>
+                    <div className={`w-10 h-3 rounded animate-pulse ${
+                      resolvedTheme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'
+                    }`}></div>
                   </div>
                 )}
               </div>
@@ -1871,8 +1918,8 @@ useEffect(() => {
                 <Utensils className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs text-gray-600">上次用餐</div>
-                <div className="text-sm font-bold text-gray-800 leading-tight">
+                <div className="text-xs theme-text-secondary">上次用餐</div>
+                <div className="text-sm font-bold theme-text-primary leading-tight">
                   {getTimeSinceLastMeal() || '无记录'}
                 </div>
               </div>
@@ -1882,22 +1929,22 @@ useEffect(() => {
                 <Sprout className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs text-gray-600">上次排便</div>
-                <div className="text-sm font-bold text-gray-800 leading-tight">
+                <div className="text-xs theme-text-secondary">上次排便</div>
+                <div className="text-sm font-bold theme-text-primary leading-tight">
                   {getTimeSinceLastStool() || '无记录'}
                 </div>
               </div>
             </div>
             <div 
-              className="stat-card rounded-xl p-2 flex items-center space-x-1.5 cursor-pointer hover:bg-white/80 transition-all"
+              className="stat-card stat-card-hoverable rounded-xl p-2 flex items-center space-x-1.5 cursor-pointer transition-all"
               onClick={() => setShowHealthStatsModal(true)}
             >
               <div className="health-icon soft w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Folder className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs text-gray-600">健康统计</div>
-                <div className="text-xs text-gray-500">点击查看</div>
+                <div className="text-xs theme-text-secondary">健康统计</div>
+                <div className="text-xs theme-text-tertiary">点击查看</div>
               </div>
             </div>
           </div>
@@ -1905,13 +1952,13 @@ useEffect(() => {
 
         {/* Calendar Section */}
         <main className="px-3 pb-6">
-          <div className="glass-morphism rounded-2xl p-3 mb-4 animate-fade-in shadow-2xl">
+          <div className="glass-morphism rounded-2xl p-3 mb-4 animate-fade-in shadow-2xl calendar-container">
             {/* Calendar Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-800">{calendarYear}年 {getMonthName(calendarMonth)}</h2>
-                  <p className="text-xs text-gray-600 mt-0.5">健康记录概览</p>
+                  <h2 className="text-xl font-bold theme-text-primary">{calendarYear}年 {getMonthName(calendarMonth)}</h2>
+                  <p className="text-xs theme-text-secondary mt-0.5">健康记录概览</p>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button onClick={goToPrivacyCalendar} className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm health-icon privacy">
@@ -1927,14 +1974,14 @@ useEffect(() => {
                   className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm"
                   title="上一个月"
                 >
-                  <ChevronLeft className="text-gray-700 w-4 h-4" />
+                  <ChevronLeft className="theme-text-primary w-4 h-4" />
                 </button>
                 <button 
                   onClick={handleNextMonth}
                   className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm"
                   title="下一个月"
                 >
-                  <ChevronRight className="text-gray-700 w-4 h-4" />
+                  <ChevronRight className="theme-text-primary w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -1943,7 +1990,7 @@ useEffect(() => {
             <div className="grid grid-cols-7 gap-1 mb-4">
               {/* Week Header */}
               {['日', '一', '二', '三', '四', '五', '六'].map((day, index) => (
-                <div key={index} className="text-center text-xs font-semibold text-gray-500 py-2">{day}</div>
+                <div key={index} className="text-center text-xs font-semibold theme-text-tertiary py-2">{day}</div>
               ))}
 
               {/* Calendar Days */}
@@ -1973,7 +2020,7 @@ useEffect(() => {
                     onClick={() => handleDateClick(cellDate)}
                     title={isCurrentMonth ? `查看 ${cellDate.getMonth() + 1}月${cellDate.getDate()}日 的记录` : ''}
                   >
-                    <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'text-gray-400' : 'text-gray-800'}`}>
+                    <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'theme-text-muted' : 'theme-text-primary'}`}>
                       {displayDay}
                     </span>
                     {/* 基于真实记录数据的圆点 */}
@@ -1997,26 +2044,26 @@ useEffect(() => {
             <div className="flex items-center justify-center space-x-3 pt-3 border-t border-white/20 flex-wrap gap-y-2">
               <div className="flex items-center space-x-1.5">
                 <div className="w-3 h-3 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-full shadow-sm"></div>
-                <span className="text-xs font-medium text-gray-700">饮食</span>
+                <span className="text-xs font-medium theme-text-secondary">饮食</span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full shadow-sm"></div>
-                <span className="text-xs font-medium text-gray-700">排便</span>
+                <span className="text-xs font-medium theme-text-secondary">排便</span>
               </div>
               {showPeriodRecords && (
                 <div className="flex items-center space-x-1.5">
                   <div className="w-3 h-3 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full shadow-sm"></div>
-                  <span className="text-xs font-medium text-gray-700">生理</span>
+                  <span className="text-xs font-medium theme-text-secondary">生理</span>
                 </div>
               )}
               <div className="flex items-center space-x-1.5">
                 <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-sm"></div>
-                <span className="text-xs font-medium text-gray-700">记录</span>
+                <span className="text-xs font-medium theme-text-secondary">记录</span>
               </div>
 
                   {/* 生理记录显示切换 */}
                   <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
-                    <span className="text-xs font-medium text-gray-700">生理</span>
+                    <span className="text-xs font-medium theme-text-secondary">生理</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -2037,22 +2084,36 @@ useEffect(() => {
           {/* Recent Records */}
           <div className="glass-morphism rounded-2xl p-3 shadow-2xl animate-fade-in">
             {/* Tab Navigation */}
-            <div className="flex items-center mb-4 bg-gray-50 rounded-xl p-0.5">
+            <div className={`flex items-center mb-4 rounded-xl p-0.5 ${
+              resolvedTheme === 'dark' ? 'bg-gray-800/50' : 'bg-gray-50'
+            }`}>
               <button 
                 onClick={() => switchTab('recent')} 
-                className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-all rounded-lg ${activeTab === 'recent' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-all rounded-lg ${
+                  activeTab === 'recent' 
+                    ? 'text-health-primary bg-white shadow-sm' 
+                    : 'theme-text-tertiary hover:theme-text-secondary'
+                }`}
               >
                 最近记录
               </button>
               <button 
                 onClick={() => switchTab('updates')} 
-                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'updates' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+                  activeTab === 'updates' 
+                    ? 'text-health-primary bg-white shadow-sm' 
+                    : 'theme-text-tertiary hover:theme-text-secondary'
+                }`}
               >
                 最近更新
               </button>
               <button 
                 onClick={() => switchTab('settings')} 
-                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'settings' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+                  activeTab === 'settings' 
+                    ? 'text-health-primary bg-white shadow-sm' 
+                    : 'theme-text-tertiary hover:theme-text-secondary'
+                }`}
               >
                 设置
               </button>
@@ -3335,7 +3396,8 @@ useEffect(() => {
                 const sortedRecords = records.sort((a, b) => {
                   const dateA = new Date(a.dateTime || a.date)
                   const dateB = new Date(b.dateTime || b.date)
-                  return dateB.getTime() - dateA.getTime()
+                  // return dateB.getTime() - dateA.getTime()
+                  return dateA.getTime() - dateB.getTime()
                 })
 
                 return (

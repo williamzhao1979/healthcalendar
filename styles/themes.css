@@ -1,0 +1,151 @@
+/* Theme CSS Variables */
+:root {
+  /* Light theme colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --bg-card: #ffffff;
+  --bg-header: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --text-muted: #d1d5db;
+  
+  --border-primary: #e5e7eb;
+  --border-secondary: #d1d5db;
+  
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  
+  /* Component specific */
+  --calendar-bg: #ffffff;
+  --calendar-cell-hover: #f3f4f6;
+  --calendar-today: #3b82f6;
+  --calendar-selected: #10b981;
+  
+  --stat-card-bg: rgba(255, 255, 255, 0.8);
+  --stat-card-border: rgba(255, 255, 255, 0.3);
+  --stat-card-hover: rgba(255, 255, 255, 0.9);
+  
+  --user-menu-bg: rgba(255, 255, 255, 0.9);
+  --user-menu-border: rgba(255, 255, 255, 0.3);
+  
+  --modal-bg: #ffffff;
+  --modal-overlay: rgba(0, 0, 0, 0.5);
+}
+
+/* Dark theme colors */
+[data-theme="dark"] {
+  --bg-primary: #1f2937;
+  --bg-secondary: #111827;
+  --bg-tertiary: #374151;
+  --bg-card: #1f2937;
+  --bg-header: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%);
+  
+  --text-primary: #ffffff;
+  --text-secondary: #e5e7eb;
+  --text-tertiary: #d1d5db;
+  --text-muted: #9ca3af;
+  
+  --border-primary: #374151;
+  --border-secondary: #4b5563;
+  
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  
+  /* Component specific */
+  --calendar-bg: #1f2937;
+  --calendar-cell-hover: #374151;
+  --calendar-today: #3b82f6;
+  --calendar-selected: #10b981;
+  
+  --stat-card-bg: rgba(17, 24, 39, 0.95);
+  --stat-card-border: rgba(75, 85, 99, 0.5);
+  --stat-card-hover: rgba(55, 65, 81, 0.7);
+  
+  --user-menu-bg: rgba(31, 41, 55, 0.9);
+  --user-menu-border: rgba(75, 85, 99, 0.3);
+  
+  --modal-bg: #1f2937;
+  --modal-overlay: rgba(0, 0, 0, 0.7);
+}
+
+/* Apply theme variables to components */
+.theme-bg-primary {
+  background-color: var(--bg-primary);
+}
+
+.theme-bg-secondary {
+  background-color: var(--bg-secondary);
+}
+
+.theme-bg-card {
+  background-color: var(--bg-card);
+}
+
+.theme-text-primary {
+  color: var(--text-primary);
+}
+
+.theme-text-secondary {
+  color: var(--text-secondary);
+}
+
+.theme-border-primary {
+  border-color: var(--border-primary);
+}
+
+.theme-shadow-md {
+  box-shadow: var(--shadow-md);
+}
+
+/* Calendar specific theming */
+.calendar-container {
+  background-color: var(--calendar-bg);
+}
+
+.calendar-cell:hover {
+  background-color: var(--calendar-cell-hover);
+}
+
+.stat-card {
+  background-color: var(--stat-card-bg);
+  border-color: var(--stat-card-border);
+}
+
+.stat-card-hoverable:hover {
+  background-color: var(--stat-card-hover) !important;
+}
+
+.user-menu {
+  background-color: var(--user-menu-bg);
+  border-color: var(--user-menu-border);
+}
+
+.modal-content {
+  background-color: var(--modal-bg);
+}
+
+.modal-overlay {
+  background-color: var(--modal-overlay);
+}
+
+/* Header gradient theming */
+.header-gradient {
+  background: var(--bg-header);
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Override transitions for specific animations that should be faster */
+.calendar-dot,
+.animate-spin,
+.animate-pulse {
+  transition: none;
+}
