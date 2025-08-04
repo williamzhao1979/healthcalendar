@@ -1285,23 +1285,31 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const selectRecordType = (type: string) => {
     closeRecordModal()
     
+    // 如果有选中的日期，格式化为 YYYY-MM-DD 格式
+    let dateParam = ''
+    if (selectedDate) {
+      const year = selectedDate.getFullYear()
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+      const day = String(selectedDate.getDate()).padStart(2, '0')
+      dateParam = `?date=${year}-${month}-${day}`
+    }
+    
     switch(type) {
       case 'meals':
-        console.log('选择了一日三餐记录')
-        // window.location.href = 'meal_page.html'
-        router.push('/meal')
+        console.log('选择了一日三餐记录', selectedDate ? `日期: ${dateParam}` : '')
+        router.push(`/meal${dateParam}`)
         break
       case 'stool':
-        console.log('选择了排便记录')
-        router.push('/stool')
+        console.log('选择了排便记录', selectedDate ? `日期: ${dateParam}` : '')
+        router.push(`/stool${dateParam}`)
         break
       case 'period':
-        console.log('选择了生理记录')
-        router.push('/period')
+        console.log('选择了生理记录', selectedDate ? `日期: ${dateParam}` : '')
+        router.push(`/period${dateParam}`)
         break
       case 'myrecord':
-        console.log('选择了我的记录')
-        router.push('/myrecord')
+        console.log('选择了我的记录', selectedDate ? `日期: ${dateParam}` : '')
+        router.push(`/myrecord${dateParam}`)
         break
     }
   }
@@ -3538,7 +3546,7 @@ useEffect(() => {
                 <button
                   onClick={() => {
                     setShowDateModal(false)
-                    // 可以在这里添加跳转到记录页面的逻辑
+                    setIsModalOpen(true)
                   }}
                   className="w-full px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
                 >
