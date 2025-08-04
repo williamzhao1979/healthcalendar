@@ -4,7 +4,10 @@ import React, { useState, useEffect } from 'react'
 import { useOneDriveSync, formatSyncTime } from '../../hooks/useOneDriveSync'
 import { CheckCircle, AlertCircle, RefreshCw, User, Database, Download, Smartphone, Monitor, Folder, File, FileText } from 'lucide-react'
 import CompatibilityChecker from '../../components/CompatibilityChecker'
+import MSALErrorRecovery from '../../components/MSALErrorRecovery'
+import OneDriveCompatibilityAlert from '../../components/OneDriveCompatibilityAlert'
 import { MobileCompatibilityUtils } from '../../lib/mobileCompatibility'
+import { microsoftAuth } from '../../lib/microsoftAuth'
 
 export default function OneDriveTestPage() {
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
@@ -35,6 +38,13 @@ export default function OneDriveTestPage() {
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-8">OneDrive 同步测试</h1>
+        
+        {/* OneDrive 兼容性检查 */}
+        <OneDriveCompatibilityAlert
+          isAvailable={oneDriveState.isOneDriveAvailable}
+          unavailabilityReason={oneDriveState.unavailabilityReason}
+          className="mb-6"
+        />
         
         {/* 设备信息 */}
         <div className="bg-slate-50 rounded-xl p-6 mb-6">
@@ -179,22 +189,18 @@ export default function OneDriveTestPage() {
             </div>
             
             {oneDriveState.error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-700 text-sm">{oneDriveState.error}</p>
-                {deviceInfo?.isMobile && oneDriveState.error.includes('crypto') && (
-                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                    <p className="text-yellow-800 text-xs">
-                      <strong>移动端加密API问题:</strong> 请尝试使用HTTPS访问或使用不同的浏览器
-                    </p>
-                  </div>
-                )}
-                <button
-                  onClick={oneDriveActions.clearError}
-                  className="mt-2 px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs rounded transition-colors"
-                >
-                  清除错误
-                </button>
-              </div>
+              <MSALErrorRecovery
+                error={new Error(oneDriveState.error)}
+                onRetry={() => oneDriveActions.checkConnection()}
+                onClearAuth={async () => {
+                  oneDriveActions.clearError()
+                  try {
+                    await microsoftAuth.logout()
+                  } catch (error) {
+                    console.warn('Logout failed during error recovery:', error)
+                  }
+                }}
+              />
             )}
           </div>
         </div>
