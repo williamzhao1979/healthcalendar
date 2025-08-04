@@ -267,7 +267,7 @@ export default function PeriodCalendarPage() {
         // Calculate predicted cycle phases based on cycle stats
         const daysSinceLastPeriod = getDaysSinceLastPeriod(dayDate)
         
-        if (daysSinceLastPeriod >= 0 && stats.averageCycle > 0) {
+        if (daysSinceLastPeriod >= 0) {
           const cycleDay = (daysSinceLastPeriod % stats.averageCycle) + 1
           
           if (cycleDay <= stats.periodDays) {
@@ -421,10 +421,10 @@ export default function PeriodCalendarPage() {
     let daysSinceLastPeriod: number = 0
     
     if (hasInsufficientData) {
-      // Single cycle or no cycles - show data but mark as insufficient
-      averageCycle = 0 // Will display as "?"
-      periodDays = periodLengths.length > 0 ? periodLengths[0] : 0
-      daysToNext = 0 // Will display as "?"
+      // Single cycle or no cycles - use default 28-day cycle with annotation
+      averageCycle = 28 // Default cycle length when insufficient data
+      periodDays = periodLengths.length > 0 ? periodLengths[0] : 5 // Use actual or default 5 days
+      daysToNext = 0 // Don't predict next period with insufficient data
     } else if (isIrregular) {
       // Few cycles - show calculated data but may be unreliable
       averageCycle = cycleLengths.length > 0 ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length) : 0
@@ -580,6 +580,7 @@ export default function PeriodCalendarPage() {
   }
 
   const handleUserChange = async (user: UserType) => {
+    await adminService.setCurrentUser(user.id)
     setCurrentUser(user)
     await loadPeriodRecords(user.id)
   }
@@ -764,9 +765,20 @@ export default function PeriodCalendarPage() {
                 <Calendar className="text-white text-xs" />
               </div>
               <div className="text-base font-bold text-gray-800 leading-tight">
-                {cycleStats.averageCycle === 0 ? '?' : cycleStats.averageCycle}
+                {(() => {
+                  const hasInsufficientData = Array.isArray(periodRecords) && periodRecords.length > 0 ? 
+                    (periodRecords.filter(r => r.userId === currentUser?.id && !r.delFlag).length < 2) : true
+                  return hasInsufficientData && cycleStats.averageCycle === 28 ? 
+                    <span className="text-orange-600">28*</span> : cycleStats.averageCycle
+                })()}
               </div>
-              <div className="text-xs text-gray-600">平均周期</div>
+              <div className="text-xs text-gray-600">
+                {(() => {
+                  const hasInsufficientData = Array.isArray(periodRecords) && periodRecords.length > 0 ? 
+                    (periodRecords.filter(r => r.userId === currentUser?.id && !r.delFlag).length < 2) : true
+                  return hasInsufficientData && cycleStats.averageCycle === 28 ? '平均周期*' : '平均周期'
+                })()}
+              </div>
             </div>
             <div className="bg-gradient-to-b from-white to-gray-50 rounded-2xl p-2.5 flex flex-col items-center text-center shadow-lg border border-white/40">
               <div className="w-7 h-7 bg-red-500 rounded-xl flex items-center justify-center flex-shrink-0 mb-1">
@@ -808,13 +820,15 @@ export default function PeriodCalendarPage() {
                     const today = new Date()
                     if (currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear()) {
                       const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
-                      if (daysSinceLastPeriod >= 0 && cycleStats.averageCycle > 0) {
+                      if (daysSinceLastPeriod >= 0) {
                         const cycleDay = (daysSinceLastPeriod % cycleStats.averageCycle) + 1
                         const phaseInfo = getCyclePhaseInfo()
                         return `第${cycleDay}天 · ${phaseInfo.title}`
                       }
                     }
-                    return cycleStats.averageCycle === 0 ? '需要更多数据来分析周期' : '查看您的周期数据'
+                    const hasInsufficientData = Array.isArray(periodRecords) && periodRecords.length > 0 ? 
+                      (periodRecords.filter(r => r.userId === currentUser?.id && !r.delFlag).length < 2) : true
+                    return hasInsufficientData ? '基于标准28天周期显示 (需要更多数据)' : '查看您的周期数据'
                   })()}
                 </p>
               </div>
@@ -1049,15 +1063,7 @@ export default function PeriodCalendarPage() {
                     const today = new Date()
                     const daysSinceLastPeriod = getDaysSinceLastPeriod(today)
                     
-                    // Handle insufficient data case
-                    if (cycleStats.averageCycle === 0) {
-                      return (
-                        <div className="text-center py-4">
-                          <div className="text-sm text-gray-500 mb-2">数据不足</div>
-                          <div className="text-xs text-gray-400">需要更多周期数据来显示进度</div>
-                        </div>
-                      )
-                    }
+                    // Always show progress using actual or default 28-day cycle
                     
                     const currentCycleDay = daysSinceLastPeriod >= 0 ? (daysSinceLastPeriod % cycleStats.averageCycle) + 1 : 1
                     const progressPercentage = Math.min(100, (currentCycleDay / cycleStats.averageCycle) * 100)
@@ -1078,7 +1084,7 @@ export default function PeriodCalendarPage() {
                       </>
                     )
                   })()}
-                  {cycleStats.averageCycle > 0 && (
+                  {(
                     <div className="grid grid-cols-4 gap-2 text-xs">
                       <div className="text-center">
                         <div className="w-3 h-3 bg-red-500 rounded-full mx-auto mb-1"></div>
@@ -1158,6 +1164,27 @@ export default function PeriodCalendarPage() {
               <span>健康日历</span>
             </button>
           </div>
+
+          {/* Data Explanation Note */}
+          {(() => {
+            const hasInsufficientData = Array.isArray(periodRecords) && periodRecords.length > 0 ? 
+              (periodRecords.filter(r => r.userId === currentUser?.id && !r.delFlag).length < 2) : true
+            return hasInsufficientData ? (
+              <div className="bg-orange-50/80 border border-orange-200 rounded-2xl p-4 mb-6">
+                <div className="flex items-start space-x-3">
+                  <div className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-xs font-bold">*</span>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-orange-800 mb-1">数据说明</h4>
+                    <p className="text-xs text-orange-700">
+                      标记*的数据基于标准28天周期计算。记录更多周期数据后，将显示您的个人化周期统计。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null
+          })()}
 
           {/* Period Records Timeline */}
           <div className="bg-white/25 backdrop-blur-md rounded-3xl p-6 shadow-2xl border border-white/30">

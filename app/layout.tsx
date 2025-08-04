@@ -1,7 +1,9 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter } from "next/font/google" 
 import "./globals.css"
+import AndroidEdgeErrorBoundary from "../components/AndroidEdgeErrorBoundary"
+import MSALRedirectHandler from "../components/MSALRedirectHandler"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -19,7 +21,11 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={inter.className}>
-        <main className="min-h-screen">{children}</main>
+        <AndroidEdgeErrorBoundary>
+          <MSALRedirectHandler>
+            <main className="min-h-screen">{children}</main>
+          </MSALRedirectHandler>
+        </AndroidEdgeErrorBoundary>
       </body>
     </html>
   )

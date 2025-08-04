@@ -35,6 +35,8 @@ import { AttachmentViewer } from './AttachmentViewer'
 import { Attachment } from '../types/attachment'
 import { OneDriveSyncModal } from './OneDriveSyncModal'
 import { OneDriveSyncToggle } from './OneDriveSyncToggle'
+import { OneDriveDisconnectModal } from './OneDriveDisconnectModal'
+import { getLocalDateString, isRecordOnLocalDate, formatLocalDateTime } from '../lib/dateUtils'
 import { set } from 'react-hook-form'
 
 // 简单的类型定义 - 避免复杂的语法
@@ -45,6 +47,7 @@ type StoolColor = 'brown' | 'dark' | 'light' | 'yellow' | 'green' | 'black' | 'r
 
 type StoolRecord = BaseRecord & {
   date: string
+  dateTime?: string // Optional for backward compatibility
   status: StoolStatus
   type: StoolType
   volume: StoolVolume
@@ -147,10 +150,16 @@ class StoolDB implements StoolDatabase {
             records.forEach((record: any) => {
               const now = new Date().toISOString()
               if (!record.createdAt) {
-                record.createdAt = record.date || now
+                record.createdAt = record.dateTime || record.date || now
               }
               if (!record.updatedAt) {
-                record.updatedAt = record.date || now
+                record.updatedAt = record.dateTime || record.date || now
+              }
+              // Ensure both date and dateTime fields exist for compatibility
+              if (record.dateTime && !record.date) {
+                record.date = record.dateTime
+              } else if (record.date && !record.dateTime) {
+                record.dateTime = record.date
               }
               stoolRecordsStore.put(record)
             })
@@ -760,6 +769,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // OneDrive同步状态和模态框
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
   const [showOneDriveSyncModal, setShowOneDriveSyncModal] = useState(false)
+  const [showOneDriveDisconnectModal, setShowOneDriveDisconnectModal] = useState(false)
   // const [activeTab, setActiveTab] = useState<'stool' | 'myrecord' | 'personal' | 'physical'>('stool')
 
   // 日历状态
@@ -813,6 +823,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
     // 初始化用户数据
     initializeUsers()
+    
+    // 检查OneDrive连接状态（处理重定向后的认证状态）
+    oneDriveActions.checkConnection().catch(error => {
+      console.warn('OneDrive连接检查失败:', error)
+    })
     
     // 点击外部关闭下拉菜单
     const handleClickOutside = (event: MouseEvent) => {
@@ -903,7 +918,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       console.log('loadStoolRecords: 获取到记录数:', records.length)
       console.log('loadStoolRecords: 记录详情:', records)
       // 按日期倒序排列
-      records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      records.sort((a, b) => new Date(b.dateTime || b.date).getTime() - new Date(a.dateTime || a.date).getTime())
       setStoolRecords(records)
     } catch (error) {
       console.error('获取排便记录失败:', error)
@@ -988,13 +1003,13 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   // 获取特定日期的记录圆点
   const getRecordDotsForDate = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0] // YYYY-MM-DD format
+    if (!currentUser) return []
+    
     const dots = []
 
-    // 检查是否有MyRecord记录
+    // 检查是否有MyRecord记录 - 使用时区安全的日期比较
     const hasMyRecord = myRecords.some(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag
+      return isRecordOnLocalDate(record.dateTime, date) && !record.delFlag && record.userId === currentUser.id
     })
     if (hasMyRecord) {
       dots.push({
@@ -1003,10 +1018,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       })
     }
 
-    // 检查是否有Stool记录
+    // 检查是否有Stool记录 - 使用时区安全的日期比较
     const hasStoolRecord = stoolRecords.some(record => {
-      const recordDate = new Date(record.date).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag
+      return isRecordOnLocalDate(record.dateTime || record.date, date) && !record.delFlag && record.userId === currentUser.id
     })
     if (hasStoolRecord) {
       dots.push({
@@ -1015,10 +1029,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       })
     }
 
-    // 检查是否有Period记录
+    // 检查是否有Period记录 - 使用时区安全的日期比较
     const hasPeriodRecord = showPeriodRecords && periodRecords.some(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag
+      return isRecordOnLocalDate(record.dateTime, date) && !record.delFlag && record.userId === currentUser.id
     })
     if (hasPeriodRecord) {
       dots.push({
@@ -1027,10 +1040,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       })
     }
 
-    // 检查是否有Meal记录
+    // 检查是否有Meal记录 - 使用时区安全的日期比较
     const hasMealRecord = mealRecords.some(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      return recordDate === dateStr && !record.delFlag
+      return isRecordOnLocalDate(record.dateTime, date) && !record.delFlag && record.userId === currentUser.id
     })
     if (hasMealRecord) {
       dots.push({
@@ -1078,11 +1090,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     // 获取当前用户的最新排便记录
     const userStoolRecords = stoolRecords
       .filter(record => record.userId === currentUser.id && !record.delFlag)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => new Date(b.dateTime || b.date).getTime() - new Date(a.dateTime || a.date).getTime())
 
     if (userStoolRecords.length === 0) return null
 
-    const lastStoolTime = new Date(userStoolRecords[0].date)
+    const lastStoolTime = new Date(userStoolRecords[0].dateTime || userStoolRecords[0].date)
     const now = new Date()
     const diffMs = now.getTime() - lastStoolTime.getTime()
     
@@ -1136,15 +1148,13 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   // 获取选中日期的所有记录
   const getRecordsForSelectedDate = () => {
-    if (!selectedDate) return []
+    if (!selectedDate || !currentUser) return []
     
-    const dateStr = selectedDate.toISOString().split('T')[0]
     const allRecords: any[] = []
 
-    // MyRecords
+    // MyRecords - 使用时区安全的日期比较
     myRecords.forEach(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      if (recordDate === dateStr && !record.delFlag) {
+      if (isRecordOnLocalDate(record.dateTime, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'myRecord',
@@ -1153,10 +1163,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       }
     })
 
-    // Stool Records
+    // Stool Records - 使用时区安全的日期比较
     stoolRecords.forEach(record => {
-      const recordDate = new Date(record.date).toISOString().split('T')[0]
-      if (recordDate === dateStr && !record.delFlag) {
+      if (isRecordOnLocalDate(record.dateTime || record.date, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'stool',
@@ -1165,11 +1174,10 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       }
     })
 
-    // Period Records (根据toggle状态)
+    // Period Records (根据toggle状态) - 使用时区安全的日期比较
     if (showPeriodRecords) {
       periodRecords.forEach(record => {
-        const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-        if (recordDate === dateStr && !record.delFlag) {
+        if (isRecordOnLocalDate(record.dateTime, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
           allRecords.push({
             ...record,
             type: 'period',
@@ -1179,10 +1187,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       })
     }
 
-    // Meal Records
+    // Meal Records - 使用时区安全的日期比较
     mealRecords.forEach(record => {
-      const recordDate = new Date(record.dateTime).toISOString().split('T')[0]
-      if (recordDate === dateStr && !record.delFlag) {
+      if (isRecordOnLocalDate(record.dateTime, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'meal',
@@ -1375,8 +1382,13 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   // 添加辅助函数
   const formatRecordTime = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    return formatLocalDateTime(dateStr, { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      year: undefined,
+      month: undefined,
+      day: undefined
+    })
   }
 
   const formatRecordDate = (dateStr: string) => {
@@ -1956,7 +1968,7 @@ const handleDataSync = useCallback(async () => {
                         {recordDots.map((dot, index) => (
                           <div 
                             key={`${dot.type}-${index}`}
-                            className={`calendar-dot bg-gradient-to-r ${isToday ? 'from-white to-white' : dot.color}`}
+                            className={`calendar-dot bg-gradient-to-r ${dot.color} ${isToday ? 'ring-2 ring-white' : ''}`}
                             title={`${dot.type} 记录`}
                           ></div>
                         ))}
@@ -2097,7 +2109,7 @@ const handleDataSync = useCallback(async () => {
                       const stoolRecordsFormatted: DisplayRecord[] = stoolRecords.map(record => ({
                         id: record.id,
                         type: 'stool',
-                        date: record.date,
+                        date: record.dateTime || record.date,
                         title: '排便记录',
                         description: record.notes || `${getStatusText(record.status)}，${getTypeText(record.type)}`,
                         tags: [
@@ -2290,7 +2302,7 @@ const handleDataSync = useCallback(async () => {
                     <div>排便记录数: {stoolRecords.length}</div>
                     <div>加载状态: {isLoading ? '加载中...' : '已完成'}</div>
                     {stoolRecords.length > 0 && (
-                      <div>记录详情: {stoolRecords.map(r => `ID:${r.id.slice(-4)},日期:${r.date.slice(0,10)}`).join(', ')}</div>
+                      <div>记录详情: {stoolRecords.map(r => `ID:${r.id.slice(-4)},日期:${(r.dateTime || r.date).slice(0,10)}`).join(', ')}</div>
                     )}
                   </div> */}
                   
@@ -2304,7 +2316,7 @@ const handleDataSync = useCallback(async () => {
                         id: record.id,
                         type: 'stool',
                         date: record.updatedAt, // 使用 updatedAt 而不是 date
-                        originalDate: record.date, // 保留原始日期用于显示
+                        originalDate: record.dateTime || record.date, // 保留原始日期用于显示
                         title: '排便记录',
                         description: record.notes || `${getStatusText(record.status)}，${getTypeText(record.type)}`,
                         tags: [
@@ -2535,6 +2547,7 @@ const handleDataSync = useCallback(async () => {
                           oneDriveActions={oneDriveActions}
                           currentUser={currentUser}
                           onOpenModal={() => setShowOneDriveSyncModal(true)}
+                          onOpenDisconnectModal={() => setShowOneDriveDisconnectModal(true)}
                         />
 
                         {/* 数据同步按钮 - 仅在OneDrive已登录时显示 */}
@@ -2847,16 +2860,17 @@ const handleDataSync = useCallback(async () => {
                   </button>
 
                   {/* 我的记录 */}
-                  <button onClick={() => selectRecordType('myrecord')} className="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
-                    <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center">
-                      <Folder className="text-purple-500 text-lg" />
+                  <button onClick={() => selectRecordType('myrecord')} className="w-full record-type-option flex items-center space-x-3 p-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                      <Folder className="text-purple-500 text-base" />
                     </div>
                     <div className="text-left flex-1">
-                      <div className="text-base font-semibold text-gray-900">我的记录</div>
-                      <div className="text-sm text-gray-500">随记</div>
+                      <div className="text-sm font-semibold text-gray-900">我的记录</div>
+                      <div className="text-xs text-gray-500">随记</div>
                     </div>
-                    <ChevronRight className="text-gray-400" />
+                    <ChevronRight className="text-gray-400 w-4 h-4" />
                   </button>
+
                 </div>
 
                 {/* Cancel Button */}
@@ -3299,7 +3313,7 @@ const handleDataSync = useCallback(async () => {
                         <Calendar className="w-8 h-8 text-gray-400" />
                       </div>
                       <p className="text-gray-500 mb-4">这一天还没有记录</p>
-                      <div className="space-y-2">
+                      {/* <div className="space-y-2">
                         <button
                           onClick={() => {
                             setShowDateModal(false)
@@ -3309,7 +3323,7 @@ const handleDataSync = useCallback(async () => {
                         >
                           添加记录
                         </button>
-                      </div>
+                      </div> */}
                     </div>
                   )
                 }
@@ -3329,10 +3343,7 @@ const handleDataSync = useCallback(async () => {
                             </span>
                           </div>
                           <span className="text-xs text-gray-500">
-                            {new Date(record.dateTime || record.date).toLocaleTimeString('zh-CN', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
+                            {formatRecordTime(record.dateTime || record.date)}
                           </span>
                         </div>
                         
@@ -3386,7 +3397,7 @@ const handleDataSync = useCallback(async () => {
                 >
                   关闭
                 </button>
-                <button
+                {/* <button
                   onClick={() => {
                     setShowDateModal(false)
                     // 这里可以添加跳转到该日期记录详情的逻辑
@@ -3394,6 +3405,15 @@ const handleDataSync = useCallback(async () => {
                   className="px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
                 >
                   查看详情
+                </button> */}
+                <button
+                  onClick={() => {
+                    setShowDateModal(false)
+                    // 可以在这里添加跳转到记录页面的逻辑
+                  }}
+                  className="w-full px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                >
+                  添加记录
                 </button>
               </div>
             </div>
@@ -3409,6 +3429,16 @@ const handleDataSync = useCallback(async () => {
         oneDriveActions={oneDriveActions}
         currentUser={currentUser}
         onSyncComplete={refreshUsers}
+      />
+
+      {/* OneDrive断开连接模态框 */}
+      <OneDriveDisconnectModal
+        isOpen={showOneDriveDisconnectModal}
+        onClose={() => setShowOneDriveDisconnectModal(false)}
+        onConfirm={() => setShowOneDriveDisconnectModal(false)}
+        oneDriveState={oneDriveState}
+        oneDriveActions={oneDriveActions}
+        currentUser={currentUser}
       />
     </div>
   )

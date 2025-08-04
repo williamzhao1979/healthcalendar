@@ -34,6 +34,7 @@ import { Attachment } from '../../types/attachment'
 
 interface StoolRecord extends BaseRecord {
   date: string
+  dateTime: string
   status: 'normal' | 'difficult' | 'constipation' | 'diarrhea'
   type: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 'unknown'
   volume: 'small' | 'medium' | 'large'
@@ -458,10 +459,10 @@ function StoolPageContent() {
       setDateTime(localDateTime.toISOString().slice(0, 16))
 
       // 如果是编辑模式，加载记录数据
-      if (isEditMode && editId) {
-        const record = await adminService.getUserRecord('stoolRecords', currentUser?.id, editId)
+      if (isEditMode && editId && currentUser) {
+        const record = await adminService.getUserRecord('stoolRecords', currentUser.id, editId)
         if (record) {
-          setDateTime(record.dateTime)
+          setDateTime(record.dateTime || record.date)
           setStatus(record.status)
           setType(record.type)
           setVolume(record.volume)
@@ -494,6 +495,7 @@ function StoolPageContent() {
 
       const recordData = {
         userId: currentUser.id,
+        date: dateTime, // For compatibility with HealthCalendar component
         dateTime,
         status,
         type,

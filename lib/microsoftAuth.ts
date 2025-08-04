@@ -9,10 +9,12 @@ type AuthState = {
     accessToken: string;
 } 
 
-// 检测是否为移动设备
-const isMobile = () => {
-  if (typeof window === 'undefined') return false
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+// 检测设备类型和浏览器
+const getDeviceInfo = () => {
+  if (typeof window === 'undefined') {
+    return { isMobile: false, isAndroidEdge: false, isWebView: false }
+  }
+  return MobileCompatibilityUtils.detectDevice()
 }
 
 // 检测是否为HTTPS环境
@@ -37,47 +39,65 @@ const getRedirectUri = () => {
   }
 }
 
-// MSAL 配置
-const msalConfig: Configuration = {
-  auth: {
-    clientId: process.env.NEXT_PUBLIC_MICROSOFT_CLIENT_ID || '',
-    authority: 'https://login.microsoftonline.com/common',
-    redirectUri: getRedirectUri(),
-  },
-  cache: {
-    // 移动端使用sessionStorage，桌面端使用localStorage
-    cacheLocation: isMobile() ? BrowserCacheLocation.SessionStorage : BrowserCacheLocation.LocalStorage,
-    // 移动端启用cookie存储以提高兼容性
-    storeAuthStateInCookie: isMobile() || !isSecureContext(),
-    // 添加安全上下文检查
-    secureCookies: isSecureContext(),
-  },
-  system: {
-    // 移动端优化配置
-    windowHashTimeout: 60000, // 增加超时时间
-    iframeHashTimeout: 6000,
-    // 日志配置
-    loggerOptions: {
-      loggerCallback: (level, message, containsPii) => {
-        if (containsPii) return
-        switch (level) {
-          case 0: // Error
-            console.error('[MSAL Error]:', message)
-            break
-          case 1: // Warning  
-            console.warn('[MSAL Warning]:', message)
-            break
-          case 2: // Info
-            console.info('[MSAL Info]:', message)
-            break
-          case 3: // Verbose
-            console.debug('[MSAL Debug]:', message)
-            break
-        }
-      },
-      piiLoggingEnabled: false,
+// MSAL 基础配置
+const createMSALConfig = (): Configuration => {
+  const deviceInfo = getDeviceInfo()
+  
+  const baseConfig: Configuration = {
+    auth: {
+      clientId: process.env.NEXT_PUBLIC_MICROSOFT_CLIENT_ID || '',
+      authority: 'https://login.microsoftonline.com/common',
+      redirectUri: getRedirectUri(),
     },
-  },
+    cache: {
+      // Mobile优先使用localStorage
+      cacheLocation: deviceInfo.isAndroidEdge ? BrowserCacheLocation.LocalStorage : 
+                    (deviceInfo.isMobile ? BrowserCacheLocation.SessionStorage : BrowserCacheLocation.LocalStorage),
+      // Mobile和所有移动端启用cookie存储
+      storeAuthStateInCookie: deviceInfo.isMobile || !isSecureContext(),
+      // 安全cookie配置
+      secureCookies: isSecureContext(),
+      // Mobile启用声明缓存
+      claimsBasedCachingEnabled: deviceInfo.isAndroidEdge,
+    },
+    system: {
+      // Mobile特殊超时配置
+      windowHashTimeout: deviceInfo.isAndroidEdge ? 90000 : (deviceInfo.isMobile ? 60000 : 60000),
+      iframeHashTimeout: deviceInfo.isAndroidEdge ? 10000 : 6000,
+      // Mobile导航延迟
+      navigateFrameWait: deviceInfo.isAndroidEdge ? 500 : 0,
+      // 安全配置
+      allowRedirectInIframe: deviceInfo.isWebView, // 仅WebView允许iframe重定向
+      // 日志配置
+      loggerOptions: {
+        loggerCallback: (level, message, containsPii) => {
+          if (containsPii) return
+          const prefix = deviceInfo.isAndroidEdge ? '[MSAL-AndroidEdge]' : '[MSAL]'
+          switch (level) {
+            case 0: // Error
+              console.error(`${prefix} Error:`, message)
+              break
+            case 1: // Warning  
+              console.warn(`${prefix} Warning:`, message)
+              break
+            case 2: // Info
+              console.info(`${prefix} Info:`, message)
+              break
+            case 3: // Verbose
+              if (deviceInfo.isAndroidEdge) {
+                console.debug(`${prefix} Debug:`, message)
+              }
+              break
+          }
+        },
+        piiLoggingEnabled: false,
+        logLevel: deviceInfo.isAndroidEdge ? 1 : 2, // 更详细的Mobile日志
+      },
+    },
+  }
+
+  // 使用移动兼容性工具的推荐配置
+  return MobileCompatibilityUtils.getRecommendedMSALConfig(baseConfig)
 }
 
 // 权限范围
@@ -91,6 +111,8 @@ export class MicrosoftAuthService {
   private initializationPromise: Promise<void> | null = null
   private isInitialized = false
   private cryptoUnavailable = false
+  private tokenRenewalTimer: NodeJS.Timeout | null = null
+  private tokenRenewalPromise: Promise<string | null> | null = null
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -102,9 +124,17 @@ export class MicrosoftAuthService {
         return
       }
       
-      // Use mobile-optimized MSAL config
-      const optimizedConfig = MobileCompatibilityUtils.getRecommendedMSALConfig(msalConfig)
-      this.msalInstance = new PublicClientApplication(optimizedConfig)
+      // Create Mobile optimized MSAL config
+      const msalConfig = createMSALConfig()
+      const deviceInfo = getDeviceInfo()
+      
+      if (deviceInfo.isAndroidEdge) {
+        console.log('Initializing MSAL for Mobile with optimized configuration')
+      } else if (deviceInfo.isMobile) {
+        console.log('Initializing MSAL for mobile device')
+      }
+      
+      this.msalInstance = new PublicClientApplication(msalConfig)
     }
   }
 
@@ -135,8 +165,11 @@ export class MicrosoftAuthService {
         await this.msalInstance!.initialize()
         console.log('MSAL initialized successfully')
         
-        // 在移动端添加额外的兼容性检查
-        if (isMobile()) {
+        // 设备兼容性检查和日志
+        const deviceInfo = getDeviceInfo()
+        if (deviceInfo.isAndroidEdge) {
+          console.log('Mobile detected, using optimized redirect-first authentication flow')
+        } else if (deviceInfo.isMobile) {
           console.log('Mobile device detected, using enhanced compatibility mode')
         }
 
@@ -184,7 +217,7 @@ export class MicrosoftAuthService {
     }
   }
 
-  // 登录 - 增强移动端支持
+  // 登录 - Mobile优化的重定向优先流程
   async login(): Promise<AuthenticationResult> {
     if (this.cryptoUnavailable) {
       const friendlyMessage = MobileCompatibilityUtils.getUserFriendlyErrorMessage(
@@ -198,29 +231,78 @@ export class MicrosoftAuthService {
     }
 
     try {
-      // 移动端使用重定向方式，桌面端使用弹窗
+      const deviceInfo = getDeviceInfo()
       let response: AuthenticationResult
       
-      if (isMobile()) {
-        // 移动端使用重定向登录
+      if (deviceInfo.isAndroidEdge || deviceInfo.isMobile) {
+        // Mobile和移动端优先使用重定向登录
+        console.log(`Starting ${deviceInfo.isAndroidEdge ? 'Mobile' : 'mobile'} redirect authentication flow`)
+        
         try {
           // 首先尝试处理重定向返回
           const redirectResponse = await this.msalInstance.handleRedirectPromise()
           if (redirectResponse) {
+            console.log('Redirect authentication completed successfully')
             response = redirectResponse
           } else {
-            // 如果没有重定向结果，开始新的登录流程
-            await this.msalInstance.loginRedirect(loginRequest)
-            // 重定向后页面会刷新，这里不会执行到
-            throw new Error('Redirecting to login...')
+            // 没有重定向结果，检查是否已有账户（静默登录场景）
+            const accounts = this.msalInstance.getAllAccounts()
+            if (accounts.length > 0) {
+              console.log('Existing account found, attempting silent token acquisition')
+              const token = await this.getTokenSilently()
+              if (token) {
+                // 构造伪造的AuthenticationResult用于返回
+                response = {
+                  authority: this.msalInstance.getConfiguration().auth.authority!,
+                  uniqueId: accounts[0].homeAccountId,
+                  tenantId: accounts[0].tenantId || '',
+                  scopes: loginRequest.scopes,
+                  account: accounts[0],
+                  idToken: '',
+                  idTokenClaims: {},
+                  accessToken: token,
+                  fromCache: true,
+                  expiresOn: null,
+                  correlationId: '',
+                  requestId: '',
+                  extExpiresOn: null,
+                  familyId: '',
+                  tokenType: 'Bearer',
+                  state: '',
+                  cloudGraphHostName: '',
+                  msGraphHost: '',
+                } as unknown as AuthenticationResult
+              } else {
+                throw new Error('Silent token acquisition failed')
+              }
+            } else {
+              // 开始新的重定向登录流程
+              console.log('Starting new redirect login flow')
+              await this.msalInstance.loginRedirect(loginRequest)
+              // 重定向后页面会刷新，这里不会执行到
+              throw new Error('Redirecting to Microsoft login page...')
+            }
           }
-        } catch (error) {
-          console.error('Redirect login error:', error)
-          // 如果重定向失败，降级到弹窗登录
+        } catch (redirectError) {
+          console.warn('Redirect login failed, attempting fallback:', redirectError)
+          
+if (redirectError instanceof Error && redirectError.message.includes('Redirecting')) {
+            throw redirectError // 重新抛出重定向消息
+          }
+          
+          // Mobile重定向失败时的特殊处理
+          if (deviceInfo.isAndroidEdge) {
+            console.log('Mobile redirect failed, trying popup with enhanced settings')
+            // Mobile可能需要用户手势触发弹窗
+            throw new Error('请点击登录按钮后，在弹出的窗口中完成登录。如果没有弹窗出现，请允许浏览器显示弹窗。')
+          }
+          
+          // 其他移动设备降级到弹窗
           response = await this.msalInstance.loginPopup(loginRequest)
         }
       } else {
-        // 桌面端使用弹窗登录
+        // 桌面端仍可使用弹窗登录
+        console.log('Starting desktop popup authentication flow')
         response = await this.msalInstance.loginPopup(loginRequest)
       }
       
@@ -236,6 +318,11 @@ export class MicrosoftAuthService {
       
       // 提供更友好的错误信息
       if (error instanceof Error) {
+        // 如果是重定向消息，直接抛出
+        if (error.message.includes('Redirecting')) {
+          throw error
+        }
+        
         const friendlyMessage = MobileCompatibilityUtils.getUserFriendlyErrorMessage(error)
         throw new Error(friendlyMessage)
       }
@@ -244,61 +331,133 @@ export class MicrosoftAuthService {
     }
   }
 
-  // 静默获取令牌 - 增强持久化和重试机制
-  async getTokenSilently(): Promise<string | null> {
+  // 静默获取令牌 - Mobile增强版本，支持重试和自动续期
+  async getTokenSilently(maxRetries: number = 3): Promise<string | null> {
     if (this.cryptoUnavailable) return null
     if (!this.msalInstance) return null
 
-    try {
-      const accounts = this.msalInstance.getAllAccounts()
-      if (accounts.length === 0) {
-        console.log('No accounts found for silent token acquisition')
-        return null
-      }
+    // 如果已有正在进行的令牌续期，等待其完成
+    if (this.tokenRenewalPromise) {
+      console.log('Token renewal in progress, waiting...')
+      return this.tokenRenewalPromise
+    }
 
-      const silentRequest: SilentRequest = {
-        ...loginRequest,
-        account: accounts[0],
-        forceRefresh: false, // 首先尝试使用缓存的令牌
-      }
+    this.tokenRenewalPromise = this.performTokenAcquisition(maxRetries)
+    const result = await this.tokenRenewalPromise
+    this.tokenRenewalPromise = null
+    return result
+  }
 
-      let response = await this.msalInstance.acquireTokenSilent(silentRequest)
-      
-      // 如果获取成功，创建或更新Graph客户端
-      this.createGraphClient(response.accessToken)
-      
-      // 保存认证状态到本地存储
-      this.saveAuthState(response.accessToken, accounts[0])
-      
-      console.log('Token acquired silently')
-      return response.accessToken
-      
-    } catch (error) {
-      console.warn('Silent token acquisition failed:', error)
-      
-      // 如果静默获取失败，尝试强制刷新
+  // 执行令牌获取的核心逻辑
+  private async performTokenAcquisition(maxRetries: number): Promise<string | null> {
+    const accounts = this.msalInstance!.getAllAccounts()
+    if (accounts.length === 0) {
+      console.log('No accounts found for silent token acquisition')
+      return null
+    }
+
+    const deviceInfo = getDeviceInfo()
+    let lastError: Error | null = null
+
+    // 重试逻辑，Mobile可能需要多次尝试
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const accounts = this.msalInstance.getAllAccounts()
-        if (accounts.length > 0) {
-          const forceRefreshRequest: SilentRequest = {
-            ...loginRequest,
-            account: accounts[0],
-            forceRefresh: true,
-          }
-          
-          const response = await this.msalInstance.acquireTokenSilent(forceRefreshRequest)
-          this.createGraphClient(response.accessToken)
-          this.saveAuthState(response.accessToken, accounts[0])
-          
-          console.log('Token refreshed successfully')
-          return response.accessToken
+        console.log(`Token acquisition attempt ${attempt}/${maxRetries}`)
+
+        const silentRequest: SilentRequest = {
+          ...loginRequest,
+          account: accounts[0],
+          forceRefresh: attempt > 1, // 第一次尝试使用缓存，后续强制刷新
         }
-      } catch (refreshError) {
-        console.error('Token refresh also failed:', refreshError)
+
+        const response = await this.msalInstance!.acquireTokenSilent(silentRequest)
+        
+        // 获取成功，创建或更新Graph客户端
+        this.createGraphClient(response.accessToken)
+        
+        // 保存认证状态到本地存储
+        this.saveAuthState(response.accessToken, accounts[0])
+        
+        // 安排令牌自动续期（在过期前5分钟）
+        this.scheduleTokenRenewal(response.expiresOn)
+        
+        console.log(`Token acquired silently on attempt ${attempt}`)
+        return response.accessToken
+        
+      } catch (error) {
+        lastError = error as Error
+        console.warn(`Token acquisition attempt ${attempt} failed:`, error)
+        
+        // Mobile特殊处理
+        if (deviceInfo.isAndroidEdge && attempt < maxRetries) {
+          // Mobile可能需要短暂延迟
+          console.log('Mobile detected, adding delay before retry')
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+        }
+        
+        // 如果是最后一次尝试，继续到错误处理
+        if (attempt === maxRetries) {
+          break
+        }
       }
-      
-      // 清理过期的认证状态
-      this.clearAuthState()
+    }
+
+    // 所有重试都失败了
+    console.error('All token acquisition attempts failed:', lastError)
+    
+    // 清理过期的认证状态
+    this.clearAuthState()
+    this.clearTokenRenewalTimer()
+    
+    return null
+  }
+
+  // 安排令牌自动续期
+  private scheduleTokenRenewal(expiresOn: Date | null): void {
+    this.clearTokenRenewalTimer()
+    
+    if (!expiresOn) return
+
+    const now = new Date()
+    const expiresAt = new Date(expiresOn)
+    const renewAt = new Date(expiresAt.getTime() - 5 * 60 * 1000) // 提前5分钟续期
+    const msUntilRenewal = renewAt.getTime() - now.getTime()
+
+    if (msUntilRenewal > 0) {
+      console.log(`Token renewal scheduled in ${Math.round(msUntilRenewal / 1000 / 60)} minutes`)
+      this.tokenRenewalTimer = setTimeout(async () => {
+        console.log('Performing scheduled token renewal')
+        await this.getTokenSilently(1) // 单次尝试的续期
+      }, msUntilRenewal)
+    }
+  }
+
+  // 清理令牌续期定时器
+  private clearTokenRenewalTimer(): void {
+    if (this.tokenRenewalTimer) {
+      clearTimeout(this.tokenRenewalTimer)
+      this.tokenRenewalTimer = null
+    }
+  }
+
+  // 处理重定向返回 - Mobile关键方法
+  async handleRedirectPromise(): Promise<AuthenticationResult | null> {
+    if (!this.msalInstance) return null
+
+    try {
+      const response = await this.msalInstance.handleRedirectPromise()
+      if (response) {
+        console.log('Redirect response processed successfully')
+        // 创建Graph客户端
+        this.createGraphClient(response.accessToken)
+        // 保存认证状态
+        this.saveAuthState(response.accessToken, response.account)
+        return response
+      }
+      return null
+    } catch (error) {
+      console.error('Failed to handle redirect promise:', error)
+      // 不抛出错误，让调用方处理
       return null
     }
   }
@@ -308,17 +467,38 @@ export class MicrosoftAuthService {
     if (!this.msalInstance) return
 
     try {
-      // 清理本地认证状态
+      // 清理所有状态
       this.clearAuthState()
+      this.clearTokenRenewalTimer()
       
-      // 执行MSAL登出
-      await this.msalInstance.logoutPopup()
+      const deviceInfo = getDeviceInfo()
+      
+      // Android Edge和移动端使用重定向登出
+      if (deviceInfo.isAndroidEdge || deviceInfo.isMobile) {
+        console.log('Using redirect logout for mobile/Android Edge')
+        console.log('Redirect window.location.origin:', window.location.origin)
+        console.log('Redirect URI:', getRedirectUri())
+        await this.msalInstance.logoutRedirect({
+          // postLogoutRedirectUri: window.location.origin + '/health-calendar'
+          postLogoutRedirectUri: window.location.origin
+        })
+      } else {
+        // 桌面端使用弹窗登出
+        console.log('Using popup logout for desktop')
+        console.log('Redirect window.location.origin:', window.location.origin)
+        console.log('Redirect URI:', getRedirectUri())
+        await this.msalInstance.logoutPopup({
+          // postLogoutRedirectUri: window.location.origin + '/health-calendar'
+          postLogoutRedirectUri: window.location.origin
+        })
+      }
       
       console.log('Logout successful')
     } catch (error) {
       console.error('Logout failed:', error)
       // 即使MSAL登出失败，也要清理本地状态
       this.clearAuthState()
+      this.clearTokenRenewalTimer()
       throw error
     }
   }
@@ -468,6 +648,7 @@ export class MicrosoftAuthService {
     try {
       localStorage.removeItem('healthcalendar_auth_state')
       this.graphClient = null
+      this.clearTokenRenewalTimer()
       console.log('Auth state cleared')
     } catch (error) {
       console.warn('Failed to clear auth state:', error)
@@ -504,6 +685,45 @@ export class MicrosoftAuthService {
     } catch (error) {
       return false
     }
+  }
+
+  // 检查令牌是否即将过期（5分钟内）
+  async isTokenExpiringSoon(): Promise<boolean> {
+    if (!this.msalInstance) return true
+
+    try {
+      const accounts = this.msalInstance.getAllAccounts()
+      if (accounts.length === 0) return true
+
+      // 尝试静默获取令牌来检查有效性
+      const silentRequest: SilentRequest = {
+        ...loginRequest,
+        account: accounts[0],
+        forceRefresh: false,
+      }
+
+      const response = await this.msalInstance.acquireTokenSilent(silentRequest)
+      
+      if (response.expiresOn) {
+        const now = new Date()
+        const expiresAt = new Date(response.expiresOn)
+        const msUntilExpiry = expiresAt.getTime() - now.getTime()
+        const fiveMinutes = 5 * 60 * 1000
+        
+        return msUntilExpiry < fiveMinutes
+      }
+      
+      return false
+    } catch (error) {
+      // 如果获取失败，认为令牌已过期
+      return true
+    }
+  }
+
+  // 主动刷新令牌
+  async refreshToken(): Promise<string | null> {
+    console.log('Proactively refreshing token')
+    return this.getTokenSilently(1) // 单次尝试刷新
   }
 
 }

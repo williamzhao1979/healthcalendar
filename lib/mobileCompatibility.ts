@@ -7,6 +7,9 @@ export class MobileCompatibilityUtils {
     isDesktop: boolean
     platform: 'ios' | 'android' | 'windows' | 'macos' | 'linux' | 'unknown'
     browserName: string
+    isAndroidEdge: boolean
+    isWebView: boolean
+    androidVersion: string | null
   } {
     if (typeof window === 'undefined') {
       return {
@@ -14,7 +17,10 @@ export class MobileCompatibilityUtils {
         isTablet: false,
         isDesktop: true,
         platform: 'unknown',
-        browserName: 'unknown'
+        browserName: 'unknown',
+        isAndroidEdge: false,
+        isWebView: false,
+        androidVersion: null
       }
     }
 
@@ -42,17 +48,41 @@ export class MobileCompatibilityUtils {
     
     // 检测浏览器
     let browserName = 'unknown'
-    if (userAgent.includes('chrome')) browserName = 'chrome'
+    if (userAgent.includes('edg/') || userAgent.includes('edge/')) browserName = 'edge'
+    else if (userAgent.includes('chrome')) browserName = 'chrome'
     else if (userAgent.includes('safari')) browserName = 'safari'
     else if (userAgent.includes('firefox')) browserName = 'firefox'
-    else if (userAgent.includes('edge')) browserName = 'edge'
+    else if (userAgent.includes('samsung')) browserName = 'samsung'
+    
+    // 检测Mobile
+    const isAndroidEdge = platform === 'android' && (
+      userAgent.includes('edg/') || 
+      userAgent.includes('edge/') ||
+      userAgent.includes('edga/') || // Edge Android
+      userAgent.includes('edgios/') // Edge iOS (fallback)
+    )
+    
+    // 检测WebView
+    const isWebView = userAgent.includes('wv') || 
+                     userAgent.includes('webview') ||
+                     (platform === 'android' && !userAgent.includes('chrome') && userAgent.includes('version'))
+    
+    // 提取Android版本
+    let androidVersion: string | null = null
+    if (platform === 'android') {
+      const match = userAgent.match(/android\s([\d.]+)/)
+      androidVersion = match ? match[1] : null
+    }
     
     return {
       isMobile,
       isTablet,
       isDesktop,
       platform,
-      browserName
+      browserName,
+      isAndroidEdge,
+      isWebView,
+      androidVersion
     }
   }
 
@@ -148,23 +178,61 @@ export class MobileCompatibilityUtils {
   // 获取推荐的MSAL配置
   static getRecommendedMSALConfig(baseConfig: any): any {
     const capabilities = this.checkBrowserCapabilities()
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    const device = this.detectDevice()
 
     const config = { ...baseConfig }
 
-    // 缓存配置优化
-    if (!capabilities.hasLocalStorage || isMobile) {
-      config.cache.cacheLocation = 'sessionStorage'
+    // Mobile优化配置
+    if (device.isAndroidEdge) {
+      // 强制使用localStorage，Mobile对此支持更好
+      config.cache.cacheLocation = 'localStorage'
+      // 启用cookie存储作为备份
+      config.cache.storeAuthStateInCookie = true
+      // 启用基于声明的缓存
+      config.cache.claimsBasedCachingEnabled = true
+      
+      // Mobile特定的系统配置
+      config.system = {
+        ...config.system,
+        windowHashTimeout: 90000, // 增加超时时间
+        iframeHashTimeout: 10000,
+        navigateFrameWait: 500, // Mobile导航延迟
+        allowRedirectInIframe: false, // 安全最佳实践
+        loggerOptions: {
+          ...config.system?.loggerOptions,
+          logLevel: 1, // Warning level for Mobile
+        }
+      }
+    } else if (device.isMobile) {
+      // 其他移动设备配置
+      if (!capabilities.hasLocalStorage) {
+        config.cache.cacheLocation = 'sessionStorage'
+      } else {
+        config.cache.cacheLocation = 'localStorage'
+      }
+      config.cache.storeAuthStateInCookie = true
+    } else {
+      // 桌面配置
+      config.cache.cacheLocation = 'localStorage'
     }
 
-    // 如果不是安全上下文或是移动端，启用cookie存储
-    if (!capabilities.isSecureContext || isMobile) {
+    // 如果不是安全上下文，启用cookie存储
+    if (!capabilities.isSecureContext) {
       config.cache.storeAuthStateInCookie = true
     }
 
     // 安全cookie配置
     if (capabilities.isSecureContext) {
       config.cache.secureCookies = true
+    }
+
+    // WebView特殊处理
+    if (device.isWebView) {
+      config.cache.storeAuthStateInCookie = true
+      config.system = {
+        ...config.system,
+        allowRedirectInIframe: true, // WebView可能需要iframe重定向
+      }
     }
 
     return config
@@ -179,6 +247,22 @@ export class MobileCompatibilityUtils {
   } {
     const device = this.detectDevice()
     const capabilities = this.checkBrowserCapabilities()
+    
+    // Mobile 特定消息
+    if (device.isAndroidEdge) {
+      return {
+        title: 'Mobile OneDrive 同步',
+        message: '正在为 Mobile 浏览器优化 OneDrive 连接...',
+        tips: [
+          '确保使用 HTTPS 连接访问应用',
+          '允许浏览器重定向到 Microsoft 登录页面',
+          '如遇登录问题，请允许浏览器弹窗权限',
+          '建议使用 WiFi 网络进行首次同步',
+          '如果认证失败，可尝试使用 Chrome 浏览器'
+        ],
+        isWarning: !capabilities.isSecureContext
+      }
+    }
     
     if (device.isMobile) {
       return {
@@ -249,6 +333,51 @@ export class MobileCompatibilityUtils {
     const device = this.detectDevice()
     const capabilities = this.checkBrowserCapabilities()
     const message = error.message.toLowerCase()
+    
+    // Mobile特定错误处理
+    if (device.isAndroidEdge) {
+      if (message.includes('interaction_required') || message.includes('interaction_in_progress')) {
+        return {
+          title: 'Mobile 认证问题',
+          message: 'Mobile 浏览器需要完成用户交互认证',
+          solutions: [
+            '请点击重新登录按钮',
+            '确保允许浏览器弹窗权限',
+            '尝试清除浏览器缓存后重新登录',
+            '如果问题持续，请尝试使用 Chrome 浏览器'
+          ],
+          isRetryable: true
+        }
+      }
+      
+      if (message.includes('token_renewal') || message.includes('silent_sso')) {
+        return {
+          title: 'Mobile 令牌续期失败',
+          message: 'Mobile 浏览器无法自动续期访问令牌',
+          solutions: [
+            '请重新登录以获取新的访问令牌',
+            '检查网络连接是否稳定',
+            '确认 Microsoft 服务可以正常访问',
+            '尝试在 WiFi 环境下重新连接'
+          ],
+          isRetryable: true
+        }
+      }
+      
+      if (message.includes('redirect') || message.includes('navigation')) {
+        return {
+          title: 'Mobile 重定向问题',
+          message: 'Mobile 浏览器重定向登录遇到问题',
+          solutions: [
+            '请允许浏览器访问 Microsoft 登录页面',
+            '检查是否启用了浏览器的弹窗拦截',
+            '尝试手动刷新页面',
+            '确保网络连接稳定'
+          ],
+          isRetryable: true
+        }
+      }
+    }
     
     if (message.includes('crypto') || message.includes('cryptography')) {
       return {

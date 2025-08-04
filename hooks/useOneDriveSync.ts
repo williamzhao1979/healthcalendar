@@ -172,6 +172,18 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
       await microsoftAuth.initialize()
       
+      // 首先检查重定向返回（Mobile关键）
+      const redirectResult = await microsoftAuth.handleRedirectPromise()
+      if (redirectResult) {
+        console.log('Redirect authentication successful in checkConnection')
+        updateState({
+          isAuthenticated: true,
+          userInfo: redirectResult.account,
+          error: null,
+        })
+        return
+      }
+      
       const isLoggedIn = microsoftAuth.isLoggedIn()
       const userInfo = microsoftAuth.getCurrentUser()
       
