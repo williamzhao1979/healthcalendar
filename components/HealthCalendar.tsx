@@ -1954,7 +1954,7 @@ const handleDataSync = useCallback(async () => {
                         {recordDots.map((dot, index) => (
                           <div 
                             key={`${dot.type}-${index}`}
-                            className={`calendar-dot bg-gradient-to-r ${isToday ? 'from-white to-white' : dot.color}`}
+                            className={`calendar-dot bg-gradient-to-r ${dot.color} ${isToday ? 'ring-2 ring-white' : ''}`}
                             title={`${dot.type} 记录`}
                           ></div>
                         ))}
