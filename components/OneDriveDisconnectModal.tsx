@@ -188,7 +188,7 @@ export const OneDriveDisconnectModal: React.FC<OneDriveDisconnectModalProps> = (
   const connectionInfo = getConnectionInfo()
 
   return (
-    <div className="fixed inset-0 z-50 flex">
+    <div className="fixed inset-0 z-[60] flex">
       {/* 背景遮罩 */}
       <div 
         className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" 

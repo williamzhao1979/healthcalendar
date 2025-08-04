@@ -35,6 +35,7 @@ import { AttachmentViewer } from './AttachmentViewer'
 import { Attachment } from '../types/attachment'
 import { OneDriveSyncModal } from './OneDriveSyncModal'
 import { OneDriveSyncToggle } from './OneDriveSyncToggle'
+import { OneDriveDisconnectModal } from './OneDriveDisconnectModal'
 import { getLocalDateString, isRecordOnLocalDate, formatLocalDateTime } from '../lib/dateUtils'
 import { set } from 'react-hook-form'
 
@@ -768,6 +769,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   // OneDrive同步状态和模态框
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
   const [showOneDriveSyncModal, setShowOneDriveSyncModal] = useState(false)
+  const [showOneDriveDisconnectModal, setShowOneDriveDisconnectModal] = useState(false)
   // const [activeTab, setActiveTab] = useState<'stool' | 'myrecord' | 'personal' | 'physical'>('stool')
 
   // 日历状态
@@ -2545,6 +2547,7 @@ const handleDataSync = useCallback(async () => {
                           oneDriveActions={oneDriveActions}
                           currentUser={currentUser}
                           onOpenModal={() => setShowOneDriveSyncModal(true)}
+                          onOpenDisconnectModal={() => setShowOneDriveDisconnectModal(true)}
                         />
 
                         {/* 数据同步按钮 - 仅在OneDrive已登录时显示 */}
@@ -2857,16 +2860,17 @@ const handleDataSync = useCallback(async () => {
                   </button>
 
                   {/* 我的记录 */}
-                  <button onClick={() => selectRecordType('myrecord')} className="w-full record-type-option flex items-center space-x-4 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105">
-                    <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center">
-                      <Folder className="text-purple-500 text-lg" />
+                  <button onClick={() => selectRecordType('myrecord')} className="w-full record-type-option flex items-center space-x-3 p-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-all hover:scale-105">
+                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                      <Folder className="text-purple-500 text-base" />
                     </div>
                     <div className="text-left flex-1">
-                      <div className="text-base font-semibold text-gray-900">我的记录</div>
-                      <div className="text-sm text-gray-500">随记</div>
+                      <div className="text-sm font-semibold text-gray-900">我的记录</div>
+                      <div className="text-xs text-gray-500">随记</div>
                     </div>
-                    <ChevronRight className="text-gray-400" />
+                    <ChevronRight className="text-gray-400 w-4 h-4" />
                   </button>
+
                 </div>
 
                 {/* Cancel Button */}
@@ -3425,6 +3429,16 @@ const handleDataSync = useCallback(async () => {
         oneDriveActions={oneDriveActions}
         currentUser={currentUser}
         onSyncComplete={refreshUsers}
+      />
+
+      {/* OneDrive断开连接模态框 */}
+      <OneDriveDisconnectModal
+        isOpen={showOneDriveDisconnectModal}
+        onClose={() => setShowOneDriveDisconnectModal(false)}
+        onConfirm={() => setShowOneDriveDisconnectModal(false)}
+        oneDriveState={oneDriveState}
+        oneDriveActions={oneDriveActions}
+        currentUser={currentUser}
       />
     </div>
   )

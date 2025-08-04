@@ -13,7 +13,6 @@ import {
   ExternalLink
 } from 'lucide-react'
 import { OneDriveSyncState, OneDriveSyncActions, formatSyncTime } from '../hooks/useOneDriveSync'
-import { OneDriveDisconnectModal } from './OneDriveDisconnectModal'
 import MobileCompatibilityUtils from '../lib/mobileCompatibility'
 
 interface OneDriveSyncToggleProps {
@@ -21,6 +20,7 @@ interface OneDriveSyncToggleProps {
   oneDriveActions: OneDriveSyncActions
   currentUser: any
   onOpenModal?: () => void
+  onOpenDisconnectModal?: () => void
   className?: string
 }
 
@@ -29,6 +29,7 @@ export const OneDriveSyncToggle: React.FC<OneDriveSyncToggleProps> = ({
   oneDriveActions,
   currentUser,
   onOpenModal,
+  onOpenDisconnectModal,
   className = ''
 }) => {
   const [isToggling, setIsToggling] = useState(false)
@@ -66,7 +67,11 @@ export const OneDriveSyncToggle: React.FC<OneDriveSyncToggleProps> = ({
         }
       } else {
         // 禁用同步 - 显示确认对话框
-        setShowDisconnectModal(true)
+        if (onOpenDisconnectModal) {
+          onOpenDisconnectModal()
+        } else {
+          setShowDisconnectModal(true)
+        }
       }
     } catch (error) {
       console.error('同步开关操作失败:', error)
@@ -304,16 +309,6 @@ export const OneDriveSyncToggle: React.FC<OneDriveSyncToggleProps> = ({
           )}
         </div>
       )}
-      
-      {/* 断开连接确认模态框 */}
-      <OneDriveDisconnectModal
-        isOpen={showDisconnectModal}
-        onClose={handleDisconnectCancel}
-        onConfirm={handleDisconnectConfirm}
-        oneDriveState={oneDriveState}
-        oneDriveActions={oneDriveActions}
-        currentUser={currentUser}
-      />
     </div>
   )
 }
