@@ -28,6 +28,8 @@ import { useOneDriveSync } from '../../hooks/useOneDriveSync'
 import { AttachmentUploader } from '../../components/AttachmentUploader'
 import { AttachmentViewer } from '../../components/AttachmentViewer'
 import { Attachment } from '../../types/attachment'
+import { useConfirm } from '../../hooks/useConfirm'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 interface MealRecord {
   id: string
@@ -387,6 +389,9 @@ function MealPageContent() {
   // OneDrive 同步状态
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
 
+  // 确认对话框
+  const { confirmState, showSuccess, closeConfirm } = useConfirm()
+
   // UI状态
   const [isLoading, setIsLoading] = useState(false)
   const [showCustomTagInput, setShowCustomTagInput] = useState(false)
@@ -500,7 +505,7 @@ function MealPageContent() {
 
   const handleSaveRecord = async () => {
     if (!currentUser) {
-      alert('请选择用户')
+      await showSuccess('提示', '请选择用户')
       return
     }
 
@@ -520,17 +525,17 @@ function MealPageContent() {
       if (isEditMode && editId) {
         // await mealDB.updateRecord(editId, recordData)
         await adminService.updateMealRecord(editId, recordData)
-        // alert('记录更新成功！')
+        // 成功后直接跳转，不显示成功提示
       } else {
         // await mealDB.saveRecord(recordData)
         await adminService.saveMealRecord(recordData)
-        // alert('记录保存成功！')
+        // 成功后直接跳转，不显示成功提示
       }
 
       router.push('/health-calendar')
     } catch (error) {
       console.error('保存记录失败:', error)
-      alert('保存失败，请重试')
+      await showSuccess('错误', '保存失败，请重试')
     } finally {
       setIsLoading(false)
     }
@@ -1069,6 +1074,19 @@ function MealPageContent() {
             </div>
           </div>
         )}
+
+      {/* 确认对话框 */}
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        onConfirm={confirmState.onConfirm}
+        onCancel={confirmState.onCancel}
+        isLoading={confirmState.isLoading}
+      />
       </div>
     </div>
   )

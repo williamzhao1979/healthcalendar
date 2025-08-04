@@ -40,6 +40,8 @@ import { OneDriveSyncToggle } from './OneDriveSyncToggle'
 import { OneDriveDisconnectModal } from './OneDriveDisconnectModal'
 import { getLocalDateString, isRecordOnLocalDate, formatLocalDateTime } from '../lib/dateUtils'
 import { useTheme } from '../hooks/useTheme'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from './ConfirmDialog'
 import { set } from 'react-hook-form'
 
 // 简单的类型定义 - 避免复杂的语法
@@ -777,6 +779,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   
   // 主题管理
   const { resolvedTheme, toggleTheme } = useTheme()
+  
+  // 确认对话框
+  const { confirmState, confirmDelete, closeConfirm, setLoading } = useConfirm()
 
   // 日历状态
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -1336,43 +1341,64 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const deleteStoolRecord = async (recordId: string) => {
     try {
-      if (!confirm('确定要删除此记录吗？')) return
+      const confirmed = await confirmDelete('排便记录')
+      if (!confirmed) {
+        closeConfirm()
+        return
+      }
+      
       console.log('删除排便记录:', recordId)
       // await stoolDB.softDeleteRecord(recordId)
       await adminService.softDeleteStoolRecord(recordId)
+      closeConfirm()
       // 重新加载数据
       await loadStoolRecords()
       console.log('排便记录已删除')
     } catch (error) {
       console.error('删除排便记录失败:', error)
+      closeConfirm()
     }
   }
 
   const deleteMyRecord = async (recordId: string) => {
     try {
-      if (!confirm('确定要删除此记录吗？')) return
+      const confirmed = await confirmDelete('我的记录')
+      if (!confirmed) {
+        closeConfirm()
+        return
+      }
+      
       console.log('删除我的记录:', recordId)
       // await myRecordDB.softDeleteRecord(recordId)
       await adminService.softDeleteMyRecord(recordId)
+      closeConfirm()
       // 重新加载数据
       await loadMyRecords()
       console.log('我的记录已删除')
     } catch (error) {
       console.error('删除我的记录失败:', error)
+      closeConfirm()
     }
   }
 
   const deleteMealRecord = async (recordId: string) => {
     try {
-      if (!confirm('确定要删除此记录吗？')) return
+      const confirmed = await confirmDelete('用餐记录')
+      if (!confirmed) {
+        closeConfirm()
+        return
+      }
+      
       console.log('删除用餐记录:', recordId)
       // await adminService.softDeleteMealRecord(recordId)
       await adminService.softDeleteRecord('mealRecords', recordId)
+      closeConfirm()
       // 重新加载数据
       await loadMealRecords()
       console.log('用餐记录已删除')
     } catch (error) {
       console.error('删除用餐记录失败:', error)
+      closeConfirm()
     }
   }
 
@@ -1383,14 +1409,21 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const deletePeriodRecord = async (recordId: string) => {
     try {
-      if (!confirm('确定要删除此记录吗？')) return
+      const confirmed = await confirmDelete('生理记录')
+      if (!confirmed) {
+        closeConfirm()
+        return
+      }
+      
       console.log('删除生理记录:', recordId)
       await adminService.softDeletePeriodRecord(recordId)
+      closeConfirm()
       // 重新加载数据
       await loadPeriodRecords()
       console.log('生理记录已删除')
     } catch (error) {
       console.error('删除生理记录失败:', error)
+      closeConfirm()
     }
   }
 
@@ -3575,6 +3608,19 @@ useEffect(() => {
         oneDriveState={oneDriveState}
         oneDriveActions={oneDriveActions}
         currentUser={currentUser}
+      />
+
+      {/* 确认对话框 */}
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        onConfirm={confirmState.onConfirm}
+        onCancel={confirmState.onCancel}
+        isLoading={confirmState.isLoading}
       />
     </div>
   )
