@@ -558,9 +558,27 @@ function MyRecordPageContent() {
 
   const initializeDateTime = () => {
     const now = new Date()
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    let targetDateTime: Date
+    
+    // 检查URL参数中是否有日期
+    const dateParam = searchParams.get('date')
+    if (dateParam) {
+      // 如果有日期参数，使用该日期 + 当前时间
+      const selectedDate = new Date(dateParam + 'T00:00:00')
+      targetDateTime = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        now.getHours(),
+        now.getMinutes()
+      )
+    } else {
+      // 否则使用当前日期时间
+      targetDateTime = now
+    }
+    
+    const localDateTime = new Date(targetDateTime.getTime() - targetDateTime.getTimezoneOffset() * 60000)
     setDateTime(localDateTime.toISOString().slice(0, 16))
-    // setDateTime(now.toISOString().slice(0, 16))
   }
 
   const loadRecordForEdit = async (id: string) => {

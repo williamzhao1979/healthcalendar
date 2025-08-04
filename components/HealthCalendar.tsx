@@ -1118,10 +1118,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   // 处理日期点击
   const handleDateClick = (date: Date) => {
-    if (date.getMonth() === calendarMonth) { // 只对当前显示月份的日期有效
-      setSelectedDate(date)
-      setShowDateModal(true)
-    }
+    // 允许点击所有日期，包括上个月和下个月的日期
+    setSelectedDate(date)
+    setShowDateModal(true)
   }
 
   // 处理上一个月
