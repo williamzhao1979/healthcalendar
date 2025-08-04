@@ -54,7 +54,7 @@ export class MobileCompatibilityUtils {
     else if (userAgent.includes('firefox')) browserName = 'firefox'
     else if (userAgent.includes('samsung')) browserName = 'samsung'
     
-    // 检测Android Edge
+    // 检测Mobile
     const isAndroidEdge = platform === 'android' && (
       userAgent.includes('edg/') || 
       userAgent.includes('edge/') ||
@@ -182,25 +182,25 @@ export class MobileCompatibilityUtils {
 
     const config = { ...baseConfig }
 
-    // Android Edge优化配置
+    // Mobile优化配置
     if (device.isAndroidEdge) {
-      // 强制使用localStorage，Android Edge对此支持更好
+      // 强制使用localStorage，Mobile对此支持更好
       config.cache.cacheLocation = 'localStorage'
       // 启用cookie存储作为备份
       config.cache.storeAuthStateInCookie = true
       // 启用基于声明的缓存
       config.cache.claimsBasedCachingEnabled = true
       
-      // Android Edge特定的系统配置
+      // Mobile特定的系统配置
       config.system = {
         ...config.system,
         windowHashTimeout: 90000, // 增加超时时间
         iframeHashTimeout: 10000,
-        navigateFrameWait: 500, // Android Edge导航延迟
+        navigateFrameWait: 500, // Mobile导航延迟
         allowRedirectInIframe: false, // 安全最佳实践
         loggerOptions: {
           ...config.system?.loggerOptions,
-          logLevel: 1, // Warning level for Android Edge
+          logLevel: 1, // Warning level for Mobile
         }
       }
     } else if (device.isMobile) {
@@ -248,11 +248,11 @@ export class MobileCompatibilityUtils {
     const device = this.detectDevice()
     const capabilities = this.checkBrowserCapabilities()
     
-    // Android Edge 特定消息
+    // Mobile 特定消息
     if (device.isAndroidEdge) {
       return {
-        title: 'Android Edge OneDrive 同步',
-        message: '正在为 Android Edge 浏览器优化 OneDrive 连接...',
+        title: 'Mobile OneDrive 同步',
+        message: '正在为 Mobile 浏览器优化 OneDrive 连接...',
         tips: [
           '确保使用 HTTPS 连接访问应用',
           '允许浏览器重定向到 Microsoft 登录页面',
@@ -334,12 +334,12 @@ export class MobileCompatibilityUtils {
     const capabilities = this.checkBrowserCapabilities()
     const message = error.message.toLowerCase()
     
-    // Android Edge特定错误处理
+    // Mobile特定错误处理
     if (device.isAndroidEdge) {
       if (message.includes('interaction_required') || message.includes('interaction_in_progress')) {
         return {
-          title: 'Android Edge 认证问题',
-          message: 'Android Edge 浏览器需要完成用户交互认证',
+          title: 'Mobile 认证问题',
+          message: 'Mobile 浏览器需要完成用户交互认证',
           solutions: [
             '请点击重新登录按钮',
             '确保允许浏览器弹窗权限',
@@ -352,8 +352,8 @@ export class MobileCompatibilityUtils {
       
       if (message.includes('token_renewal') || message.includes('silent_sso')) {
         return {
-          title: 'Android Edge 令牌续期失败',
-          message: 'Android Edge 浏览器无法自动续期访问令牌',
+          title: 'Mobile 令牌续期失败',
+          message: 'Mobile 浏览器无法自动续期访问令牌',
           solutions: [
             '请重新登录以获取新的访问令牌',
             '检查网络连接是否稳定',
@@ -366,8 +366,8 @@ export class MobileCompatibilityUtils {
       
       if (message.includes('redirect') || message.includes('navigation')) {
         return {
-          title: 'Android Edge 重定向问题',
-          message: 'Android Edge 浏览器重定向登录遇到问题',
+          title: 'Mobile 重定向问题',
+          message: 'Mobile 浏览器重定向登录遇到问题',
           solutions: [
             '请允许浏览器访问 Microsoft 登录页面',
             '检查是否启用了浏览器的弹窗拦截',

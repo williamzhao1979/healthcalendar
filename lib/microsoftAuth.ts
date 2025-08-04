@@ -50,21 +50,21 @@ const createMSALConfig = (): Configuration => {
       redirectUri: getRedirectUri(),
     },
     cache: {
-      // Android Edge优先使用localStorage
+      // Mobile优先使用localStorage
       cacheLocation: deviceInfo.isAndroidEdge ? BrowserCacheLocation.LocalStorage : 
                     (deviceInfo.isMobile ? BrowserCacheLocation.SessionStorage : BrowserCacheLocation.LocalStorage),
-      // Android Edge和所有移动端启用cookie存储
+      // Mobile和所有移动端启用cookie存储
       storeAuthStateInCookie: deviceInfo.isMobile || !isSecureContext(),
       // 安全cookie配置
       secureCookies: isSecureContext(),
-      // Android Edge启用声明缓存
+      // Mobile启用声明缓存
       claimsBasedCachingEnabled: deviceInfo.isAndroidEdge,
     },
     system: {
-      // Android Edge特殊超时配置
+      // Mobile特殊超时配置
       windowHashTimeout: deviceInfo.isAndroidEdge ? 90000 : (deviceInfo.isMobile ? 60000 : 60000),
       iframeHashTimeout: deviceInfo.isAndroidEdge ? 10000 : 6000,
-      // Android Edge导航延迟
+      // Mobile导航延迟
       navigateFrameWait: deviceInfo.isAndroidEdge ? 500 : 0,
       // 安全配置
       allowRedirectInIframe: deviceInfo.isWebView, // 仅WebView允许iframe重定向
@@ -91,7 +91,7 @@ const createMSALConfig = (): Configuration => {
           }
         },
         piiLoggingEnabled: false,
-        logLevel: deviceInfo.isAndroidEdge ? 1 : 2, // 更详细的Android Edge日志
+        logLevel: deviceInfo.isAndroidEdge ? 1 : 2, // 更详细的Mobile日志
       },
     },
   }
@@ -124,12 +124,12 @@ export class MicrosoftAuthService {
         return
       }
       
-      // Create Android Edge optimized MSAL config
+      // Create Mobile optimized MSAL config
       const msalConfig = createMSALConfig()
       const deviceInfo = getDeviceInfo()
       
       if (deviceInfo.isAndroidEdge) {
-        console.log('Initializing MSAL for Android Edge with optimized configuration')
+        console.log('Initializing MSAL for Mobile with optimized configuration')
       } else if (deviceInfo.isMobile) {
         console.log('Initializing MSAL for mobile device')
       }
@@ -168,7 +168,7 @@ export class MicrosoftAuthService {
         // 设备兼容性检查和日志
         const deviceInfo = getDeviceInfo()
         if (deviceInfo.isAndroidEdge) {
-          console.log('Android Edge detected, using optimized redirect-first authentication flow')
+          console.log('Mobile detected, using optimized redirect-first authentication flow')
         } else if (deviceInfo.isMobile) {
           console.log('Mobile device detected, using enhanced compatibility mode')
         }
@@ -217,7 +217,7 @@ export class MicrosoftAuthService {
     }
   }
 
-  // 登录 - Android Edge优化的重定向优先流程
+  // 登录 - Mobile优化的重定向优先流程
   async login(): Promise<AuthenticationResult> {
     if (this.cryptoUnavailable) {
       const friendlyMessage = MobileCompatibilityUtils.getUserFriendlyErrorMessage(
@@ -235,8 +235,8 @@ export class MicrosoftAuthService {
       let response: AuthenticationResult
       
       if (deviceInfo.isAndroidEdge || deviceInfo.isMobile) {
-        // Android Edge和移动端优先使用重定向登录
-        console.log(`Starting ${deviceInfo.isAndroidEdge ? 'Android Edge' : 'mobile'} redirect authentication flow`)
+        // Mobile和移动端优先使用重定向登录
+        console.log(`Starting ${deviceInfo.isAndroidEdge ? 'Mobile' : 'mobile'} redirect authentication flow`)
         
         try {
           // 首先尝试处理重定向返回
@@ -290,10 +290,10 @@ if (redirectError instanceof Error && redirectError.message.includes('Redirectin
             throw redirectError // 重新抛出重定向消息
           }
           
-          // Android Edge重定向失败时的特殊处理
+          // Mobile重定向失败时的特殊处理
           if (deviceInfo.isAndroidEdge) {
-            console.log('Android Edge redirect failed, trying popup with enhanced settings')
-            // Android Edge可能需要用户手势触发弹窗
+            console.log('Mobile redirect failed, trying popup with enhanced settings')
+            // Mobile可能需要用户手势触发弹窗
             throw new Error('请点击登录按钮后，在弹出的窗口中完成登录。如果没有弹窗出现，请允许浏览器显示弹窗。')
           }
           
@@ -331,7 +331,7 @@ if (redirectError instanceof Error && redirectError.message.includes('Redirectin
     }
   }
 
-  // 静默获取令牌 - Android Edge增强版本，支持重试和自动续期
+  // 静默获取令牌 - Mobile增强版本，支持重试和自动续期
   async getTokenSilently(maxRetries: number = 3): Promise<string | null> {
     if (this.cryptoUnavailable) return null
     if (!this.msalInstance) return null
@@ -359,7 +359,7 @@ if (redirectError instanceof Error && redirectError.message.includes('Redirectin
     const deviceInfo = getDeviceInfo()
     let lastError: Error | null = null
 
-    // 重试逻辑，Android Edge可能需要多次尝试
+    // 重试逻辑，Mobile可能需要多次尝试
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`Token acquisition attempt ${attempt}/${maxRetries}`)
@@ -388,10 +388,10 @@ if (redirectError instanceof Error && redirectError.message.includes('Redirectin
         lastError = error as Error
         console.warn(`Token acquisition attempt ${attempt} failed:`, error)
         
-        // Android Edge特殊处理
+        // Mobile特殊处理
         if (deviceInfo.isAndroidEdge && attempt < maxRetries) {
-          // Android Edge可能需要短暂延迟
-          console.log('Android Edge detected, adding delay before retry')
+          // Mobile可能需要短暂延迟
+          console.log('Mobile detected, adding delay before retry')
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
         }
         
@@ -440,7 +440,7 @@ if (redirectError instanceof Error && redirectError.message.includes('Redirectin
     }
   }
 
-  // 处理重定向返回 - Android Edge关键方法
+  // 处理重定向返回 - Mobile关键方法
   async handleRedirectPromise(): Promise<AuthenticationResult | null> {
     if (!this.msalInstance) return null
 
@@ -473,12 +473,12 @@ if (redirectError instanceof Error && redirectError.message.includes('Redirectin
       
       const deviceInfo = getDeviceInfo()
       
-      // Android Edge和移动端使用重定向登出
+      // Mobile和移动端使用重定向登出
       if (deviceInfo.isAndroidEdge || deviceInfo.isMobile) {
-        console.log('Using redirect logout for mobile/Android Edge')
+        console.log('Using redirect logout for mobile/Mobile')
         await this.msalInstance.logoutRedirect({
           // console.log('redirecting to health-calendar after logout')
-          // postLogoutRedirectUri: window.location.origin + '/health-calendar'
+          postLogoutRedirectUri: window.location.origin + '/health-calendar'
         })
       } else {
         // 桌面端使用弹窗登出

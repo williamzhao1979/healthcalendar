@@ -43,7 +43,7 @@ export const MSALRedirectHandler: React.FC<MSALRedirectHandlerProps> = ({ childr
         console.log('Detected MSAL redirect parameters, handling redirect...')
         
         if (device.isAndroidEdge) {
-          console.log('Android Edge redirect detected')
+          console.log('Mobile redirect detected')
         }
 
         setIsHandlingRedirect(true)
@@ -116,7 +116,7 @@ export const MSALRedirectHandler: React.FC<MSALRedirectHandlerProps> = ({ childr
               正在处理登录重定向
               {deviceInfo?.isAndroidEdge && (
                 <Badge variant="outline" className="text-xs">
-                  Android Edge
+                  Mobile
                 </Badge>
               )}
             </AlertTitle>
@@ -128,7 +128,7 @@ export const MSALRedirectHandler: React.FC<MSALRedirectHandlerProps> = ({ childr
               {deviceInfo?.isAndroidEdge && (
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                   <p className="text-sm text-blue-800">
-                    <strong>Android Edge 用户：</strong>重定向处理可能需要稍长时间，请耐心等待。
+                    <strong>Mobile 用户：</strong>重定向处理可能需要稍长时间，请耐心等待。
                   </p>
                 </div>
               )}
@@ -158,7 +158,7 @@ export const MSALRedirectHandler: React.FC<MSALRedirectHandlerProps> = ({ childr
               登录重定向失败
               {deviceInfo?.isAndroidEdge && (
                 <Badge variant="outline" className="text-xs">
-                  Android Edge
+                  Mobile
                 </Badge>
               )}
             </AlertTitle>
@@ -170,7 +170,7 @@ export const MSALRedirectHandler: React.FC<MSALRedirectHandlerProps> = ({ childr
               {deviceInfo?.isAndroidEdge && (
                 <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
                   <p className="text-sm text-amber-800">
-                    <strong>Android Edge 用户：</strong>建议使用 Chrome 浏览器以获得更稳定的认证体验。
+                    <strong>Mobile 用户：</strong>建议使用 Chrome 浏览器以获得更稳定的认证体验。
                   </p>
                 </div>
               )}

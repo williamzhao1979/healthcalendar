@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Android Edge MSAL 认证测试脚本
+ * Mobile MSAL 认证测试脚本
  * 用于验证重构后的认证流程是否正常工作
  */
 
 const fs = require('fs')
 const path = require('path')
 
-console.log('🔍 Android Edge MSAL 认证重构验证')
+console.log('🔍 Mobile MSAL 认证重构验证')
 console.log('================================\n')
 
 // 检查关键文件是否存在
@@ -59,7 +59,7 @@ const features = [
   {
     file: 'lib/mobileCompatibility.ts',
     patterns: ['isAndroidEdge', 'detectDevice', 'getOneDriveErrorTips'],
-    description: 'Android Edge 设备检测'
+    description: 'Mobile 设备检测'
   },
   {
     file: 'lib/microsoftAuth.ts', 
@@ -73,13 +73,13 @@ const features = [
   },
   {
     file: 'hooks/useOneDriveSync.ts',
-    patterns: ['handleRedirectPromise', 'Android Edge关键', 'redirectResult'],
+    patterns: ['handleRedirectPromise', 'Mobile关键', 'redirectResult'],
     description: 'React Hook 重定向处理'
   },
   {
     file: 'components/AndroidEdgeErrorBoundary.tsx',
     patterns: ['class AndroidEdgeErrorBoundary', 'componentDidCatch', 'isAndroidEdge'],
-    description: 'Android Edge 错误边界'
+    description: 'Mobile 错误边界'
   },
   {
     file: 'components/MSALErrorRecovery.tsx',
@@ -110,7 +110,7 @@ const configChecks = [
       const hasRedirectFirst = content.includes('loginRedirect')
       return hasAndroidEdgeConfig && hasLocalStorage && hasRedirectFirst
     },
-    description: 'Android Edge 特定配置'
+    description: 'Mobile 特定配置'
   },
   {
     file: 'lib/mobileCompatibility.ts',
@@ -137,17 +137,17 @@ console.log('\n📊 重构验证总结')
 console.log('================')
 
 if (allFilesExist && allFeaturesImplemented) {
-  console.log('✅ 所有检查通过！Android Edge MSAL 认证重构已完成')
+  console.log('✅ 所有检查通过！Mobile MSAL 认证重构已完成')
   console.log('\n🎯 重构成果:')
-  console.log('   • ✅ Phase 1: MSAL 核心配置更新 (Android Edge 优化)')
+  console.log('   • ✅ Phase 1: MSAL 核心配置更新 (Mobile 优化)')
   console.log('   • ✅ Phase 2: 静默令牌获取增强和生命周期管理')
-  console.log('   • ✅ Phase 3: Android Edge 特定错误处理')
+  console.log('   • ✅ Phase 3: Mobile 特定错误处理')
   console.log('   • ✅ Phase 4: 完整的错误处理和恢复机制')
   console.log('   • ✅ Phase 5: React Hook 集成更新')
   console.log('   • ✅ Phase 6: 测试和验证页面')
   
   console.log('\n🚀 下一步建议:')
-  console.log('   1. 在 Android Edge 设备上实际测试认证流程')
+  console.log('   1. 在 Mobile 设备上实际测试认证流程')
   console.log('   2. 访问 http://localhost:3008/android-edge-test 进行兼容性测试')
   console.log('   3. 测试重定向认证流程的稳定性')
   console.log('   4. 验证令牌自动续期功能')
@@ -159,11 +159,11 @@ if (allFilesExist && allFeaturesImplemented) {
 }
 
 console.log('\n🔗 相关测试页面:')
-console.log('   • Android Edge 测试: http://localhost:3008/android-edge-test')
+console.log('   • Mobile 测试: http://localhost:3008/android-edge-test')
 console.log('   • OneDrive 功能测试: http://localhost:3008/onedrive-test')
 console.log('   • 基础功能测试: http://localhost:3008/basic-test')
 
-console.log('\n📱 Android Edge 特定注意事项:')
+console.log('\n📱 Mobile 特定注意事项:')
 console.log('   • 确保使用 HTTPS 连接 (https://localhost:3443)')
 console.log('   • 允许浏览器弹窗和重定向')
 console.log('   • 建议使用 Chrome 浏览器作为备选方案')

@@ -46,6 +46,7 @@ type StoolColor = 'brown' | 'dark' | 'light' | 'yellow' | 'green' | 'black' | 'r
 
 type StoolRecord = BaseRecord & {
   date: string
+  dateTime?: string // Optional for backward compatibility
   status: StoolStatus
   type: StoolType
   volume: StoolVolume
@@ -148,10 +149,16 @@ class StoolDB implements StoolDatabase {
             records.forEach((record: any) => {
               const now = new Date().toISOString()
               if (!record.createdAt) {
-                record.createdAt = record.date || now
+                record.createdAt = record.dateTime || record.date || now
               }
               if (!record.updatedAt) {
-                record.updatedAt = record.date || now
+                record.updatedAt = record.dateTime || record.date || now
+              }
+              // Ensure both date and dateTime fields exist for compatibility
+              if (record.dateTime && !record.date) {
+                record.date = record.dateTime
+              } else if (record.date && !record.dateTime) {
+                record.dateTime = record.date
               }
               stoolRecordsStore.put(record)
             })
@@ -909,7 +916,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       console.log('loadStoolRecords: 获取到记录数:', records.length)
       console.log('loadStoolRecords: 记录详情:', records)
       // 按日期倒序排列
-      records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      records.sort((a, b) => new Date(b.dateTime || b.date).getTime() - new Date(a.dateTime || a.date).getTime())
       setStoolRecords(records)
     } catch (error) {
       console.error('获取排便记录失败:', error)
@@ -1011,7 +1018,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
     // 检查是否有Stool记录 - 使用时区安全的日期比较
     const hasStoolRecord = stoolRecords.some(record => {
-      return isRecordOnLocalDate(record.date, date) && !record.delFlag && record.userId === currentUser.id
+      return isRecordOnLocalDate(record.dateTime || record.date, date) && !record.delFlag && record.userId === currentUser.id
     })
     if (hasStoolRecord) {
       dots.push({
@@ -1081,11 +1088,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     // 获取当前用户的最新排便记录
     const userStoolRecords = stoolRecords
       .filter(record => record.userId === currentUser.id && !record.delFlag)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => new Date(b.dateTime || b.date).getTime() - new Date(a.dateTime || a.date).getTime())
 
     if (userStoolRecords.length === 0) return null
 
-    const lastStoolTime = new Date(userStoolRecords[0].date)
+    const lastStoolTime = new Date(userStoolRecords[0].dateTime || userStoolRecords[0].date)
     const now = new Date()
     const diffMs = now.getTime() - lastStoolTime.getTime()
     
@@ -1156,7 +1163,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
     // Stool Records - 使用时区安全的日期比较
     stoolRecords.forEach(record => {
-      if (isRecordOnLocalDate(record.date, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
+      if (isRecordOnLocalDate(record.dateTime || record.date, selectedDate) && !record.delFlag && record.userId === currentUser.id) {
         allRecords.push({
           ...record,
           type: 'stool',
@@ -2100,7 +2107,7 @@ const handleDataSync = useCallback(async () => {
                       const stoolRecordsFormatted: DisplayRecord[] = stoolRecords.map(record => ({
                         id: record.id,
                         type: 'stool',
-                        date: record.date,
+                        date: record.dateTime || record.date,
                         title: '排便记录',
                         description: record.notes || `${getStatusText(record.status)}，${getTypeText(record.type)}`,
                         tags: [
@@ -2293,7 +2300,7 @@ const handleDataSync = useCallback(async () => {
                     <div>排便记录数: {stoolRecords.length}</div>
                     <div>加载状态: {isLoading ? '加载中...' : '已完成'}</div>
                     {stoolRecords.length > 0 && (
-                      <div>记录详情: {stoolRecords.map(r => `ID:${r.id.slice(-4)},日期:${r.date.slice(0,10)}`).join(', ')}</div>
+                      <div>记录详情: {stoolRecords.map(r => `ID:${r.id.slice(-4)},日期:${(r.dateTime || r.date).slice(0,10)}`).join(', ')}</div>
                     )}
                   </div> */}
                   
@@ -2307,7 +2314,7 @@ const handleDataSync = useCallback(async () => {
                         id: record.id,
                         type: 'stool',
                         date: record.updatedAt, // 使用 updatedAt 而不是 date
-                        originalDate: record.date, // 保留原始日期用于显示
+                        originalDate: record.dateTime || record.date, // 保留原始日期用于显示
                         title: '排便记录',
                         description: record.notes || `${getStatusText(record.status)}，${getTypeText(record.type)}`,
                         tags: [

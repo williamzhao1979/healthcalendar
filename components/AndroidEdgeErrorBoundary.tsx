@@ -48,9 +48,9 @@ class AndroidEdgeErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('AndroidEdgeErrorBoundary caught an error:', error, errorInfo)
     
-    // 在Android Edge上记录额外的调试信息
+    // 在Mobile上记录额外的调试信息
     if (this.state.isAndroidEdge) {
-      console.error('Android Edge Error Context:', {
+      console.error('Mobile Error Context:', {
         userAgent: navigator.userAgent,
         cookiesEnabled: navigator.cookieEnabled,
         onLine: navigator.onLine,
@@ -87,7 +87,7 @@ class AndroidEdgeErrorBoundary extends Component<Props, State> {
         retryCount: prevState.retryCount + 1
       }))
       
-      // Android Edge可能需要短暂延迟后重试
+      // Mobile可能需要短暂延迟后重试
       if (this.state.isAndroidEdge) {
         setTimeout(() => {
           window.location.reload()
@@ -106,7 +106,7 @@ class AndroidEdgeErrorBoundary extends Component<Props, State> {
       localStorage.removeItem('msal.cache')
       sessionStorage.clear()
       
-      // 清理Android Edge特定的缓存
+      // 清理Mobile特定的缓存
       if (this.state.isAndroidEdge) {
         // 尝试清理更多缓存项
         const keysToRemove = []
@@ -131,26 +131,26 @@ class AndroidEdgeErrorBoundary extends Component<Props, State> {
 
     const errorMessage = this.state.error.message.toLowerCase()
     
-    // Android Edge特定错误处理
+    // Mobile特定错误处理
     if (this.state.isAndroidEdge) {
       if (errorMessage.includes('crypto') || errorMessage.includes('cryptography')) {
-        return 'Android Edge 浏览器的加密功能不可用。这可能是由于浏览器设置或网络环境导致的。'
+        return 'Mobile 浏览器的加密功能不可用。这可能是由于浏览器设置或网络环境导致的。'
       }
       
       if (errorMessage.includes('msal') || errorMessage.includes('authentication')) {
-        return 'Android Edge 浏览器的认证模块遇到问题。这可能是由于浏览器兼容性或网络连接问题导致的。'
+        return 'Mobile 浏览器的认证模块遇到问题。这可能是由于浏览器兼容性或网络连接问题导致的。'
       }
       
       if (errorMessage.includes('redirect') || errorMessage.includes('navigation')) {
-        return 'Android Edge 浏览器的页面重定向功能遇到问题。这可能是由于浏览器安全设置导致的。'
+        return 'Mobile 浏览器的页面重定向功能遇到问题。这可能是由于浏览器安全设置导致的。'
       }
       
       if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
-        return 'Android Edge 浏览器的网络请求失败。请检查网络连接或尝试切换到 WiFi 网络。'
+        return 'Mobile 浏览器的网络请求失败。请检查网络连接或尝试切换到 WiFi 网络。'
       }
       
       if (errorMessage.includes('storage') || errorMessage.includes('quota')) {
-        return 'Android Edge 浏览器的存储空间不足或访问受限。请清理浏览器缓存或释放存储空间。'
+        return 'Mobile 浏览器的存储空间不足或访问受限。请清理浏览器缓存或释放存储空间。'
       }
     }
     
@@ -171,7 +171,7 @@ class AndroidEdgeErrorBoundary extends Component<Props, State> {
       
       if (errorMessage.includes('crypto')) {
         baseSolutions.push('确认浏览器支持最新的 Web 标准')
-        baseSolutions.push('更新 Android Edge 到最新版本')
+        baseSolutions.push('更新 Mobile 到最新版本')
       }
       
       if (errorMessage.includes('storage') || errorMessage.includes('quota')) {
@@ -209,7 +209,7 @@ class AndroidEdgeErrorBoundary extends Component<Props, State> {
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>
-                {this.state.isAndroidEdge ? 'Android Edge 兼容性问题' : '应用程序错误'}
+                {this.state.isAndroidEdge ? 'Mobile 兼容性问题' : '应用程序错误'}
               </AlertTitle>
               <AlertDescription className="space-y-4">
                 <div>
@@ -231,8 +231,8 @@ class AndroidEdgeErrorBoundary extends Component<Props, State> {
                     <div className="flex items-start space-x-2">
                       <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
                       <div className="text-sm text-blue-800">
-                        <p className="font-semibold">Android Edge 用户提示：</p>
-                        <p>我们检测到您正在使用 Android Edge 浏览器。为了获得最佳体验，建议使用 Chrome 浏览器访问此应用。</p>
+                        <p className="font-semibold">Mobile 用户提示：</p>
+                        <p>我们检测到您正在使用 Mobile 浏览器。为了获得最佳体验，建议使用 Chrome 浏览器访问此应用。</p>
                       </div>
                     </div>
                   </div>

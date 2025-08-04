@@ -9,6 +9,12 @@
 export function getLocalDateString(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
   
+  // Check if the date is valid
+  if (!d || isNaN(d.getTime())) {
+    console.warn('Invalid date passed to getLocalDateString:', date)
+    return new Date().toISOString().slice(0, 10) // Return today's date as fallback
+  }
+  
   // Use local date components to avoid timezone shifts
   const year = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -22,6 +28,10 @@ export function getLocalDateString(date: Date | string): string {
  * This prevents timezone issues when comparing dates
  */
 export function isSameLocalDay(date1: Date | string, date2: Date | string): boolean {
+  // Handle undefined/null dates gracefully
+  if (!date1 || !date2) {
+    return false
+  }
   return getLocalDateString(date1) === getLocalDateString(date2)
 }
 
@@ -30,6 +40,13 @@ export function isSameLocalDay(date1: Date | string, date2: Date | string): bool
  */
 export function getLocalDateTimeString(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date
+  
+  // Check if the date is valid
+  if (!d || isNaN(d.getTime())) {
+    console.warn('Invalid date passed to getLocalDateTimeString:', date)
+    const now = new Date()
+    return now.toISOString().slice(0, 16).replace('T', ' ') // Return current datetime as fallback
+  }
   
   const year = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -102,6 +119,14 @@ export function formatLocalDateTime(date: Date | string, options?: Intl.DateTime
  */
 export function getStartOfLocalDay(date: Date | string): Date {
   const d = typeof date === 'string' ? new Date(date) : date
+  
+  // Check if the date is valid
+  if (!d || isNaN(d.getTime())) {
+    console.warn('Invalid date passed to getStartOfLocalDay:', date)
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  }
+  
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
@@ -110,6 +135,14 @@ export function getStartOfLocalDay(date: Date | string): Date {
  */
 export function getEndOfLocalDay(date: Date | string): Date {
   const d = typeof date === 'string' ? new Date(date) : date
+  
+  // Check if the date is valid
+  if (!d || isNaN(d.getTime())) {
+    console.warn('Invalid date passed to getEndOfLocalDay:', date)
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+  }
+  
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
 }
 
@@ -118,5 +151,9 @@ export function getEndOfLocalDay(date: Date | string): Date {
  * This is the main function to use for calendar date matching
  */
 export function isRecordOnLocalDate(recordDateTime: string, calendarDate: Date): boolean {
+  // Handle undefined/null record dates gracefully
+  if (!recordDateTime || !calendarDate) {
+    return false
+  }
   return isSameLocalDay(recordDateTime, calendarDate)
 }

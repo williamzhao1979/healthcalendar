@@ -41,7 +41,7 @@ export const OneDriveCompatibilityAlert: React.FC<OneDriveCompatibilityAlertProp
         OneDrive同步不可用
         {deviceInfo.isAndroidEdge && (
           <Badge variant="outline" className="text-xs">
-            Android Edge
+            Mobile
           </Badge>
         )}
       </AlertTitle>
@@ -50,14 +50,14 @@ export const OneDriveCompatibilityAlert: React.FC<OneDriveCompatibilityAlertProp
           <p>{unavailabilityReason || '您的浏览器不支持OneDrive同步功能'}</p>
         </div>
 
-        {/* Android Edge特定提示 */}
+        {/* Mobile特定提示 */}
         {deviceInfo.isAndroidEdge && (
           <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
             <div className="flex items-start space-x-2">
               <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-amber-800">
-                <p className="font-semibold">Android Edge 兼容性提示：</p>
-                <p>我们检测到您正在使用 Android Edge 浏览器。由于浏览器兼容性限制，OneDrive 同步功能可能不稳定。为了获得最佳体验，强烈建议使用 Chrome 浏览器。</p>
+                <p className="font-semibold">Mobile 兼容性提示：</p>
+                <p>我们检测到您正在使用 Mobile 浏览器。由于浏览器兼容性限制，OneDrive 同步功能可能不稳定。为了获得最佳体验，强烈建议使用 Chrome 浏览器。</p>
               </div>
             </div>
           </div>

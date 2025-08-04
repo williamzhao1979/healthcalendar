@@ -1284,6 +1284,13 @@ export class IndexedDBAdminService {
       if (!record.createdAt) record.createdAt = now;
       record.updatedAt = now;
       
+      // 确保both date and dateTime fields exist for backward compatibility
+      if (record.dateTime && !record.date) {
+        record.date = record.dateTime;
+      } else if (record.date && !record.dateTime) {
+        record.dateTime = record.date;
+      }
+      
       const addRequest = store.add(record);
       addRequest.onsuccess = () => resolve(record.id);
       addRequest.onerror = () => reject(addRequest.error);
@@ -1307,6 +1314,13 @@ export class IndexedDBAdminService {
         
         // 合并现有记录和新记录
         Object.assign(existingRecord, record);
+        
+        // 确保both date and dateTime fields exist for backward compatibility
+        if (existingRecord.dateTime && !existingRecord.date) {
+          existingRecord.date = existingRecord.dateTime;
+        } else if (existingRecord.date && !existingRecord.dateTime) {
+          existingRecord.dateTime = existingRecord.date;
+        }
         
         // 验证记录格式
         // const validation = this.validateRecord('stoolRecords', existingRecord);

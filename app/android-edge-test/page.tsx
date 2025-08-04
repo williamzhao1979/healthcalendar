@@ -183,7 +183,7 @@ export default function AndroidEdgeTestPage() {
 
     for (const test of tests) {
       await runTest(test.name, test.fn)
-      // 在Android Edge上添加延迟以避免过快的请求
+      // 在Mobile上添加延迟以避免过快的请求
       if (deviceInfo?.isAndroidEdge) {
         await new Promise(resolve => setTimeout(resolve, 500))
       }
@@ -238,15 +238,15 @@ export default function AndroidEdgeTestPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
             <Shield className="w-8 h-8 text-blue-600" />
-            Android Edge 兼容性测试
+            Mobile 兼容性测试
             {deviceInfo.isAndroidEdge && (
               <Badge variant="default" className="bg-orange-100 text-orange-800 border-orange-200">
-                检测到 Android Edge
+                检测到 Mobile
               </Badge>
             )}
           </h1>
           <p className="text-gray-600">
-            测试和验证 Android Edge 浏览器的 MSAL 认证兼容性和功能支持
+            测试和验证 Mobile 浏览器的 MSAL 认证兼容性和功能支持
           </p>
         </div>
 
@@ -286,7 +286,7 @@ export default function AndroidEdgeTestPage() {
                       <span className="font-mono text-sm">{deviceInfo.platform}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Android Edge:</span>
+                      <span className="text-gray-600">Mobile:</span>
                       <Badge variant={deviceInfo.isAndroidEdge ? "destructive" : "outline"}>
                         {deviceInfo.isAndroidEdge ? '是' : '否'}
                       </Badge>
@@ -339,7 +339,7 @@ export default function AndroidEdgeTestPage() {
                   兼容性测试套件
                 </CardTitle>
                 <CardDescription>
-                  全面测试 Android Edge 浏览器的各项功能支持
+                  全面测试 Mobile 浏览器的各项功能支持
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -419,7 +419,7 @@ export default function AndroidEdgeTestPage() {
                   MSAL 认证测试
                 </CardTitle>
                 <CardDescription>
-                  测试 Microsoft Authentication Library 在 Android Edge 上的功能
+                  测试 Microsoft Authentication Library 在 Mobile 上的功能
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -522,18 +522,17 @@ export default function AndroidEdgeTestPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Info className="w-5 h-5" />
-                  Android Edge 使用建议
+                  Mobile 使用建议
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {deviceInfo.isAndroidEdge ? (
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>检测到 Android Edge 浏览器</AlertTitle>
+                    <AlertTitle>检测到 Mobile 浏览器</AlertTitle>
                     <AlertDescription className="space-y-3">
-                      <p>我们检测到您正在使用 Android Edge 浏览器。由于兼容性限制，建议您:</p>
+                      <p>我们检测到您正在使用 Mobile 浏览器。由于兼容性限制，建议您:</p>
                       <ul className="list-disc list-inside space-y-1 ml-4">
-                        <li>使用 Chrome 浏览器以获得最佳体验</li>
                         <li>确保使用 HTTPS 连接</li>
                         <li>允许浏览器弹窗和重定向</li>
                         <li>保持稳定的网络连接</li>

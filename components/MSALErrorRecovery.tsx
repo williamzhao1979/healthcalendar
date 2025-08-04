@@ -94,7 +94,7 @@ export const MSALErrorRecovery: React.FC<MSALErrorRecoveryProps> = ({
       )
     }
 
-    // Android Edge特定按钮
+    // Mobile特定按钮
     if (deviceInfo.isAndroidEdge) {
       buttons.push(
         <Button
@@ -144,7 +144,7 @@ export const MSALErrorRecovery: React.FC<MSALErrorRecoveryProps> = ({
         {errorTips.title}
         {deviceInfo.isAndroidEdge && (
           <Badge variant="outline" className="text-xs">
-            Android Edge
+            Mobile
           </Badge>
         )}
       </AlertTitle>
@@ -164,14 +164,14 @@ export const MSALErrorRecovery: React.FC<MSALErrorRecoveryProps> = ({
           </ol>
         </div>
 
-        {/* Android Edge特定提示 */}
+        {/* Mobile特定提示 */}
         {isAndroidEdgeSpecific && (
           <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
             <div className="flex items-start space-x-2">
               <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-amber-800">
-                <p className="font-semibold">Android Edge 特别提示：</p>
-                <p>这是 Android Edge 浏览器的已知兼容性问题。建议使用 Chrome 浏览器以获得最佳体验。</p>
+                <p className="font-semibold">Mobile 特别提示：</p>
+                <p>这是 Mobile 浏览器的已知兼容性问题。</p>
               </div>
             </div>
           </div>
@@ -218,7 +218,7 @@ export const MSALErrorRecovery: React.FC<MSALErrorRecoveryProps> = ({
               <div><strong>错误消息：</strong> {error.message}</div>
               <div><strong>浏览器：</strong> {deviceInfo.browserName}</div>
               <div><strong>设备类型：</strong> {deviceInfo.isMobile ? '移动设备' : '桌面设备'}</div>
-              <div><strong>Android Edge：</strong> {deviceInfo.isAndroidEdge ? '是' : '否'}</div>
+              <div><strong>Mobile：</strong> {deviceInfo.isAndroidEdge ? '是' : '否'}</div>
               <div><strong>用户代理：</strong> {navigator.userAgent}</div>
             </div>
           </details>
