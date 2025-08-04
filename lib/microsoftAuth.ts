@@ -477,7 +477,7 @@ if (redirectError instanceof Error && redirectError.message.includes('Redirectin
       if (deviceInfo.isAndroidEdge || deviceInfo.isMobile) {
         console.log('Using redirect logout for mobile/Android Edge')
         await this.msalInstance.logoutRedirect({
-          console.log('redirecting to health-calendar after logout')
+          // console.log('redirecting to health-calendar after logout')
           // postLogoutRedirectUri: window.location.origin + '/health-calendar'
         })
       } else {
