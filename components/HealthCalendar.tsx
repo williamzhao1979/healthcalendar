@@ -815,6 +815,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     // 初始化用户数据
     initializeUsers()
     
+    // 检查OneDrive连接状态（处理重定向后的认证状态）
+    oneDriveActions.checkConnection().catch(error => {
+      console.warn('OneDrive连接检查失败:', error)
+    })
+    
     // 点击外部关闭下拉菜单
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement
