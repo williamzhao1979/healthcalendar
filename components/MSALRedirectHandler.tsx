@@ -62,25 +62,42 @@ export const MSALRedirectHandler: React.FC<MSALRedirectHandlerProps> = ({ childr
               const cleanUrl = window.location.origin + window.location.pathname
               window.history.replaceState({}, document.title, cleanUrl)
             }
+            
+            // 延迟显示成功状态，然后跳转
+            setTimeout(() => {
+              setIsHandlingRedirect(false)
+              setTimeout(() => {
+                // 强制刷新页面以确保状态正确更新
+                // 这样可以避免状态不同步的问题
+                if (window.location.pathname === '/health-calendar') {
+                  // 如果已经在健康日历页面，直接刷新
+                  window.location.reload()
+                } else {
+                  // 否则跳转到健康日历页面
+                  window.location.href = '/health-calendar'
+                }
+              }, 1500) // 给用户1.5秒时间看到成功消息
+            }, device.isAndroidEdge ? 2000 : 1000)
+            
           } else {
             console.log('No redirect response received')
             setRedirectResult('error')
             setError('未收到重定向响应，可能是认证流程异常')
+            
+            // 延迟隐藏加载状态
+            setTimeout(() => {
+              setIsHandlingRedirect(false)
+            }, device.isAndroidEdge ? 2000 : 1000)
           }
         } catch (error) {
           console.error('Failed to handle redirect:', error)
           setRedirectResult('error')
           setError(error instanceof Error ? error.message : '重定向处理失败')
-        } finally {
-          // 延迟隐藏加载状态，给用户足够的反馈时间
+          
+          // 延迟隐藏加载状态
           setTimeout(() => {
             setIsHandlingRedirect(false)
-            
-            // 如果成功，再延迟一秒后清理结果状态
-            if (redirectResult === 'success') {
-              setTimeout(() => setRedirectResult(null), 1000)
-            }
-          }, device.isAndroidEdge ? 2000 : 1000) // Android Edge需要更长的处理时间
+          }, device.isAndroidEdge ? 2000 : 1000)
         }
       }
     }
