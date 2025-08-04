@@ -1001,6 +1001,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
   }, [currentUser])
 
+  
   // 获取特定日期的记录圆点
   const getRecordDotsForDate = (date: Date) => {
     if (!currentUser) return []
@@ -1737,6 +1738,7 @@ const handleAttachmentDownload = useCallback(async (attachment: Attachment) => {
 
 // 处理数据同步
 const handleDataSync = useCallback(async () => {
+  console.log('handleDataSync 开始数据同步...')
   if (!currentUser || !oneDriveState.isAuthenticated) {
     return
   }
@@ -1751,7 +1753,7 @@ const handleDataSync = useCallback(async () => {
       oneDriveActions.syncIDBOneDriveMealRecords()
     ])
     
-    console.log('数据同步完成')
+    console.log('handleDataSync 数据同步完成')
     
     // 刷新所有数据显示
     await Promise.all([
@@ -1760,11 +1762,23 @@ const handleDataSync = useCallback(async () => {
       loadMealRecords(),
       loadPeriodRecords()
     ])
+    console.log('handleDataSync 所有记录已刷新')
   } catch (error) {
     console.error('数据同步失败:', error)
     alert('数据同步失败: ' + (error instanceof Error ? error.message : '未知错误'))
   }
 }, [currentUser, oneDriveState.isAuthenticated, oneDriveActions, loadStoolRecords, loadMyRecords, loadMealRecords, loadPeriodRecords])
+
+useEffect(() => {
+  if (oneDriveState.isAuthenticated && currentUser) {
+    loadStoolRecords()
+    loadMyRecords()
+    loadMealRecords()
+    loadPeriodRecords()
+    // 添加测试数据（仅在开发环境中）
+    // addTestDataIfNeeded()
+  }
+}, [oneDriveState.isAuthenticated])
 
   return (
     <div className="min-h-screen">
