@@ -62,7 +62,7 @@
   --calendar-today: #3b82f6;
   --calendar-selected: #10b981;
   
-  --stat-card-bg: rgba(17, 24, 39, 0.95);
+  --stat-card-bg: rgba(0, 0, 0, 0.8);
   --stat-card-border: rgba(75, 85, 99, 0.5);
   --stat-card-hover: rgba(55, 65, 81, 0.7);
   
