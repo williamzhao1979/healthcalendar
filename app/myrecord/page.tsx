@@ -558,9 +558,27 @@ function MyRecordPageContent() {
 
   const initializeDateTime = () => {
     const now = new Date()
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+    let targetDateTime: Date
+    
+    // 检查URL参数中是否有日期
+    const dateParam = searchParams.get('date')
+    if (dateParam) {
+      // 如果有日期参数，使用该日期 + 当前时间
+      const selectedDate = new Date(dateParam + 'T00:00:00')
+      targetDateTime = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        now.getHours(),
+        now.getMinutes()
+      )
+    } else {
+      // 否则使用当前日期时间
+      targetDateTime = now
+    }
+    
+    const localDateTime = new Date(targetDateTime.getTime() - targetDateTime.getTimezoneOffset() * 60000)
     setDateTime(localDateTime.toISOString().slice(0, 16))
-    // setDateTime(now.toISOString().slice(0, 16))
   }
 
   const loadRecordForEdit = async (id: string) => {
@@ -584,9 +602,11 @@ function MyRecordPageContent() {
   }
 
   const handleUserChange = async (user: UserType) => {
+    await adminService.setCurrentUser(user.id)
     // 更新用户活跃状态
     // await userDB.setActiveUser(user.id)
-    setCurrentUser(user)
+    // setCurrentUser(user)
+    setCurrentUser(users.find(u => u.id === user.id) || null)
     
     // 重新加载用户列表以更新活跃状态
     // const updatedUsers = await userDB.getAllUsers()
@@ -648,6 +668,11 @@ function MyRecordPageContent() {
         // await myRecordDB.saveRecord(recordData)
         await adminService.saveMyRecord(recordData)
         // alert('记录已保存！')
+      }
+
+      if (oneDriveState.isAuthenticated) {
+        console.log('MyRecord页面 - 开始同步OneDrive我的记录')
+        oneDriveActions.syncIDBOneDriveMyRecords()
       }
 
       // 返回到健康日历页面

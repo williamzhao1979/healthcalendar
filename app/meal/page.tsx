@@ -28,6 +28,8 @@ import { useOneDriveSync } from '../../hooks/useOneDriveSync'
 import { AttachmentUploader } from '../../components/AttachmentUploader'
 import { AttachmentViewer } from '../../components/AttachmentViewer'
 import { Attachment } from '../../types/attachment'
+import { useConfirm } from '../../hooks/useConfirm'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 interface MealRecord {
   id: string
@@ -364,6 +366,13 @@ const UserSwitcher: React.FC<{
   )
 }
 
+const getDefaultMealType = () => {
+  const hour = new Date().getHours()
+  if (hour < 11) return 'breakfast'        // before 11:00
+  if (hour < 17) return 'lunch'            // 11:00 ~ 16:59
+  return 'dinner'                          // 17:00+
+}
+
 function MealPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -377,7 +386,7 @@ function MealPageContent() {
   // 表单状态
   const [date, setDate] = useState('')
   const [dateTime, setDateTime] = useState('')
-  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner'>('breakfast')
+  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner'>(getDefaultMealType)
   const [amount, setAmount] = useState<'very_little' | 'little' | 'moderate' | 'much'>('moderate')
   const [notes, setNotes] = useState('')
   const [tags, setTags] = useState<string[]>(['健康', '美味'])
@@ -386,6 +395,9 @@ function MealPageContent() {
   
   // OneDrive 同步状态
   const [oneDriveState, oneDriveActions] = useOneDriveSync()
+
+  // 确认对话框
+  const { confirmState, showSuccess, closeConfirm } = useConfirm()
 
   // UI状态
   const [isLoading, setIsLoading] = useState(false)
@@ -398,7 +410,7 @@ function MealPageContent() {
 
   useEffect(() => {
     initializeData()
-  }, [editId])
+  }, [editId, searchParams])
   
   // 单独的OneDrive初始化，只执行一次
   useEffect(() => {
@@ -449,8 +461,26 @@ function MealPageContent() {
 
       // 设置默认日期时间
       const now = new Date()
-      const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      // setDate(localDateTime.toISOString().slice(0, 16))
+      let targetDateTime: Date
+      
+      // 检查URL参数中是否有日期
+      const dateParam = searchParams.get('date')
+      if (dateParam) {
+        // 如果有日期参数，使用该日期 + 当前时间
+        const selectedDate = new Date(dateParam + 'T00:00:00')
+        targetDateTime = new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          selectedDate.getDate(),
+          now.getHours(),
+          now.getMinutes()
+        )
+      } else {
+        // 否则使用当前日期时间
+        targetDateTime = now
+      }
+      
+      const localDateTime = new Date(targetDateTime.getTime() - targetDateTime.getTimezoneOffset() * 60000)
       setDateTime(localDateTime.toISOString().slice(0, 16))
 
       // 如果是编辑模式，加载记录数据
@@ -474,16 +504,18 @@ function MealPageContent() {
   }
 
   const handleUserChange = async (user: UserType) => {
-    setCurrentUser(user)
+      await adminService.setCurrentUser(user.id)
+    // setCurrentUser(user)
+      setCurrentUser(users.find(u => u.id === user.id) || null)
     // await userDB.setActiveUser(user.id)
   }
 
   const handleSaveRecord = async () => {
     if (!currentUser) {
-      alert('请选择用户')
+      await showSuccess('提示', '请选择用户')
       return
     }
-
+    console.log('Meal页面 - 开始保存记录')
     try {
       setIsLoading(true)
 
@@ -500,17 +532,22 @@ function MealPageContent() {
       if (isEditMode && editId) {
         // await mealDB.updateRecord(editId, recordData)
         await adminService.updateMealRecord(editId, recordData)
-        // alert('记录更新成功！')
+        // 成功后直接跳转，不显示成功提示
       } else {
         // await mealDB.saveRecord(recordData)
         await adminService.saveMealRecord(recordData)
-        // alert('记录保存成功！')
+        // 成功后直接跳转，不显示成功提示
+      }
+
+      if (oneDriveState.isAuthenticated) {
+        console.log('Meal页面 - 开始同步OneDrive饮食记录')
+        oneDriveActions.syncIDBOneDriveMealRecords()
       }
 
       router.push('/health-calendar')
     } catch (error) {
       console.error('保存记录失败:', error)
-      alert('保存失败，请重试')
+      await showSuccess('错误', '保存失败，请重试')
     } finally {
       setIsLoading(false)
     }
@@ -1049,6 +1086,19 @@ function MealPageContent() {
             </div>
           </div>
         )}
+
+      {/* 确认对话框 */}
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        onConfirm={confirmState.onConfirm}
+        onCancel={confirmState.onCancel}
+        isLoading={confirmState.isLoading}
+      />
       </div>
     </div>
   )

@@ -128,35 +128,67 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
     return file
   }, [compressImages, compressImage])
 
-  // 验证文件
-  const validateFile = (file: File): string | null => {
+  // 验证单个文件
+  const validateFile = (file: File, currentAttachmentCount: number): string | null => {
     if (file.size > MAX_FILE_SIZE) {
-      return `文件大小不能超过 ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(1)}MB`
+      return `文件"${file.name}"大小不能超过 ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(1)}MB`
     }
 
-    if (attachments.length >= MAX_ATTACHMENTS_PER_RECORD) {
+    if (currentAttachmentCount >= MAX_ATTACHMENTS_PER_RECORD) {
       return `每个记录最多只能上传 ${MAX_ATTACHMENTS_PER_RECORD} 个附件`
     }
 
     return null
   }
 
-  // 处理文件上传
+  // 验证多个文件
+  const validateFiles = (files: FileList): { validFiles: File[], errors: string[] } => {
+    const validFiles: File[] = []
+    const errors: string[] = []
+    let currentCount = attachments.length
+
+    // 首先检查总数量限制
+    if (currentCount + files.length > MAX_ATTACHMENTS_PER_RECORD) {
+      errors.push(`选择的文件过多。当前已有 ${currentCount} 个附件，最多只能再上传 ${MAX_ATTACHMENTS_PER_RECORD - currentCount} 个`)
+      return { validFiles: [], errors }
+    }
+
+    // 逐个验证文件
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const error = validateFile(file, currentCount + validFiles.length)
+      
+      if (error) {
+        errors.push(error)
+      } else {
+        validFiles.push(file)
+      }
+    }
+
+    return { validFiles, errors }
+  }
+
+  // 处理多文件上传
   const handleFileUpload = useCallback(async (files: FileList) => {
     if (!oneDriveConnected) {
       setUploadState(prev => ({ ...prev, error: '需要先连接OneDrive才能上传附件' }))
       return
     }
 
-    const originalFile = files[0] // 暂时只支持单文件上传
-    if (!originalFile) return
+    if (files.length === 0) return
 
-    console.log(`🔄 开始处理文件上传: ${originalFile.name}`)
-    console.log(`📝 原始文件信息 - 大小: ${(originalFile.size / 1024 / 1024).toFixed(2)}MB, 类型: ${originalFile.type}`)
+    console.log(`🔄 开始处理多文件上传: ${files.length} 个文件`)
 
-    const validationError = validateFile(originalFile)
-    if (validationError) {
-      setUploadState(prev => ({ ...prev, error: validationError }))
+    // 验证所有文件
+    const { validFiles, errors } = validateFiles(files)
+    
+    if (errors.length > 0) {
+      setUploadState(prev => ({ ...prev, error: errors.join('; ') }))
+      return
+    }
+
+    if (validFiles.length === 0) {
+      setUploadState(prev => ({ ...prev, error: '没有有效的文件可以上传' }))
       return
     }
 
@@ -166,59 +198,84 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
       error: null
     })
 
+    const newAttachments: Attachment[] = []
+    const totalFiles = validFiles.length
+    let completedFiles = 0
+
     try {
-      // 预处理文件（可能包含压缩）
-      console.log(`🔧 预处理文件 - 压缩选项: ${compressImages ? '启用' : '禁用'}`)
-      const processedFile = await preprocessFile(originalFile)
-      
-      console.log(`✅ 文件预处理完成`)
-      console.log(`📝 处理后文件信息 - 大小: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB, 类型: ${processedFile.type}`)
-      console.log(`📊 文件大小变化: ${originalFile.size === processedFile.size ? '无变化' : `${originalFile.size} -> ${processedFile.size} bytes`}`)
+      console.log(`📋 开始批量上传 ${totalFiles} 个文件`)
 
-      // 模拟上传进度
-      const progressInterval = setInterval(() => {
-        setUploadState(prev => ({
-          ...prev,
-          progress: Math.min(prev.progress + 10, 90)
-        }))
-      }, 100)
+      // 批量处理所有文件
+      for (let i = 0; i < validFiles.length; i++) {
+        const originalFile = validFiles[i]
+        
+        console.log(`🔄 处理文件 ${i + 1}/${totalFiles}: ${originalFile.name}`)
+        console.log(`📝 文件信息 - 大小: ${(originalFile.size / 1024 / 1024).toFixed(2)}MB, 类型: ${originalFile.type}`)
 
-      console.log(`⬆️ 开始上传到OneDrive`)
-      const fileName = await onUpload(processedFile, recordType, recordId)
+        try {
+          // 预处理文件（可能包含压缩）
+          console.log(`🔧 预处理文件 - 压缩选项: ${compressImages ? '启用' : '禁用'}`)
+          const processedFile = await preprocessFile(originalFile)
+          
+          console.log(`✅ 文件预处理完成`)
+          console.log(`📝 处理后文件信息 - 大小: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`)
 
-      clearInterval(progressInterval)
+          console.log(`⬆️ 开始上传到OneDrive: ${originalFile.name}`)
+          const fileName = await onUpload(processedFile, recordType, recordId)
 
-      // 创建新的附件对象
-      const newAttachment: Attachment = {
-        id: `attachment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        fileName,
-        originalName: originalFile.name,
-        fileSize: processedFile.size, // 使用处理后的文件大小
-        mimeType: originalFile.type,
-        uploadedAt: new Date().toISOString(),
-        isUploaded: true
+          // 创建新的附件对象
+          const newAttachment: Attachment = {
+            id: `attachment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${i}`,
+            fileName,
+            originalName: originalFile.name,
+            fileSize: processedFile.size,
+            mimeType: originalFile.type,
+            uploadedAt: new Date().toISOString(),
+            isUploaded: true
+          }
+
+          newAttachments.push(newAttachment)
+          completedFiles++
+
+          // 更新进度
+          const progress = Math.floor((completedFiles / totalFiles) * 100)
+          setUploadState(prev => ({
+            ...prev,
+            progress
+          }))
+
+          console.log(`🎉 文件上传成功 ${completedFiles}/${totalFiles}: ${originalFile.name}`)
+
+        } catch (fileError) {
+          console.error(`❌ 文件上传失败: ${originalFile.name}`, fileError)
+          // 继续处理其他文件，不中断整个过程
+        }
       }
 
       // 更新附件列表
-      const updatedAttachments = [...attachments, newAttachment]
-      onAttachmentsChange(updatedAttachments)
+      if (newAttachments.length > 0) {
+        const updatedAttachments = [...attachments, ...newAttachments]
+        onAttachmentsChange(updatedAttachments)
+      }
 
       setUploadState({
         isUploading: false,
         progress: 100,
-        error: null
+        error: completedFiles === 0 ? '所有文件上传失败' : 
+               completedFiles < totalFiles ? `部分文件上传成功 (${completedFiles}/${totalFiles})` : null
       })
 
-      console.log('🎉 附件上传成功:', newAttachment)
+      console.log(`🏁 批量上传完成: ${completedFiles}/${totalFiles} 个文件成功`)
+
     } catch (error) {
       setUploadState({
         isUploading: false,
         progress: 0,
-        error: error instanceof Error ? error.message : '上传失败'
+        error: error instanceof Error ? error.message : '批量上传失败'
       })
-      console.error('❌ 附件上传失败:', error)
+      console.error('❌ 批量上传失败:', error)
     }
-  }, [oneDriveConnected, attachments, onUpload, onAttachmentsChange, recordType, recordId, validateFile, preprocessFile, compressImages])
+  }, [oneDriveConnected, attachments, onUpload, onAttachmentsChange, recordType, recordId, validateFiles, preprocessFile, compressImages])
 
   // 处理删除附件
   const handleDeleteAttachment = useCallback(async (attachment: Attachment) => {
@@ -351,28 +408,29 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
           accept={SUPPORTED_FILE_TYPES.all.join(',')}
           onChange={handleFileSelect}
           disabled={disabled}
+          multiple
         />
         
         {uploadState.isUploading ? (
           <div className="space-y-2">
             <Upload className="w-6 h-6 text-blue-500 mx-auto animate-pulse" />
-            <p className="text-sm text-gray-600">正在上传...</p>
+            <p className="text-sm text-gray-600">正在批量上传文件...</p>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
                 className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${uploadState.progress}%` }}
               ></div>
             </div>
-            <p className="text-xs text-gray-500">{uploadState.progress}%</p>
+            <p className="text-xs text-gray-500">上传进度: {uploadState.progress}%</p>
           </div>
         ) : (
           <div className="space-y-2">
             <Upload className="w-6 h-6 text-gray-400 mx-auto" />
             <p className="text-sm text-gray-600">
-              拖拽文件到此处或点击上传
+              拖拽文件到此处或点击选择多个文件
             </p>
             <p className="text-xs text-gray-500">
-              支持图片、PDF、文档等格式，最大 {(MAX_FILE_SIZE / 1024 / 1024).toFixed(1)}MB
+              支持同时上传多个文件，每个文件最大 {(MAX_FILE_SIZE / 1024 / 1024).toFixed(1)}MB，最多 {MAX_ATTACHMENTS_PER_RECORD} 个附件
             </p>
           </div>
         )}

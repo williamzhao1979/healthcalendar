@@ -24,7 +24,9 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
-  Calendar
+  Calendar,
+  Moon,
+  Sun
 } from 'lucide-react'
 import { userDB, User as UserType, UserUtils } from '../lib/userDatabase'
 import { HEALTH_CALENDAR_DB_VERSION } from '../lib/dbVersion'
@@ -37,6 +39,9 @@ import { OneDriveSyncModal } from './OneDriveSyncModal'
 import { OneDriveSyncToggle } from './OneDriveSyncToggle'
 import { OneDriveDisconnectModal } from './OneDriveDisconnectModal'
 import { getLocalDateString, isRecordOnLocalDate, formatLocalDateTime } from '../lib/dateUtils'
+import { useTheme } from '../hooks/useTheme'
+import { useConfirm } from '../hooks/useConfirm'
+import ConfirmDialog from './ConfirmDialog'
 import { set } from 'react-hook-form'
 
 // 简单的类型定义 - 避免复杂的语法
@@ -771,6 +776,12 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const [showOneDriveSyncModal, setShowOneDriveSyncModal] = useState(false)
   const [showOneDriveDisconnectModal, setShowOneDriveDisconnectModal] = useState(false)
   // const [activeTab, setActiveTab] = useState<'stool' | 'myrecord' | 'personal' | 'physical'>('stool')
+  
+  // 主题管理
+  const { resolvedTheme, toggleTheme } = useTheme()
+  
+  // 确认对话框
+  const { confirmState, confirmDelete, closeConfirm, setLoading } = useConfirm()
 
   // 日历状态
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -1112,10 +1123,9 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   // 处理日期点击
   const handleDateClick = (date: Date) => {
-    if (date.getMonth() === calendarMonth) { // 只对当前显示月份的日期有效
-      setSelectedDate(date)
-      setShowDateModal(true)
-    }
+    // 允许点击所有日期，包括上个月和下个月的日期
+    setSelectedDate(date)
+    setShowDateModal(true)
   }
 
   // 处理上一个月
@@ -1279,23 +1289,31 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const selectRecordType = (type: string) => {
     closeRecordModal()
     
+    // 如果有选中的日期，格式化为 YYYY-MM-DD 格式
+    let dateParam = ''
+    if (selectedDate) {
+      const year = selectedDate.getFullYear()
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+      const day = String(selectedDate.getDate()).padStart(2, '0')
+      dateParam = `?date=${year}-${month}-${day}`
+    }
+    
     switch(type) {
       case 'meals':
-        console.log('选择了一日三餐记录')
-        // window.location.href = 'meal_page.html'
-        router.push('/meal')
+        console.log('选择了一日三餐记录', selectedDate ? `日期: ${dateParam}` : '')
+        router.push(`/meal${dateParam}`)
         break
       case 'stool':
-        console.log('选择了排便记录')
-        router.push('/stool')
+        console.log('选择了排便记录', selectedDate ? `日期: ${dateParam}` : '')
+        router.push(`/stool${dateParam}`)
         break
       case 'period':
-        console.log('选择了生理记录')
-        router.push('/period')
+        console.log('选择了生理记录', selectedDate ? `日期: ${dateParam}` : '')
+        router.push(`/period${dateParam}`)
         break
       case 'myrecord':
-        console.log('选择了我的记录')
-        router.push('/myrecord')
+        console.log('选择了我的记录', selectedDate ? `日期: ${dateParam}` : '')
+        router.push(`/myrecord${dateParam}`)
         break
     }
   }
@@ -1323,43 +1341,64 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const deleteStoolRecord = async (recordId: string) => {
     try {
-      if (!confirm('确定要删除此记录吗？')) return
+      const confirmed = await confirmDelete('排便记录')
+      if (!confirmed) {
+        closeConfirm()
+        return
+      }
+      
       console.log('删除排便记录:', recordId)
       // await stoolDB.softDeleteRecord(recordId)
       await adminService.softDeleteStoolRecord(recordId)
+      closeConfirm()
       // 重新加载数据
       await loadStoolRecords()
       console.log('排便记录已删除')
     } catch (error) {
       console.error('删除排便记录失败:', error)
+      closeConfirm()
     }
   }
 
   const deleteMyRecord = async (recordId: string) => {
     try {
-      if (!confirm('确定要删除此记录吗？')) return
+      const confirmed = await confirmDelete('我的记录')
+      if (!confirmed) {
+        closeConfirm()
+        return
+      }
+      
       console.log('删除我的记录:', recordId)
       // await myRecordDB.softDeleteRecord(recordId)
       await adminService.softDeleteMyRecord(recordId)
+      closeConfirm()
       // 重新加载数据
       await loadMyRecords()
       console.log('我的记录已删除')
     } catch (error) {
       console.error('删除我的记录失败:', error)
+      closeConfirm()
     }
   }
 
   const deleteMealRecord = async (recordId: string) => {
     try {
-      if (!confirm('确定要删除此记录吗？')) return
+      const confirmed = await confirmDelete('用餐记录')
+      if (!confirmed) {
+        closeConfirm()
+        return
+      }
+      
       console.log('删除用餐记录:', recordId)
       // await adminService.softDeleteMealRecord(recordId)
       await adminService.softDeleteRecord('mealRecords', recordId)
+      closeConfirm()
       // 重新加载数据
       await loadMealRecords()
       console.log('用餐记录已删除')
     } catch (error) {
       console.error('删除用餐记录失败:', error)
+      closeConfirm()
     }
   }
 
@@ -1370,14 +1409,21 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   const deletePeriodRecord = async (recordId: string) => {
     try {
-      if (!confirm('确定要删除此记录吗？')) return
+      const confirmed = await confirmDelete('生理记录')
+      if (!confirmed) {
+        closeConfirm()
+        return
+      }
+      
       console.log('删除生理记录:', recordId)
       await adminService.softDeletePeriodRecord(recordId)
+      closeConfirm()
       // 重新加载数据
       await loadPeriodRecords()
       console.log('生理记录已删除')
     } catch (error) {
       console.error('删除生理记录失败:', error)
+      closeConfirm()
     }
   }
 
@@ -1531,6 +1577,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       console.log('新用户已添加:', newUser)
       alert(`用户 "${userName}" 已成功添加！`)
       
+      if (oneDriveState.isAuthenticated) {
+        console.log('开始同步OneDriveUsers')
+        oneDriveActions.syncIDBOneDriveUsers()
+      }
+
       // 刷新用户列表
       await refreshUsers()
       closeAddUserModal()
@@ -1603,6 +1654,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
           delFlag: true
         })
         
+      if (oneDriveState.isAuthenticated) {
+        console.log('开始同步OneDriveUsers')
+        oneDriveActions.syncIDBOneDriveUsers()
+      }
+      
         await refreshUsers();
         console.log('用户已删除:', userId)
       }
@@ -1651,6 +1707,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         avatarUrl
       })
 
+      if (oneDriveState.isAuthenticated) {
+        console.log('开始同步OneDriveUsers')
+        oneDriveActions.syncIDBOneDriveUsers()
+      }
+      
       console.log('用户信息已更新:', editingUser.id)
       alert(`用户信息已成功更新！`)
       
@@ -1781,14 +1842,18 @@ useEffect(() => {
 }, [oneDriveState.isAuthenticated])
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen theme-bg-primary">
       {/* Background */}
-      <div className="fixed inset-0 hero-gradient"></div>
-      <div className="fixed inset-0 bg-white/10"></div>
+      <div className="fixed inset-0 header-gradient"></div>
+      <div className={`fixed inset-0 ${resolvedTheme === 'dark' ? 'bg-black/10' : 'bg-white/10'}`}></div>
       
       <div className="relative min-h-screen">
         {/* Header */}
-        <header className="sticky top-0 z-50 px-6 py-3 bg-white/25 backdrop-blur-md border-b border-white/20">
+        <header className={`sticky top-0 z-50 px-6 py-3 backdrop-blur-md border-b ${
+          resolvedTheme === 'dark' 
+            ? 'bg-gray-800/25 border-gray-600/20' 
+            : 'bg-white/25 border-white/20'
+        }`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="relative">
@@ -1798,34 +1863,61 @@ useEffect(() => {
                 <div className="absolute inset-0 pulse-ring bg-green-500 bg-opacity-20 rounded-xl"></div>
               </div>
               <div>
-                <h1 className="text-base font-bold text-gray-800">健康日历</h1>
-                <p className="text-xs text-gray-600 font-medium">生活离不开吃喝拉撒</p>
+                <h1 className="text-base font-bold theme-text-primary">健康日历</h1>
+                <p className="text-xs theme-text-secondary font-medium">生活离不开吃喝拉撒</p>
               </div>
             </div>
             
             {/* User Profile */}
-            <div className="flex items-center">
+            <div className="flex items-center space-x-2">
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleTheme}
+                className={`flex items-center px-2 py-1 backdrop-blur-sm rounded-xl transition-all border ${
+                  resolvedTheme === 'dark' 
+                    ? 'bg-gray-700/30 hover:bg-gray-600/40 border-gray-600/20' 
+                    : 'bg-white/30 hover:bg-white/40 border-white/20'
+                }`}
+                title={resolvedTheme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
+              >
+                {resolvedTheme === 'dark' ? (
+                  <Sun className="w-4 h-4 theme-text-primary" />
+                ) : (
+                  <Moon className="w-4 h-4 theme-text-primary" />
+                )}
+              </button>
+              
               <div className="relative user-menu-container">
                 {currentUser && !isLoading && (
                   <div className="relative">
                     {/* User Button */}
                     <button 
                       onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                      className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl hover:bg-white/40 transition-all border border-white/20"
+                      className={`flex items-center space-x-1.5 px-2 py-1 backdrop-blur-sm rounded-xl transition-all border ${
+                        resolvedTheme === 'dark' 
+                          ? 'bg-gray-700/30 hover:bg-gray-600/40 border-gray-600/20' 
+                          : 'bg-white/30 hover:bg-white/40 border-white/20'
+                      }`}
                     >
                       <SafeAvatar
                         src={currentUser.avatarUrl}
                         alt="用户头像"
-                        className="w-5 h-5 rounded-full ring-1 ring-white/50 object-cover"
+                        className={`w-5 h-5 rounded-full ring-1 object-cover ${
+                          resolvedTheme === 'dark' ? 'ring-gray-400/50' : 'ring-white/50'
+                        }`}
                         fallbackClassName="w-5 h-5"
                       />
-                      <span className="text-xs font-semibold text-gray-800">{currentUser.name}</span>
-                      <ChevronLeft className={`w-3 h-3 text-gray-500 transform transition-transform ${isUserMenuOpen ? 'rotate-90' : '-rotate-90'}`} />
+                      <span className="text-xs font-semibold theme-text-primary">{currentUser.name}</span>
+                      <ChevronLeft className={`w-3 h-3 theme-text-tertiary transform transition-transform ${isUserMenuOpen ? 'rotate-90' : '-rotate-90'}`} />
                     </button>
 
                     {/* User Dropdown Menu */}
                     {isUserMenuOpen && (
-                      <div className="absolute top-full right-0 mt-1 w-48 bg-white/90 backdrop-blur-sm rounded-xl border border-white/30 shadow-lg z-50">
+                      <div className={`absolute top-full right-0 mt-1 w-48 backdrop-blur-sm rounded-xl border shadow-lg z-50 user-menu ${
+                        resolvedTheme === 'dark' 
+                          ? 'bg-gray-800/90 border-gray-600/30' 
+                          : 'bg-white/90 border-white/30'
+                      }`}>
                         <div className="p-2">
                           {users.map((user) => (
                             <button
@@ -1834,8 +1926,10 @@ useEffect(() => {
                                 switchUser(user.id)
                                 setIsUserMenuOpen(false)
                               }}
-                              className={`w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg text-left hover:bg-white/50 transition-colors ${
-                                currentUser?.id === user.id ? 'bg-green-100/80 text-green-800' : 'text-gray-700'
+                              className={`w-full flex items-center space-x-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                                currentUser?.id === user.id 
+                                  ? (resolvedTheme === 'dark' ? 'bg-green-800/50 text-green-300' : 'bg-green-100/80 text-green-800')
+                                  : `theme-text-secondary ${resolvedTheme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-white/50'}`
                               }`}
                             >
                               <SafeAvatar
@@ -1853,9 +1947,17 @@ useEffect(() => {
                   </div>
                 )}
                 {isLoading && (
-                  <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
-                    <div className="w-5 h-5 rounded-full bg-gray-300 animate-pulse"></div>
-                    <div className="w-10 h-3 bg-gray-300 rounded animate-pulse"></div>
+                  <div className={`flex items-center space-x-1.5 px-2 py-1 backdrop-blur-sm rounded-xl border ${
+                    resolvedTheme === 'dark' 
+                      ? 'bg-gray-700/30 border-gray-600/20' 
+                      : 'bg-white/30 border-white/20'
+                  }`}>
+                    <div className={`w-5 h-5 rounded-full animate-pulse ${
+                      resolvedTheme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'
+                    }`}></div>
+                    <div className={`w-10 h-3 rounded animate-pulse ${
+                      resolvedTheme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'
+                    }`}></div>
                   </div>
                 )}
               </div>
@@ -1871,8 +1973,8 @@ useEffect(() => {
                 <Utensils className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs text-gray-600">上次用餐</div>
-                <div className="text-sm font-bold text-gray-800 leading-tight">
+                <div className="text-xs theme-text-secondary">上次用餐</div>
+                <div className="text-sm font-bold theme-text-primary leading-tight">
                   {getTimeSinceLastMeal() || '无记录'}
                 </div>
               </div>
@@ -1882,22 +1984,22 @@ useEffect(() => {
                 <Sprout className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs text-gray-600">上次排便</div>
-                <div className="text-sm font-bold text-gray-800 leading-tight">
+                <div className="text-xs theme-text-secondary">上次排便</div>
+                <div className="text-sm font-bold theme-text-primary leading-tight">
                   {getTimeSinceLastStool() || '无记录'}
                 </div>
               </div>
             </div>
             <div 
-              className="stat-card rounded-xl p-2 flex items-center space-x-1.5 cursor-pointer hover:bg-white/80 transition-all"
+              className="stat-card stat-card-hoverable rounded-xl p-2 flex items-center space-x-1.5 cursor-pointer transition-all"
               onClick={() => setShowHealthStatsModal(true)}
             >
               <div className="health-icon soft w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Folder className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs text-gray-600">健康统计</div>
-                <div className="text-xs text-gray-500">点击查看</div>
+                <div className="text-xs theme-text-secondary">健康统计</div>
+                <div className="text-xs theme-text-tertiary">点击查看</div>
               </div>
             </div>
           </div>
@@ -1905,13 +2007,13 @@ useEffect(() => {
 
         {/* Calendar Section */}
         <main className="px-3 pb-6">
-          <div className="glass-morphism rounded-2xl p-3 mb-4 animate-fade-in shadow-2xl">
+          <div className="glass-morphism rounded-2xl p-3 mb-4 animate-fade-in shadow-2xl calendar-container">
             {/* Calendar Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-800">{calendarYear}年 {getMonthName(calendarMonth)}</h2>
-                  <p className="text-xs text-gray-600 mt-0.5">健康记录概览</p>
+                  <h2 className="text-xl font-bold theme-text-primary">{calendarYear}年 {getMonthName(calendarMonth)}</h2>
+                  <p className="text-xs theme-text-secondary mt-0.5">健康记录概览</p>
                 </div>
                 <div className="flex items-center space-x-2">
                   <button onClick={goToPrivacyCalendar} className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm health-icon privacy">
@@ -1927,14 +2029,14 @@ useEffect(() => {
                   className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm"
                   title="上一个月"
                 >
-                  <ChevronLeft className="text-gray-700 w-4 h-4" />
+                  <ChevronLeft className="theme-text-primary w-4 h-4" />
                 </button>
                 <button 
                   onClick={handleNextMonth}
                   className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm"
                   title="下一个月"
                 >
-                  <ChevronRight className="text-gray-700 w-4 h-4" />
+                  <ChevronRight className="theme-text-primary w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -1943,7 +2045,7 @@ useEffect(() => {
             <div className="grid grid-cols-7 gap-1 mb-4">
               {/* Week Header */}
               {['日', '一', '二', '三', '四', '五', '六'].map((day, index) => (
-                <div key={index} className="text-center text-xs font-semibold text-gray-500 py-2">{day}</div>
+                <div key={index} className="text-center text-xs font-semibold theme-text-tertiary py-2">{day}</div>
               ))}
 
               {/* Calendar Days */}
@@ -1963,8 +2065,8 @@ useEffect(() => {
                 const isCurrentMonth = cellDate.getMonth() === calendarMonth
                 const displayDay = cellDate.getDate()
                 
-                // 获取该日期的记录圆点
-                const recordDots = isCurrentMonth ? getRecordDotsForDate(cellDate) : []
+                // 获取该日期的记录圆点 - 支持跨月份显示
+                const recordDots = getRecordDotsForDate(cellDate)
                 
                 return (
                   <div 
@@ -1973,7 +2075,7 @@ useEffect(() => {
                     onClick={() => handleDateClick(cellDate)}
                     title={isCurrentMonth ? `查看 ${cellDate.getMonth() + 1}月${cellDate.getDate()}日 的记录` : ''}
                   >
-                    <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'text-gray-400' : 'text-gray-800'}`}>
+                    <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'theme-text-muted' : 'theme-text-primary'}`}>
                       {displayDay}
                     </span>
                     {/* 基于真实记录数据的圆点 */}
@@ -1997,26 +2099,26 @@ useEffect(() => {
             <div className="flex items-center justify-center space-x-3 pt-3 border-t border-white/20 flex-wrap gap-y-2">
               <div className="flex items-center space-x-1.5">
                 <div className="w-3 h-3 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-full shadow-sm"></div>
-                <span className="text-xs font-medium text-gray-700">饮食</span>
+                <span className="text-xs font-medium theme-text-secondary">饮食</span>
               </div>
               <div className="flex items-center space-x-1.5">
                 <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full shadow-sm"></div>
-                <span className="text-xs font-medium text-gray-700">排便</span>
+                <span className="text-xs font-medium theme-text-secondary">排便</span>
               </div>
               {showPeriodRecords && (
                 <div className="flex items-center space-x-1.5">
                   <div className="w-3 h-3 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full shadow-sm"></div>
-                  <span className="text-xs font-medium text-gray-700">生理</span>
+                  <span className="text-xs font-medium theme-text-secondary">生理</span>
                 </div>
               )}
               <div className="flex items-center space-x-1.5">
                 <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-sm"></div>
-                <span className="text-xs font-medium text-gray-700">记录</span>
+                <span className="text-xs font-medium theme-text-secondary">记录</span>
               </div>
 
                   {/* 生理记录显示切换 */}
                   <div className="flex items-center space-x-1.5 px-2 py-1 bg-white/30 backdrop-blur-sm rounded-xl border border-white/20">
-                    <span className="text-xs font-medium text-gray-700">生理</span>
+                    <span className="text-xs font-medium theme-text-secondary">生理</span>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -2037,22 +2139,36 @@ useEffect(() => {
           {/* Recent Records */}
           <div className="glass-morphism rounded-2xl p-3 shadow-2xl animate-fade-in">
             {/* Tab Navigation */}
-            <div className="flex items-center mb-4 bg-gray-50 rounded-xl p-0.5">
+            <div className={`flex items-center mb-4 rounded-xl p-0.5 ${
+              resolvedTheme === 'dark' ? 'bg-gray-800/50' : 'bg-gray-50'
+            }`}>
               <button 
                 onClick={() => switchTab('recent')} 
-                className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-all rounded-lg ${activeTab === 'recent' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 px-3 py-1.5 text-xs font-semibold transition-all rounded-lg ${
+                  activeTab === 'recent' 
+                    ? 'text-health-primary bg-white shadow-sm' 
+                    : 'theme-text-tertiary hover:theme-text-secondary'
+                }`}
               >
                 最近记录
               </button>
               <button 
                 onClick={() => switchTab('updates')} 
-                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'updates' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+                  activeTab === 'updates' 
+                    ? 'text-health-primary bg-white shadow-sm' 
+                    : 'theme-text-tertiary hover:theme-text-secondary'
+                }`}
               >
                 最近更新
               </button>
               <button 
                 onClick={() => switchTab('settings')} 
-                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'settings' ? 'text-health-primary bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium transition-colors ${
+                  activeTab === 'settings' 
+                    ? 'text-health-primary bg-white shadow-sm' 
+                    : 'theme-text-tertiary hover:theme-text-secondary'
+                }`}
               >
                 设置
               </button>
@@ -3316,7 +3432,7 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* 记录列表 */}
+            {/* 记录列表 - 使用时间线UI */}
             <div className="p-4 max-h-96 overflow-y-auto">
               {(() => {
                 const records = getRecordsForSelectedDate()
@@ -3327,74 +3443,128 @@ useEffect(() => {
                         <Calendar className="w-8 h-8 text-gray-400" />
                       </div>
                       <p className="text-gray-500 mb-4">这一天还没有记录</p>
-                      {/* <div className="space-y-2">
-                        <button
-                          onClick={() => {
-                            setShowDateModal(false)
-                            // 可以在这里添加跳转到记录页面的逻辑
-                          }}
-                          className="w-full px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
-                        >
-                          添加记录
-                        </button>
-                      </div> */}
                     </div>
                   )
                 }
 
+                // 按时间排序记录
+                const sortedRecords = records.sort((a, b) => {
+                  const dateA = new Date(a.dateTime || a.date)
+                  const dateB = new Date(b.dateTime || b.date)
+                  // return dateB.getTime() - dateA.getTime()
+                  return dateA.getTime() - dateB.getTime()
+                })
+
                 return (
-                  <div className="space-y-3">
-                    {records.map((record, index) => (
-                      <div key={`${record.type}-${index}`} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-2">
-                            {record.type === 'myRecord' && <Heart className="w-4 h-4 text-blue-500" />}
-                            {record.type === 'stool' && <Sprout className="w-4 h-4 text-green-500" />}
-                            {record.type === 'period' && <Flower2 className="w-4 h-4 text-pink-500" />}
-                            {record.type === 'meal' && <Utensils className="w-4 h-4 text-orange-500" />}
-                            <span className="text-sm font-medium text-gray-900">
-                              {record.typeName}
-                            </span>
+                  <div className="timeline-container">
+                    <div className="timeline-line"></div>
+                    {sortedRecords.map((record, index) => (
+                      <div key={`${record.type}-${index}`} className="timeline-item">
+                        <div className="timeline-time">{formatRecordTime(record.dateTime || record.date)}</div>
+                        <div className="record-card rounded-xl p-2.5 shadow-sm transition-all relative">
+                          {/* 删除按钮 */}
+                          {(record.type === 'stool' || record.type === 'myRecord' || record.type === 'meal' || record.type === 'period') && (
+                            <button
+                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center transition-colors z-10"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (record.type === 'stool') {
+                                  deleteStoolRecord(record.id)
+                                } else if (record.type === 'myRecord') {
+                                  deleteMyRecord(record.id)
+                                } else if (record.type === 'meal') {
+                                  deleteMealRecord(record.id)
+                                } else if (record.type === 'period') {
+                                  deletePeriodRecord(record.id)
+                                }
+                              }}
+                              title="删除记录"
+                            >
+                              <Trash2 className="text-red-500 w-3 h-3" />
+                            </button>
+                          )}
+                          
+                          <div 
+                            className={`flex items-start ${
+                              record.type === 'stool' || record.type === 'myRecord' || record.type === 'meal' || record.type === 'period' ? 'cursor-pointer hover:bg-gray-50 rounded-lg p-1 -m-1' : ''
+                            }`}
+                            onClick={() => {
+                              if (record.type === 'stool') {
+                                editStoolRecord(record.id)
+                              } else if (record.type === 'myRecord') {
+                                editMyRecord(record.id)
+                              } else if (record.type === 'meal') {
+                                editMealRecord(record.id)
+                              } else if (record.type === 'period') {
+                                editPeriodRecord(record.id)
+                              }
+                              setShowDateModal(false) // 编辑时关闭模态框
+                            }}
+                          >
+                            {/* Icon based on record type */}
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              record.type === 'meal' ? 'bg-orange-100' :
+                              record.type === 'stool' ? 'bg-green-100' :
+                              record.type === 'myRecord' ? 'bg-blue-100' :
+                              record.type === 'period' ? 'bg-pink-100' : 'bg-gray-100'
+                            }`}>
+                              {record.type === 'meal' && <Utensils className="text-orange-500 w-4 h-4" />}
+                              {record.type === 'stool' && <Sprout className="text-green-500 w-4 h-4" />}
+                              {record.type === 'myRecord' && <Heart className="text-blue-500 w-4 h-4" />}
+                              {record.type === 'period' && <Heart className="text-pink-500 w-4 h-4" />}
+                            </div>
+                            
+                            <div className="ml-2 flex-1 pr-8">
+                              <div className="flex justify-between items-start">
+                                <div className="text-sm font-semibold text-gray-900">
+                                  {record.typeName}
+                                </div>
+                                {(record.type === 'stool' || record.type === 'myRecord' || record.type === 'meal' || record.type === 'period') && (
+                                  <div className="text-xs text-gray-400">点击编辑</div>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-600 mt-0.5">
+                                {record.notes || record.content || '无备注'}
+                              </div>
+                              
+                              {/* 标签 */}
+                              {record.tags && record.tags.length > 0 && (
+                                <div className="flex items-center space-x-1.5 mt-1.5 flex-wrap gap-1">
+                                  {record.tags.slice(0, 3).map((tag: string, tagIndex: number) => (
+                                    <span 
+                                      key={tagIndex} 
+                                      className={`px-1.5 py-0.5 text-xs rounded-md ${
+                                        record.type === 'stool' ? 'bg-green-100 text-green-600' :
+                                        record.type === 'meal' ? 'bg-orange-100 text-orange-600' :
+                                        record.type === 'myRecord' ? 'bg-blue-100 text-blue-600' :
+                                        record.type === 'period' ? 'bg-pink-100 text-pink-600' :
+                                        'bg-gray-100 text-gray-600'
+                                      }`}
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {record.tags.length > 3 && (
+                                    <span className="px-1.5 py-0.5 text-xs rounded-md bg-gray-100 text-gray-600">
+                                      +{record.tags.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* 附件显示 */}
+                              {record.attachments && record.attachments.length > 0 && (
+                                <div className="mt-2">
+                                  <AttachmentViewer 
+                                    attachments={record.attachments}
+                                    onDownload={handleAttachmentDownload}
+                                    compact={true}
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <span className="text-xs text-gray-500">
-                            {formatRecordTime(record.dateTime || record.date)}
-                          </span>
                         </div>
-                        
-                        {/* 记录内容预览 */}
-                        <div className="text-sm text-gray-600">
-                          {record.notes || record.content || '无备注'}
-                        </div>
-                        
-                        {/* 标签 */}
-                        {record.tags && record.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {record.tags.slice(0, 3).map((tag: string, tagIndex: number) => (
-                              <span 
-                                key={tagIndex}
-                                className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            {record.tags.length > 3 && (
-                              <span className="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">
-                                +{record.tags.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        
-                        {/* 附件显示 */}
-                        {record.attachments && record.attachments.length > 0 && (
-                          <div className="mt-2">
-                            <AttachmentViewer 
-                              attachments={record.attachments}
-                              onDownload={handleAttachmentDownload}
-                              compact={true}
-                            />
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -3423,7 +3593,7 @@ useEffect(() => {
                 <button
                   onClick={() => {
                     setShowDateModal(false)
-                    // 可以在这里添加跳转到记录页面的逻辑
+                    setIsModalOpen(true)
                   }}
                   className="w-full px-4 py-2 bg-health-primary text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
                 >
@@ -3453,6 +3623,19 @@ useEffect(() => {
         oneDriveState={oneDriveState}
         oneDriveActions={oneDriveActions}
         currentUser={currentUser}
+      />
+
+      {/* 确认对话框 */}
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        type={confirmState.type}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        onConfirm={confirmState.onConfirm}
+        onCancel={confirmState.onCancel}
+        isLoading={confirmState.isLoading}
       />
     </div>
   )
