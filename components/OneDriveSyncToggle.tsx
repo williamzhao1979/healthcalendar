@@ -45,6 +45,13 @@ export const OneDriveSyncToggle: React.FC<OneDriveSyncToggleProps> = ({
   const handleToggle = async (enabled: boolean) => {
     if (isToggling) return
     
+    console.log('🔄 OneDrive toggle clicked:', enabled ? 'enable' : 'disable')
+    console.log('📊 Current oneDriveState:', {
+      isAuthenticated: oneDriveState.isAuthenticated,
+      lastSyncTime: oneDriveState.lastSyncTime ? oneDriveState.lastSyncTime.toISOString() : null,
+      syncStatus: oneDriveState.syncStatus
+    })
+    
     setIsToggling(true)
     
     try {
@@ -58,11 +65,13 @@ export const OneDriveSyncToggle: React.FC<OneDriveSyncToggleProps> = ({
           
           // 如果连接成功，启动数据同步
           if (oneDriveState.isAuthenticated && currentUser) {
+            console.log('🔄 Starting sync operations...')
             await Promise.all([
               oneDriveActions.syncIDBOneDriveUsers(),
               oneDriveActions.syncIDBOneDriveMyRecords(),
               oneDriveActions.syncIDBOneDriveStoolRecords(),
             ])
+            console.log('✅ Sync operations completed')
           }
         }
       } else {
@@ -74,7 +83,7 @@ export const OneDriveSyncToggle: React.FC<OneDriveSyncToggleProps> = ({
         }
       }
     } catch (error) {
-      console.error('同步开关操作失败:', error)
+      console.error('❌ 同步开关操作失败:', error)
     } finally {
       setIsToggling(false)
     }
