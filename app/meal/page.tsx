@@ -387,6 +387,24 @@ function MealPageContent() {
   const [date, setDate] = useState('')
   const [dateTime, setDateTime] = useState('')
   const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner'>(getDefaultMealType)
+
+  // 根据 dateTime 的变化自动更新 mealType
+  useEffect(() => {
+    if (!dateTime) return
+
+    const date = new Date(dateTime)
+    const hour = date.getHours()
+
+    if (hour < 11) {
+      setMealType('breakfast')
+    } else if (hour < 17) {
+      setMealType('lunch')
+    } else {
+      setMealType('dinner')
+    }
+  }, [dateTime])
+
+
   const [amount, setAmount] = useState<'very_little' | 'little' | 'moderate' | 'much'>('moderate')
   const [notes, setNotes] = useState('')
   const [tags, setTags] = useState<string[]>(['健康', '美味'])
@@ -605,9 +623,9 @@ function MealPageContent() {
   }
 
   const mealTypeOptions = [
-    { id: 'breakfast', label: '早餐', desc: '06:00-10:00', icon: Sun, color: 'orange' },
-    { id: 'lunch', label: '午餐', desc: '11:00-14:00', icon: Sun, color: 'yellow' },
-    { id: 'dinner', label: '晚餐', desc: '17:00-20:00', icon: Moon, color: 'purple' }
+    { id: 'breakfast', label: '早餐', desc: '-11:00', icon: Sun, color: 'orange' },
+    { id: 'lunch', label: '午餐', desc: '11:00-16:59', icon: Sun, color: 'yellow' },
+    { id: 'dinner', label: '晚餐', desc: '17:00-', icon: Moon, color: 'purple' }
   ]
 
   const amountOptions = [
