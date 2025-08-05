@@ -407,6 +407,13 @@ function StoolPageContent() {
   useEffect(() => {
     oneDriveActions.checkConnection()
   }, [])
+
+  // 当用户加载完成且处于编辑模式时，加载记录
+  useEffect(() => {
+    if (currentUser && editId && isEditMode) {
+      loadRecordForEdit(editId)
+    }
+  }, [currentUser, editId, isEditMode])
   
   // 监听OneDrive状态变化（调试用）
   useEffect(() => {
@@ -476,20 +483,7 @@ function StoolPageContent() {
       const localDateTime = new Date(targetDateTime.getTime() - targetDateTime.getTimezoneOffset() * 60000)
       setDateTime(localDateTime.toISOString().slice(0, 16))
 
-      // 如果是编辑模式，加载记录数据
-      if (isEditMode && editId && currentUser) {
-        const record = await adminService.getUserRecord('stoolRecords', currentUser.id, editId)
-        if (record) {
-          setDateTime(record.dateTime || record.date)
-          setStatus(record.status)
-          setType(record.type)
-          setVolume(record.volume)
-          setColor(record.color)
-          setNotes(record.notes)
-          setTags(record.tags)
-          setAttachments(record.attachments)
-        }
-      }
+      // 编辑模式的记录加载移到单独的 useEffect 中处理
     } catch (error) {
       console.error('初始化数据失败:', error)
     } finally {
@@ -502,6 +496,31 @@ function StoolPageContent() {
     // setCurrentUser(user)
     setCurrentUser(users.find(u => u.id === user.id) || null)
     // await userDB.setActiveUser(user.id)
+  }
+
+  const loadRecordForEdit = async (id: string) => {
+    try {
+      if (!currentUser?.id) {
+        console.error('当前用户未找到')
+        return
+      }
+      
+      const record = await adminService.getUserRecord('stoolRecords', currentUser.id, id)
+      if (record) {
+        setDateTime(record.dateTime || record.date)
+        setStatus(record.status)
+        setType(record.type)
+        setVolume(record.volume)
+        setColor(record.color)
+        setNotes(record.notes || '')
+        setTags(record.tags || [])
+        setAttachments(record.attachments || [])
+        console.log('Loaded stool record for edit:', record)
+        console.log('Loaded attachments:', record.attachments)
+      }
+    } catch (error) {
+      console.error('Failed to load stool record for edit:', error)
+    }
   }
 
   const handleSaveRecord = async () => {

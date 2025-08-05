@@ -366,6 +366,13 @@ const UserSwitcher: React.FC<{
   )
 }
 
+const getDefaultMealType = () => {
+  const hour = new Date().getHours()
+  if (hour < 11) return 'breakfast'        // before 11:00
+  if (hour < 17) return 'lunch'            // 11:00 ~ 16:59
+  return 'dinner'                          // 17:00+
+}
+
 function MealPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -379,7 +386,7 @@ function MealPageContent() {
   // 表单状态
   const [date, setDate] = useState('')
   const [dateTime, setDateTime] = useState('')
-  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner'>('breakfast')
+  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner'>(getDefaultMealType)
   const [amount, setAmount] = useState<'very_little' | 'little' | 'moderate' | 'much'>('moderate')
   const [notes, setNotes] = useState('')
   const [tags, setTags] = useState<string[]>(['健康', '美味'])
