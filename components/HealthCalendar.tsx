@@ -832,6 +832,24 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       localStorage.setItem('showPeriodRecords', 'true');
     }
 
+    // 恢复用户选择的月份和年份
+    const storedYear = localStorage.getItem('healthcalendar_selected_year');
+    const storedMonth = localStorage.getItem('healthcalendar_selected_month');
+    
+    if (storedYear) {
+      const year = parseInt(storedYear, 10);
+      if (!isNaN(year) && year >= 1900 && year <= 2100) {
+        setCalendarYear(year);
+      }
+    }
+    
+    if (storedMonth) {
+      const month = parseInt(storedMonth, 10);
+      if (!isNaN(month) && month >= 0 && month <= 11) {
+        setCalendarMonth(month);
+      }
+    }
+
     // 初始化用户数据
     initializeUsers()
     
@@ -870,6 +888,12 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       document.removeEventListener('click', handleClickOutside)
     }
   }, [])
+
+  // 监听月份和年份变化，保存到localStorage
+  useEffect(() => {
+    localStorage.setItem('healthcalendar_selected_year', calendarYear.toString());
+    localStorage.setItem('healthcalendar_selected_month', calendarMonth.toString());
+  }, [calendarYear, calendarMonth])
 
   const initializeUsers = async () => {
     try {
@@ -1140,22 +1164,42 @@ const loadAllRecords = async () => {
 
   // 处理上一个月
   const handlePreviousMonth = () => {
+    let newYear = calendarYear;
+    let newMonth = calendarMonth;
+    
     if (calendarMonth === 0) {
-      setCalendarYear(calendarYear - 1)
-      setCalendarMonth(11)
+      newYear = calendarYear - 1;
+      newMonth = 11;
+      setCalendarYear(newYear);
+      setCalendarMonth(newMonth);
     } else {
-      setCalendarMonth(calendarMonth - 1)
+      newMonth = calendarMonth - 1;
+      setCalendarMonth(newMonth);
     }
+    
+    // 保存用户选择的月份和年份到localStorage
+    localStorage.setItem('healthcalendar_selected_year', newYear.toString());
+    localStorage.setItem('healthcalendar_selected_month', newMonth.toString());
   }
 
   // 处理下一个月
   const handleNextMonth = () => {
+    let newYear = calendarYear;
+    let newMonth = calendarMonth;
+    
     if (calendarMonth === 11) {
-      setCalendarYear(calendarYear + 1)
-      setCalendarMonth(0)
+      newYear = calendarYear + 1;
+      newMonth = 0;
+      setCalendarYear(newYear);
+      setCalendarMonth(newMonth);
     } else {
-      setCalendarMonth(calendarMonth + 1)
+      newMonth = calendarMonth + 1;
+      setCalendarMonth(newMonth);
     }
+    
+    // 保存用户选择的月份和年份到localStorage
+    localStorage.setItem('healthcalendar_selected_year', newYear.toString());
+    localStorage.setItem('healthcalendar_selected_month', newMonth.toString());
   }
 
   // 获取月份名称
