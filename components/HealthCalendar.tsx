@@ -1000,6 +1000,16 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
     }
   }
 
+
+const loadAllRecords = async () => {
+  await Promise.all([
+    loadStoolRecords(),
+    loadMyRecords(),
+    loadMealRecords(),
+    loadPeriodRecords()
+  ])
+}
+
   // 当用户变化时重新加载数据
   useEffect(() => {
     if (currentUser) {
@@ -1711,7 +1721,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         console.log('开始同步OneDriveUsers')
         oneDriveActions.syncIDBOneDriveUsers()
       }
-      
+
       console.log('用户信息已更新:', editingUser.id)
       alert(`用户信息已成功更新！`)
       
@@ -1816,6 +1826,11 @@ const handleDataSync = useCallback(async () => {
     
     console.log('handleDataSync 数据同步完成')
     
+    // 手动触发一次完整的数据导出以更新同步时间
+    console.log('🔄 Starting export data to update sync time...')
+    await oneDriveActions.exportData(currentUser.id)
+    console.log('✅ Export data completed, sync time should be updated')
+    
     // 刷新所有数据显示
     await Promise.all([
       loadStoolRecords(),
@@ -1832,10 +1847,12 @@ const handleDataSync = useCallback(async () => {
 
 useEffect(() => {
   if (oneDriveState.isAuthenticated && currentUser) {
-    loadStoolRecords()
-    loadMyRecords()
-    loadMealRecords()
-    loadPeriodRecords()
+    // loadStoolRecords()
+    // loadMyRecords()
+    // loadMealRecords()
+    // loadPeriodRecords()
+
+    loadAllRecords
     // 添加测试数据（仅在开发环境中）
     // addTestDataIfNeeded()
   }
@@ -2897,7 +2914,11 @@ useEffect(() => {
                             <div className="text-xs text-gray-500">使用深色主题</div>
                           </div>
                           <label className="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" className="sr-only peer" />
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              onClick={toggleTheme}
+                            />
                             <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-health-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-health-primary"></div>
                           </label>
                         </div>
