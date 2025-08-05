@@ -535,6 +535,11 @@ function StoolPageContent() {
         // alert('记录保存成功！')
       }
 
+      if (oneDriveState.isAuthenticated) {
+        console.log('Stool页面 - 开始同步OneDrive饮食记录')
+        oneDriveActions.syncIDBOneDriveStoolRecords()
+      }
+
       router.push('/health-calendar')
     } catch (error) {
       console.error('保存记录失败:', error)

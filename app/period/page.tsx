@@ -699,6 +699,11 @@ function PeriodPageContent() {
         await adminService.savePeriodRecord(recordData)
       }
 
+      if (oneDriveState.isAuthenticated) {
+        console.log('Period页面 - 开始同步OneDrive饮食记录')
+        oneDriveActions.syncIDBOneDrivePeriodRecords()
+      }
+
       router.push('/health-calendar')
     } catch (error) {
       console.error('Failed to save record:', error)

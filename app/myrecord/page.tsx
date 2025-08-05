@@ -670,6 +670,11 @@ function MyRecordPageContent() {
         // alert('记录已保存！')
       }
 
+      if (oneDriveState.isAuthenticated) {
+        console.log('MyRecord页面 - 开始同步OneDrive我的记录')
+        oneDriveActions.syncIDBOneDriveMyRecords()
+      }
+
       // 返回到健康日历页面
       router.push('/health-calendar')
     } catch (error) {

@@ -1577,6 +1577,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       console.log('新用户已添加:', newUser)
       alert(`用户 "${userName}" 已成功添加！`)
       
+      if (oneDriveState.isAuthenticated) {
+        console.log('开始同步OneDriveUsers')
+        oneDriveActions.syncIDBOneDriveUsers()
+      }
+
       // 刷新用户列表
       await refreshUsers()
       closeAddUserModal()
@@ -1649,6 +1654,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
           delFlag: true
         })
         
+      if (oneDriveState.isAuthenticated) {
+        console.log('开始同步OneDriveUsers')
+        oneDriveActions.syncIDBOneDriveUsers()
+      }
+      
         await refreshUsers();
         console.log('用户已删除:', userId)
       }
@@ -1697,6 +1707,11 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         avatarUrl
       })
 
+      if (oneDriveState.isAuthenticated) {
+        console.log('开始同步OneDriveUsers')
+        oneDriveActions.syncIDBOneDriveUsers()
+      }
+      
       console.log('用户信息已更新:', editingUser.id)
       alert(`用户信息已成功更新！`)
       

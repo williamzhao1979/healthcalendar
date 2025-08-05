@@ -508,7 +508,7 @@ function MealPageContent() {
       await showSuccess('提示', '请选择用户')
       return
     }
-
+    console.log('Meal页面 - 开始保存记录')
     try {
       setIsLoading(true)
 
@@ -530,6 +530,11 @@ function MealPageContent() {
         // await mealDB.saveRecord(recordData)
         await adminService.saveMealRecord(recordData)
         // 成功后直接跳转，不显示成功提示
+      }
+
+      if (oneDriveState.isAuthenticated) {
+        console.log('Meal页面 - 开始同步OneDrive饮食记录')
+        oneDriveActions.syncIDBOneDriveMealRecords()
       }
 
       router.push('/health-calendar')
