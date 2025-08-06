@@ -2,6 +2,7 @@ import { userDB } from './userDatabase'
 import { microsoftAuth } from './microsoftAuth'
 import { getPageFiles } from 'next/dist/server/get-page-files'
 import { adminService } from '@/lib/adminService'
+import { on } from 'events'
 
 export interface ExportMetadata {
   version: string
@@ -884,12 +885,7 @@ console.log('microsoftAuth', microsoftAuth)
             // 本地不存在，直接添加
             try {
               const newUser = {
-                id: oneDriveUser.id,
-                name: oneDriveUser.name || 'Unknown',
-                avatarUrl: oneDriveUser.avatarUrl || '',
-                isActive: oneDriveUser.isActive !== undefined ? oneDriveUser.isActive : false,
-                createdAt: oneDriveUser.createdAt || new Date().toISOString(),
-                updatedAt: oneDriveUser.updatedAt
+                ...oneDriveUser
               }
               
               // 直接使用IndexedDB添加完整的用户对象

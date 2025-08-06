@@ -1,8 +1,9 @@
 // lib/adminService.ts
-// IndexedDB 管理服务，用于后台管理功能
+// IndexedDB管理服务，用于后台管理功能
 
 import { request } from 'https'
 import { HEALTH_CALENDAR_DB_VERSION } from './dbVersion'
+import { User } from '@/types/record'
 
 export interface DatabaseStats {
   dbName: string
@@ -39,17 +40,17 @@ export interface BackupData {
   data: Record<string, any[]>
 }
 
-export interface User {
-  id: string;
-  name: string;
-  avatarUrl: string;
-  isActive: boolean;
-  createdAt: string;
-  createdBy?: string;
-  updatedAt: string;
-  updatedBy?: string;
-  delFlag: boolean;
-}
+// export interface User {
+//   id: string;
+//   name: string;
+//   avatarUrl: string;
+//   isActive: boolean;
+//   createdAt: string;
+//   createdBy?: string;
+//   updatedAt: string;
+//   updatedBy?: string;
+//   delFlag: boolean;
+// }
 
 
 export class IndexedDBAdminService {
@@ -894,7 +895,7 @@ export class IndexedDBAdminService {
     }
   }
 
-  // 获取所有用户
+  // 获取所有用户delFlag:false
   async getAllUsers(): Promise<User[]> {
     try {
       await this.ensureIDB();
