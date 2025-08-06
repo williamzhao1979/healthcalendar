@@ -318,7 +318,7 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
           </div>
 
           {/* 移动设备提示 */}
-          {isMobile && !oneDriveState.isAuthenticated && (
+          {/* {isMobile && !oneDriveState.isAuthenticated && (
             <div className="mb-6 p-4 bg-blue-50 rounded-2xl border border-blue-200">
               <div className="flex items-start space-x-3">
                 <Smartphone className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
@@ -335,7 +335,7 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
                 </div>
               </div>
             </div>
-          )}
+          )} */}
 
           {/* 连接状态 */}
           <div className="mb-6 p-4 bg-gray-50 rounded-2xl">
@@ -376,41 +376,8 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
             </div>
           )}
 
-          {/* 同步步骤 */}
-          <div className="mb-6 space-y-3">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">
-              {isInitialSetup ? '设置步骤' : '同步项目'}
-            </h4>
-            {syncSteps.map((step, index) => (
-              <div key={step.id} className="flex items-start space-x-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  {getStepIcon(step)}
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-800">{step.title}</div>
-                  <div className="text-xs text-gray-600 mt-0.5">{step.description}</div>
-                </div>
-              </div>
-            ))}
-          </div>
 
-          {/* 错误信息 */}
-          {oneDriveState.error && (
-            <div className="mb-6 p-4 bg-red-50 rounded-2xl border border-red-200">
-              <div className="flex items-start space-x-3">
-                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="text-sm font-semibold text-red-800 mb-1">同步错误</h4>
-                  <p className="text-xs text-red-700">{oneDriveState.error}</p>
-                  {isMobile && (
-                    <p className="text-xs text-red-600 mt-2">
-                      💡 移动设备提示：请尝试刷新页面或使用HTTPS连接
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+
 
           {/* 操作按钮 */}
           <div className="flex space-x-3">
@@ -469,6 +436,25 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
               }
             </p>
           </div>
+
+          {/* 同步步骤 */}
+          <div className="mb-6 space-y-3">
+            <h4 className="text-sm font-semibold text-gray-700 mb-3">
+              {isInitialSetup ? '设置步骤' : '同步项目'}
+            </h4>
+            {syncSteps.map((step, index) => (
+              <div key={step.id} className="flex items-start space-x-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  {getStepIcon(step)}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-800">{step.title}</div>
+                  <div className="text-xs text-gray-600 mt-0.5">{step.description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
         </div>
       </div>
     </div>
