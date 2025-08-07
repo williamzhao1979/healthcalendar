@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import AndroidEdgeErrorBoundary from "../components/AndroidEdgeErrorBoundary"
 import MSALRedirectHandler from "../components/MSALRedirectHandler"
+import { Toaster } from "../components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -24,6 +25,7 @@ export default function RootLayout({
         <AndroidEdgeErrorBoundary>
           <MSALRedirectHandler>
             <main className="min-h-screen">{children}</main>
+            <Toaster />
           </MSALRedirectHandler>
         </AndroidEdgeErrorBoundary>
       </body>

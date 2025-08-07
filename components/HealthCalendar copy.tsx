@@ -2141,14 +2141,14 @@ useEffect(() => {
             </div>
             <div 
               className="stat-card stat-card-hoverable rounded-xl p-2 flex items-center space-x-1.5 cursor-pointer transition-all"
-              onClick={() => window.open('https://aihelper.life/', '_blank')}
+              onClick={() => setShowHealthStatsModal(true)}
             >
               <div className="health-icon soft w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0">
                 <Folder className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs theme-text-secondary">AI工具</div>
-                <div className="text-xs theme-text-tertiary">点击使用</div>
+                <div className="text-xs theme-text-secondary">健康统计</div>
+                <div className="text-xs theme-text-tertiary">点击查看</div>
               </div>
             </div>
           </div>
