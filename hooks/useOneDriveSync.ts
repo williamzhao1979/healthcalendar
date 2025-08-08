@@ -251,6 +251,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
   // 检查连接状态 - 增强持久化认证支持
   const checkConnection = useCallback(async () => {
     try {
+      console.log('🔄 checkConnection...')
       // First check if OneDrive is available at all
       const isOneDriveAvailable = microsoftAuth.isOneDriveAvailable()
       const unavailabilityReason = microsoftAuth.getUnavailabilityReason()
@@ -397,7 +398,8 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       try {
         const currentSyncTime = globalState.lastSyncTime ? globalState.lastSyncTime.toISOString() : 
                               localStorage.getItem('healthcalendar_last_sync_backup')
-        
+        console.log('💾 Saving auth state with syncTime:', currentSyncTime )
+
         localStorage.setItem('healthcalendar_auth_state', JSON.stringify({
           isAuthenticated: true,
           userInfo: result.account,

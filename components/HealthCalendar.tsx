@@ -2201,14 +2201,15 @@ useEffect(() => {
               {Array.from({ length: 35 }, (_, i) => {
                 // 使用状态管理的日期
                 const today = new Date()
+                // console.log('当前日期:', today)
                 
                 // 获取当前显示月份的第一天是星期几
                 const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1)
                 const startOfWeek = firstDayOfMonth.getDay()
                 
-                // 计算当前格子对应的日期
-                const dayOffset = i - startOfWeek
-                const cellDate = new Date(calendarYear, calendarMonth, dayOffset + 1)
+                // 修复日期计算逻辑
+                const dayNumber = i - startOfWeek + 1
+                const cellDate = new Date(calendarYear, calendarMonth, dayNumber)
                 
                 const isToday = cellDate.toDateString() === today.toDateString()
                 const isCurrentMonth = cellDate.getMonth() === calendarMonth
