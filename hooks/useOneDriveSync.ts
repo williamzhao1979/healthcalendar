@@ -82,7 +82,7 @@ const updateGlobalState = (newState: Partial<OneDriveSyncState>) => {
 const restoreStateFromStorage = () => {
   try {
     console.log('🔄 Attempting to restore state from localStorage...')
-    const savedAuthState = localStorage.getItem('healthcalendar_auth_state')
+    const savedAuthState = localStorage.getItem('healthcalendar_onedrive_state')
     console.log('📋 Saved auth state exists:', !!savedAuthState)
     
     if (savedAuthState) {
@@ -135,7 +135,7 @@ const restoreStateFromStorage = () => {
                 
                 // 同时更新auth state中的lastSyncTime以保持一致性
                 authData.lastSyncTime = lastSyncTime.toISOString()
-                localStorage.setItem('healthcalendar_auth_state', JSON.stringify(authData))
+                localStorage.setItem('healthcalendar_onedrive_state', JSON.stringify(authData))
                 console.log('🔄 Updated auth state with backup sync time')
               }
             } catch (e) {
@@ -223,11 +223,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
     try {
       console.log('💾 Updating sync time in localStorage:', syncTime.toISOString())
       
-      const savedAuthState = localStorage.getItem('healthcalendar_auth_state')
+      const savedAuthState = localStorage.getItem('healthcalendar_onedrive_state')
       if (savedAuthState) {
         const authData = JSON.parse(savedAuthState)
         authData.lastSyncTime = syncTime.toISOString()
-        localStorage.setItem('healthcalendar_auth_state', JSON.stringify(authData))
+        localStorage.setItem('healthcalendar_onedrive_state', JSON.stringify(authData))
         console.log('✅ Updated lastSyncTime in auth state')
       } else {
         console.log('⚠️ No auth state found, creating new one with sync time')
@@ -237,7 +237,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
           lastSyncTime: syncTime.toISOString(),
           timestamp: Date.now()
         }
-        localStorage.setItem('healthcalendar_auth_state', JSON.stringify(newAuthData))
+        localStorage.setItem('healthcalendar_onedrive_state', JSON.stringify(newAuthData))
       }
       
       // 同时保存一个备份时间戳
@@ -251,6 +251,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
   // 检查连接状态 - 增强持久化认证支持
   const checkConnection = useCallback(async () => {
     try {
+      console.log('🔄 checkConnection...')
       // First check if OneDrive is available at all
       const isOneDriveAvailable = microsoftAuth.isOneDriveAvailable()
       const unavailabilityReason = microsoftAuth.getUnavailabilityReason()
@@ -282,7 +283,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
           const currentSyncTime = globalState.lastSyncTime ? globalState.lastSyncTime.toISOString() : 
                                 localStorage.getItem('healthcalendar_last_sync_backup')
           
-          localStorage.setItem('healthcalendar_auth_state', JSON.stringify({
+          localStorage.setItem('healthcalendar_onedrive_state', JSON.stringify({
             isAuthenticated: true,
             userInfo: redirectResult.account,
             lastSyncTime: currentSyncTime,
@@ -317,7 +318,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
             const currentSyncTime = globalState.lastSyncTime ? globalState.lastSyncTime.toISOString() : 
                                   localStorage.getItem('healthcalendar_last_sync_backup')
             
-            localStorage.setItem('healthcalendar_auth_state', JSON.stringify({
+            localStorage.setItem('healthcalendar_onedrive_state', JSON.stringify({
               isAuthenticated: true,
               userInfo: userInfo,
               lastSyncTime: currentSyncTime,
@@ -397,8 +398,9 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       try {
         const currentSyncTime = globalState.lastSyncTime ? globalState.lastSyncTime.toISOString() : 
                               localStorage.getItem('healthcalendar_last_sync_backup')
-        
-        localStorage.setItem('healthcalendar_auth_state', JSON.stringify({
+        console.log('💾 Saving auth state with syncTime:', currentSyncTime )
+
+        localStorage.setItem('healthcalendar_onedrive_state', JSON.stringify({
           isAuthenticated: true,
           userInfo: result.account,
           lastSyncTime: currentSyncTime,
@@ -439,7 +441,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
       
       // 清除保存的认证状态
       try {
-        localStorage.removeItem('healthcalendar_auth_state')
+        localStorage.removeItem('healthcalendar_onedrive_state')
         localStorage.removeItem('healthcalendar_last_sync_backup')
       } catch (error) {
         console.warn('Failed to clear auth state from localStorage:', error)
@@ -790,7 +792,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
           }
 
           // 检查是否有保存的认证状态
-          const savedAuthState = localStorage.getItem('healthcalendar_auth_state')
+          const savedAuthState = localStorage.getItem('healthcalendar_onedrive_state')
           console.log('🔍 检查localStorage中的认证状态:', savedAuthState ? '存在' : '不存在')
           
           if (savedAuthState) {
@@ -820,11 +822,11 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
                 })
               } else {
                 console.log('⏰ 认证状态已过期或无效，清除保存的状态')
-                localStorage.removeItem('healthcalendar_auth_state')
+                localStorage.removeItem('healthcalendar_onedrive_state')
               }
             } catch (error) {
               console.warn('❌ 解析认证状态失败:', error)
-              localStorage.removeItem('healthcalendar_auth_state')
+              localStorage.removeItem('healthcalendar_onedrive_state')
             }
           } else {
             console.log('💭 localStorage中无认证状态')
@@ -1332,7 +1334,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
         // 首先检查基本的认证状态
         if (!state.isAuthenticated) {
           // 尝试从localStorage恢复状态
-          const savedAuthState = localStorage.getItem('healthcalendar_auth_state')
+          const savedAuthState = localStorage.getItem('healthcalendar_onedrive_state')
           if (savedAuthState) {
             try {
               const authData = JSON.parse(savedAuthState)
@@ -1522,7 +1524,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
 // 辅助函数：格式化同步时间
 export const formatSyncTime = (date: Date | null | undefined): string => {
-  console.log('🕐 formatSyncTime called with:', date ? date.toISOString() : date)
+  // console.log('🕐 formatSyncTime called with:', date ? date.toISOString() : date)
   if (!date || date === undefined) return '从未同步'
   
   // 确保date是一个有效的Date对象

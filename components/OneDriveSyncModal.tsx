@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { 
   X, 
   Cloud, 
@@ -100,104 +100,71 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
     } else {
       setIsInitialSetup(false)
       setSyncSteps([
+        // {
+        //   id: 'users',
+        //   title: '同步用户数据',
+        //   description: '正在同步用户信息...',
+        //   status: 'pending',
+        //   icon: Users
+        // },
+        // {
+        //   id: 'meal',
+        //   title: '同步饮食记录',
+        //   description: '正在同步饮食数据...',
+        //   status: 'pending',
+        //   icon: Download
+        // },
+        // {
+        //   id: 'stool',
+        //   title: '同步排便记录',
+        //   description: '正在同步排便数据...',
+        //   status: 'pending',
+        //   icon: Download
+        // },
+        // {
+        //   id: 'period',
+        //   title: '同步生理记录',
+        //   description: '正在同步生理数据...',
+        //   status: 'pending',
+        //   icon: Download
+        // },
+        // {
+        //   id: 'records',
+        //   title: '同步记录',
+        //   description: '正在同步个人记录...',
+        //   status: 'pending',
+        //   icon: Download
+        // }
         {
-          id: 'users',
-          title: '同步用户数据',
-          description: '正在同步用户信息...',
+          id: 'sync',
+          title: '同步数据',
+          description: '将本地数据同步到云端',
           status: 'pending',
-          icon: Users
-        },
-        {
-          id: 'records',
-          title: '同步健康记录',
-          description: '正在同步个人记录...',
-          status: 'pending',
-          icon: Activity
-        },
-        {
-          id: 'stool',
-          title: '同步排便记录',
-          description: '正在同步排便数据...',
-          status: 'pending',
-          icon: FileText
+          icon: RefreshCw
         }
       ])
     }
   }, [oneDriveState.isAuthenticated, isMobile])
 
-  // 监听同步状态变化
-  useEffect(() => {
-    if (oneDriveState.isConnecting && isInitialSetup) {
-      updateStepStatus('connect', 'in_progress')
-    }
-    
-    if (oneDriveState.isAuthenticated && isInitialSetup) {
-      updateStepStatus('connect', 'completed')
-      updateStepStatus('verify', 'completed')
-      updateStepStatus('setup', 'completed')
-    }
-
-    if (oneDriveState.syncStatus === 'syncing') {
-      if (!isInitialSetup) {
-        updateStepStatus('users', 'in_progress')
-      } else {
-        updateStepStatus('sync', 'in_progress')
-      }
-    }
-
-    if (oneDriveState.syncStatus === 'success') {
-      setSyncSteps(prev => prev.map(step => ({ ...step, status: 'completed' as const })))
-      setSyncProgress(100)
-    }
-
-    if (oneDriveState.error) {
-      setSyncSteps(prev => prev.map(step => 
-        step.status === 'in_progress' ? { ...step, status: 'error' as const } : step
-      ))
-    }
-  }, [oneDriveState, isInitialSetup])
-
   // 更新步骤状态
-  const updateStepStatus = (stepId: string, status: SyncStep['status']) => {
-    setSyncSteps(prev => prev.map(step => 
-      step.id === stepId ? { ...step, status } : step
-    ))
-    
-    // 更新进度
-    const completedSteps = syncSteps.filter(step => step.status === 'completed').length
-    setSyncProgress((completedSteps / syncSteps.length) * 100)
-  }
-
-  // 处理连接
-  const handleConnect = async () => {
-    try {
-      updateStepStatus('connect', 'in_progress')
-      await oneDriveActions.connect()
+  const updateStepStatus = useCallback((stepId: string, status: SyncStep['status']) => {
+    setSyncSteps(prev => {
+      const updatedSteps = prev.map(step => 
+        step.id === stepId ? { ...step, status } : step
+      )
       
-      if (oneDriveState.isAuthenticated) {
-        updateStepStatus('connect', 'completed')
-        updateStepStatus('verify', 'in_progress')
-        
-        setTimeout(() => {
-          updateStepStatus('verify', 'completed')
-          updateStepStatus('setup', 'in_progress')
-          
-          setTimeout(() => {
-            updateStepStatus('setup', 'completed')
-            updateStepStatus('sync', 'in_progress')
-            
-            // 开始数据同步
-            handleSync()
-          }, 1000)
-        }, 500)
-      }
-    } catch (error) {
-      updateStepStatus('connect', 'error')
-    }
-  }
+      // 更新进度 - 使用更新后的步骤数据
+      const completedSteps = updatedSteps.filter(step => step.status === 'completed').length
+      console.log('已完成步骤:', completedSteps, '总步骤:', updatedSteps.length)
+      console.log('updatedSteps:', updatedSteps)
+      setSyncProgress((completedSteps / updatedSteps.length) * 100)
+      
+      return updatedSteps
+    })
+  }, [])
 
   // 处理同步
-  const handleSync = async () => {
+  const handleSync = useCallback(async () => {
     if (!currentUser) return
 
     try {
@@ -213,25 +180,16 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
         updateStepStatus('sync', 'completed')
       } else {
         // 常规同步流程
-        updateStepStatus('users', 'in_progress')
-        await oneDriveActions.syncIDBOneDriveUsers()
-        updateStepStatus('users', 'completed')
-        
-        updateStepStatus('records', 'in_progress')
-        await oneDriveActions.syncIDBOneDriveMyRecords()
-        updateStepStatus('records', 'completed')
-        
-        updateStepStatus('stool', 'in_progress')
-        await oneDriveActions.syncIDBOneDriveStoolRecords()
-        updateStepStatus('stool', 'completed')
-
-        updateStepStatus('period', 'in_progress')
-        await oneDriveActions.syncIDBOneDrivePeriodRecords()
-        updateStepStatus('period', 'completed')
-
-        updateStepStatus('meal', 'in_progress')
-        await oneDriveActions.syncIDBOneDriveMealRecords()
-        updateStepStatus('meal', 'completed')
+        updateStepStatus('sync', 'in_progress')
+        setSyncProgress(0)
+        await Promise.all([
+          oneDriveActions.syncIDBOneDriveUsers(),
+          oneDriveActions.syncIDBOneDriveMyRecords(),
+          oneDriveActions.syncIDBOneDriveStoolRecords(),
+          oneDriveActions.syncIDBOneDrivePeriodRecords(),
+          oneDriveActions.syncIDBOneDriveMealRecords(),
+        ])
+        updateStepStatus('sync', 'completed')
       }
       
       setSyncProgress(100)
@@ -242,6 +200,65 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
       }
     } catch (error) {
       console.error('同步失败:', error)
+      updateStepStatus('sync', 'error')
+    }
+  }, [currentUser, isInitialSetup, oneDriveActions, updateStepStatus, onSyncComplete])
+
+  // 监听同步状态变化
+  useEffect(() => {
+    if (oneDriveState.isConnecting && isInitialSetup) {
+      updateStepStatus('connect', 'in_progress')
+    }
+    
+    if (oneDriveState.isAuthenticated && isInitialSetup) {
+      updateStepStatus('connect', 'completed')
+      updateStepStatus('verify', 'completed')
+      updateStepStatus('setup', 'completed')
+      updateStepStatus('sync', 'in_progress')
+      
+      // 认证完成后自动开始同步
+      handleSync()
+    }
+
+    if (oneDriveState.syncStatus === 'syncing') {
+      updateStepStatus('sync', 'in_progress')
+    }
+
+    if (oneDriveState.syncStatus === 'success') {
+      setSyncSteps(prev => {
+        const updatedSteps = prev.map(step => ({ ...step, status: 'completed' as const }))
+        const completedSteps = updatedSteps.filter(step => step.status === 'completed').length
+        setSyncProgress((completedSteps / updatedSteps.length) * 100)
+        return updatedSteps
+      })
+    }
+
+    if (oneDriveState.error) {
+      setSyncSteps(prev => {
+        const updatedSteps = prev.map(step => 
+          step.status === 'in_progress' ? { ...step, status: 'error' as const } : step
+        )
+        const completedSteps = updatedSteps.filter(step => step.status === 'completed').length
+        setSyncProgress((completedSteps / updatedSteps.length) * 100)
+        return updatedSteps
+      })
+    }
+  }, [oneDriveState, isInitialSetup, updateStepStatus, handleSync])
+
+  // 处理连接
+  const handleConnect = async () => {
+    try {
+      updateStepStatus('connect', 'in_progress')
+      await oneDriveActions.connect()
+      
+      // 检查连接状态
+      await oneDriveActions.checkConnection()
+      
+      console.log('连接完成，认证状态:', oneDriveState.isAuthenticated)
+      
+    } catch (error) {
+      console.error('连接失败:', error)
+      updateStepStatus('connect', 'error')
     }
   }
 
