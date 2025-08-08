@@ -1524,7 +1524,7 @@ export const useOneDriveSync = (): [OneDriveSyncState, OneDriveSyncActions] => {
 
 // 辅助函数：格式化同步时间
 export const formatSyncTime = (date: Date | null | undefined): string => {
-  console.log('🕐 formatSyncTime called with:', date ? date.toISOString() : date)
+  // console.log('🕐 formatSyncTime called with:', date ? date.toISOString() : date)
   if (!date || date === undefined) return '从未同步'
   
   // 确保date是一个有效的Date对象

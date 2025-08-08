@@ -163,6 +163,47 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
     })
   }, [])
 
+  // 处理同步
+  const handleSync = useCallback(async () => {
+    if (!currentUser) return
+
+    try {
+      if (isInitialSetup) {
+        // 初始设置时的完整同步
+        await Promise.all([
+          oneDriveActions.syncIDBOneDriveUsers(),
+          oneDriveActions.syncIDBOneDriveMyRecords(),
+          oneDriveActions.syncIDBOneDriveStoolRecords(),
+          oneDriveActions.syncIDBOneDrivePeriodRecords(),
+          oneDriveActions.syncIDBOneDriveMealRecords(),
+        ])
+        updateStepStatus('sync', 'completed')
+      } else {
+        // 常规同步流程
+        updateStepStatus('sync', 'in_progress')
+        setSyncProgress(0)
+        await Promise.all([
+          oneDriveActions.syncIDBOneDriveUsers(),
+          oneDriveActions.syncIDBOneDriveMyRecords(),
+          oneDriveActions.syncIDBOneDriveStoolRecords(),
+          oneDriveActions.syncIDBOneDrivePeriodRecords(),
+          oneDriveActions.syncIDBOneDriveMealRecords(),
+        ])
+        updateStepStatus('sync', 'completed')
+      }
+      
+      setSyncProgress(100)
+      
+      // 同步完成后调用回调函数刷新HealthCalendar的数据
+      if (onSyncComplete) {
+        onSyncComplete()
+      }
+    } catch (error) {
+      console.error('同步失败:', error)
+      updateStepStatus('sync', 'error')
+    }
+  }, [currentUser, isInitialSetup, oneDriveActions, updateStepStatus, onSyncComplete])
+
   // 监听同步状态变化
   useEffect(() => {
     if (oneDriveState.isConnecting && isInitialSetup) {
@@ -173,6 +214,10 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
       updateStepStatus('connect', 'completed')
       updateStepStatus('verify', 'completed')
       updateStepStatus('setup', 'completed')
+      updateStepStatus('sync', 'in_progress')
+      
+      // 认证完成后自动开始同步
+      handleSync()
     }
 
     if (oneDriveState.syncStatus === 'syncing') {
@@ -198,7 +243,7 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
         return updatedSteps
       })
     }
-  }, [oneDriveState, isInitialSetup, updateStepStatus])
+  }, [oneDriveState, isInitialSetup, updateStepStatus, handleSync])
 
   // 处理连接
   const handleConnect = async () => {
@@ -206,91 +251,14 @@ export const OneDriveSyncModal: React.FC<OneDriveSyncModalProps> = ({
       updateStepStatus('connect', 'in_progress')
       await oneDriveActions.connect()
       
+      // 检查连接状态
       await oneDriveActions.checkConnection()
-      // 等待一小段时间让状态更新
-      setTimeout(async () => {
-          updateStepStatus('connect', 'completed')
-          await oneDriveActions.checkConnection()
-          updateStepStatus('verify', 'in_progress')
-          
-          setTimeout(async () => {
-            updateStepStatus('verify', 'completed')
-            await oneDriveActions.checkConnection()
-            updateStepStatus('setup', 'in_progress')
-            
-            setTimeout(async () => {
-              updateStepStatus('setup', 'completed')
-              updateStepStatus('sync', 'in_progress')
-              
-              // 开始数据同步
-              // await handleSync()
-            }, 1000)
-          }, 1000)
-      }, 1000)
+      
+      console.log('连接完成，认证状态:', oneDriveState.isAuthenticated)
+      
     } catch (error) {
       console.error('连接失败:', error)
       updateStepStatus('connect', 'error')
-    }
-  }
-
-  // 处理同步
-  const handleSync = async () => {
-    if (!currentUser) return
-
-    try {
-      if (isInitialSetup) {
-        // 初始设置时的完整同步
-        await Promise.all([
-          oneDriveActions.syncIDBOneDriveUsers(),
-          oneDriveActions.syncIDBOneDriveMyRecords(),
-          oneDriveActions.syncIDBOneDriveStoolRecords(),
-          oneDriveActions.syncIDBOneDrivePeriodRecords(),
-          oneDriveActions.syncIDBOneDriveMealRecords(),
-        ])
-        updateStepStatus('sync', 'completed')
-      } else {
-        // 常规同步流程
-        // await updateStepStatus('users', 'in_progress')
-        // await oneDriveActions.syncIDBOneDriveUsers()
-        // await updateStepStatus('users', 'completed')
-
-        // await updateStepStatus('meal', 'in_progress')
-        // await oneDriveActions.syncIDBOneDriveMealRecords()
-        // await updateStepStatus('meal', 'completed')
-
-        // await updateStepStatus('stool', 'in_progress')
-        // await oneDriveActions.syncIDBOneDriveStoolRecords()
-        // await updateStepStatus('stool', 'completed')
-
-        // await updateStepStatus('period', 'in_progress')
-        // await oneDriveActions.syncIDBOneDrivePeriodRecords()
-        // await updateStepStatus('period', 'completed')
-
-        // await updateStepStatus('records', 'in_progress')
-        // await oneDriveActions.syncIDBOneDriveMyRecords()
-        // await updateStepStatus('records', 'completed')
-
-        // 初始设置时的完整同步
-        updateStepStatus('sync', 'in_progress')
-        setSyncProgress(0)
-        await Promise.all([
-          oneDriveActions.syncIDBOneDriveUsers(),
-          oneDriveActions.syncIDBOneDriveMyRecords(),
-          oneDriveActions.syncIDBOneDriveStoolRecords(),
-          oneDriveActions.syncIDBOneDrivePeriodRecords(),
-          oneDriveActions.syncIDBOneDriveMealRecords(),
-        ])
-        updateStepStatus('sync', 'completed')
-      }
-      
-      setSyncProgress(100)
-      
-      // 同步完成后调用回调函数刷新HealthCalendar的数据
-      if (onSyncComplete) {
-        onSyncComplete()
-      }
-    } catch (error) {
-      console.error('同步失败:', error)
     }
   }
 
