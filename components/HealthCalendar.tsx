@@ -2211,7 +2211,11 @@ useEffect(() => {
                 const dayNumber = i - startOfWeek + 1
                 const cellDate = new Date(calendarYear, calendarMonth, dayNumber)
                 
-                const isToday = cellDate.toDateString() === today.toDateString()
+                // 修复跨设备时区问题：直接比较年月日而不是使用toDateString()
+                const isToday = 
+                  cellDate.getFullYear() === today.getFullYear() &&
+                  cellDate.getMonth() === today.getMonth() &&
+                  cellDate.getDate() === today.getDate()
                 const isCurrentMonth = cellDate.getMonth() === calendarMonth
                 const displayDay = cellDate.getDate()
                 
