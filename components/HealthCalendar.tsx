@@ -1502,9 +1502,20 @@ const loadAllRecords = async () => {
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
     
-    if (date.toDateString() === today.toDateString()) {
+    // 使用时区安全的日期比较：直接比较年月日组件
+    const isToday = 
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate()
+    
+    const isYesterday = 
+      date.getFullYear() === yesterday.getFullYear() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getDate() === yesterday.getDate()
+    
+    if (isToday) {
       return '今天, ' + date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
-    } else if (date.toDateString() === yesterday.toDateString()) {
+    } else if (isYesterday) {
       return '昨天, ' + date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
     } else {
       return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -2198,55 +2209,77 @@ useEffect(() => {
               ))}
 
               {/* Calendar Days */}
-              {Array.from({ length: 35 }, (_, i) => {
-                // 使用状态管理的日期
-                const today = new Date()
-                // console.log('当前日期:', today)
+              {(() => {
+                // 创建今天的日期一次，避免在循环中重复创建导致时区不一致
+                const now = new Date()
+                // 创建基于本地时区的今天日期对象，确保跨设备一致性
+                // 这样创建的日期对象总是代表当地时区的今天，不受UTC偏移影响
+                const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate())
                 
-                // 获取当前显示月份的第一天是星期几
-                const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1)
-                const startOfWeek = firstDayOfMonth.getDay()
+                // 调试信息 - 帮助诊断移动端时区问题
+                if (typeof window !== 'undefined') {
+                  console.log('🗓️ Calendar Debug - Date Info:', {
+                    originalNow: now.toString(),
+                    todayLocal: todayLocal.toString(),
+                    nowUTC: now.toUTCString(),
+                    localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    nowOffset: now.getTimezoneOffset(),
+                    localComponents: {
+                      year: now.getFullYear(),
+                      month: now.getMonth(),
+                      date: now.getDate(),
+                      hours: now.getHours()
+                    },
+                    calendarState: { calendarYear, calendarMonth }
+                  })
+                }
                 
-                // 修复日期计算逻辑
-                const dayNumber = i - startOfWeek + 1
-                const cellDate = new Date(calendarYear, calendarMonth, dayNumber)
-                
-                // 修复跨设备时区问题：直接比较年月日而不是使用toDateString()
-                const isToday = 
-                  cellDate.getFullYear() === today.getFullYear() &&
-                  cellDate.getMonth() === today.getMonth() &&
-                  cellDate.getDate() === today.getDate()
-                const isCurrentMonth = cellDate.getMonth() === calendarMonth
-                const displayDay = cellDate.getDate()
-                
-                // 获取该日期的记录圆点 - 支持跨月份显示
-                const recordDots = getRecordDotsForDate(cellDate)
-                
-                return (
-                  <div 
-                    key={i} 
-                    className={`calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`}
-                    onClick={() => handleDateClick(cellDate)}
-                    title={isCurrentMonth ? `查看 ${cellDate.getMonth() + 1}月${cellDate.getDate()}日 的记录` : ''}
-                  >
-                    <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'theme-text-muted' : 'theme-text-primary'}`}>
-                      {displayDay}
-                    </span>
-                    {/* 基于真实记录数据的圆点 */}
-                    {recordDots.length > 0 && (
-                      <div className="flex mt-0.5">
-                        {recordDots.map((dot, index) => (
-                          <div 
-                            key={`${dot.type}-${index}`}
-                            className={`calendar-dot bg-gradient-to-r ${dot.color} ${isToday ? 'ring-2 ring-white' : ''}`}
-                            title={`${dot.type} 记录`}
-                          ></div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                return Array.from({ length: 35 }, (_, i) => {
+                  // 获取当前显示月份的第一天是星期几
+                  const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1)
+                  const startOfWeek = firstDayOfMonth.getDay()
+                  
+                  // 修复日期计算逻辑
+                  const dayNumber = i - startOfWeek + 1
+                  const cellDate = new Date(calendarYear, calendarMonth, dayNumber)
+                  
+                  // 修复跨设备时区问题：直接比较年月日，使用本地时区创建的今天日期
+                  const isToday = 
+                    cellDate.getFullYear() === todayLocal.getFullYear() &&
+                    cellDate.getMonth() === todayLocal.getMonth() &&
+                    cellDate.getDate() === todayLocal.getDate()
+                  const isCurrentMonth = cellDate.getMonth() === calendarMonth
+                  const displayDay = cellDate.getDate()
+                  
+                  // 获取该日期的记录圆点 - 支持跨月份显示
+                  const recordDots = getRecordDotsForDate(cellDate)
+                  
+                  return (
+                    <div 
+                      key={i} 
+                      className={`calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`}
+                      onClick={() => handleDateClick(cellDate)}
+                      title={isCurrentMonth ? `查看 ${cellDate.getMonth() + 1}月${cellDate.getDate()}日 的记录` : ''}
+                    >
+                      <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'theme-text-muted' : 'theme-text-primary'}`}>
+                        {displayDay}
+                      </span>
+                      {/* 基于真实记录数据的圆点 */}
+                      {recordDots.length > 0 && (
+                        <div className="flex mt-0.5">
+                          {recordDots.map((dot, index) => (
+                            <div 
+                              key={`${dot.type}-${index}`}
+                              className={`calendar-dot bg-gradient-to-r ${dot.color} ${isToday ? 'ring-2 ring-white' : ''}`}
+                              title={`${dot.type} 记录`}
+                            ></div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              })()}
             </div>
 
             {/* Legend */}
