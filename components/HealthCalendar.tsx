@@ -2218,6 +2218,10 @@ useEffect(() => {
                 
                 // 调试信息 - 帮助诊断移动端时区问题
                 if (typeof window !== 'undefined') {
+                  // 检查localStorage中的日历状态
+                  const storedYear = localStorage.getItem('healthcalendar_selected_year')
+                  const storedMonth = localStorage.getItem('healthcalendar_selected_month')
+                  
                   console.log('🗓️ Calendar Debug - Date Info:', {
                     originalNow: now.toString(),
                     todayLocal: todayLocal.toString(),
@@ -2230,7 +2234,13 @@ useEffect(() => {
                       date: now.getDate(),
                       hours: now.getHours()
                     },
-                    calendarState: { calendarYear, calendarMonth }
+                    calendarState: { calendarYear, calendarMonth },
+                    localStorage: {
+                      storedYear,
+                      storedMonth,
+                      parsedYear: storedYear ? parseInt(storedYear, 10) : null,
+                      parsedMonth: storedMonth ? parseInt(storedMonth, 10) : null
+                    }
                   })
                 }
                 
@@ -2251,15 +2261,62 @@ useEffect(() => {
                   const isCurrentMonth = cellDate.getMonth() === calendarMonth
                   const displayDay = cellDate.getDate()
                   
+                  // 🔍 详细调试信息 - 只记录特定日期和今天
+                  if (displayDay === 12 || displayDay === 11 || isToday) {
+                    console.log(`📅 Calendar Cell Debug [${i}]:`, {
+                      index: i,
+                      displayDay,
+                      cellDate: cellDate.toString(),
+                      cellDateComponents: {
+                        year: cellDate.getFullYear(),
+                        month: cellDate.getMonth(),
+                        date: cellDate.getDate()
+                      },
+                      todayLocal: todayLocal.toString(),
+                      todayComponents: {
+                        year: todayLocal.getFullYear(),
+                        month: todayLocal.getMonth(),
+                        date: todayLocal.getDate()
+                      },
+                      isToday,
+                      isCurrentMonth,
+                      calendarState: { calendarYear, calendarMonth },
+                      calculationDetails: {
+                        firstDayOfMonth: firstDayOfMonth.toString(),
+                        startOfWeek,
+                        dayNumber,
+                        originalIndex: i
+                      }
+                    })
+                  }
+                  
                   // 获取该日期的记录圆点 - 支持跨月份显示
                   const recordDots = getRecordDotsForDate(cellDate)
+                  
+                  // 🎨 CSS类名调试
+                  const cssClasses = `calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`
+                  
+                  if (displayDay === 12 || displayDay === 11 || isToday) {
+                    console.log(`🎨 CSS Classes Debug [${displayDay}日]:`, {
+                      isToday,
+                      cssClasses,
+                      hasToday: cssClasses.includes('today'),
+                      hasTextWhite: cssClasses.includes('text-white')
+                    })
+                  }
                   
                   return (
                     <div 
                       key={i} 
-                      className={`calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`}
+                      className={cssClasses}
                       onClick={() => handleDateClick(cellDate)}
                       title={isCurrentMonth ? `查看 ${cellDate.getMonth() + 1}月${cellDate.getDate()}日 的记录` : ''}
+                      style={isToday ? { 
+                        backgroundColor: '#10b981', // 强制绿色背景用于测试
+                        color: 'white',
+                        fontWeight: 'bold',
+                        border: '2px solid #059669'
+                      } : undefined}
                     >
                       <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'theme-text-muted' : 'theme-text-primary'}`}>
                         {displayDay}
