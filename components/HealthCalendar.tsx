@@ -880,6 +880,27 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
       element.classList.add('animate-fade-in')
     })
 
+    // 🔍 DOM调试：检查今天的元素是否正确渲染
+    setTimeout(() => {
+      const todayElements = document.querySelectorAll('[data-is-today="true"]')
+      const todayClassElements = document.querySelectorAll('.today')
+      console.log('🔍 DOM Today Elements Check:', {
+        todayDataElements: todayElements.length,
+        todayClassElements: todayClassElements.length,
+        allTodayData: Array.from(todayElements).map(el => ({
+          day: el.getAttribute('data-day'),
+          index: el.getAttribute('data-index'),
+          classes: el.className,
+          hasToday: el.classList.contains('today')
+        })),
+        allTodayClass: Array.from(todayClassElements).map(el => ({
+          day: el.getAttribute('data-day'),
+          index: el.getAttribute('data-index'),
+          classes: el.className
+        }))
+      })
+    }, 1000) // 1秒后检查DOM
+
     // Animate record cards
     const recordCards = document.querySelectorAll('.record-card')
     recordCards.forEach((card, index) => {
@@ -2301,7 +2322,8 @@ useEffect(() => {
                       isToday,
                       cssClasses,
                       hasToday: cssClasses.includes('today'),
-                      hasTextWhite: cssClasses.includes('text-white')
+                      hasTextWhite: cssClasses.includes('text-white'),
+                      domIdentifier: `calendar-cell-${i}-day-${displayDay}` // DOM识别符
                     })
                   }
                   
@@ -2311,12 +2333,9 @@ useEffect(() => {
                       className={cssClasses}
                       onClick={() => handleDateClick(cellDate)}
                       title={isCurrentMonth ? `查看 ${cellDate.getMonth() + 1}月${cellDate.getDate()}日 的记录` : ''}
-                      style={isToday ? { 
-                        backgroundColor: '#10b981', // 强制绿色背景用于测试
-                        color: 'white',
-                        fontWeight: 'bold',
-                        border: '2px solid #059669'
-                      } : undefined}
+                      data-day={displayDay}
+                      data-index={i}
+                      data-is-today={isToday}
                     >
                       <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'theme-text-muted' : 'theme-text-primary'}`}>
                         {displayDay}

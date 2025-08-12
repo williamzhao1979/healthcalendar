@@ -128,3 +128,26 @@ body {
     background-color: #059669;
   }
 }
+
+/* Calendar Today Styling - High Priority */
+@layer components {
+  .calendar-cell.today {
+    background-color: #10b981 !important;
+    color: white !important;
+    font-weight: bold !important;
+    border: 2px solid #059669 !important;
+    box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3) !important;
+  }
+  
+  .calendar-cell.today:hover {
+    background-color: #059669 !important;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
+  }
+  
+  /* Ensure today styling overrides any theme */
+  [data-theme="dark"] .calendar-cell.today {
+    background-color: #10b981 !important;
+    color: white !important;
+  }
+}
