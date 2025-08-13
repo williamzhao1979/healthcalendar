@@ -899,7 +899,7 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
         second: '2-digit'
       }).format(now)
       
-      console.log('🔍 DOM Today Elements Check:', {
+      console.log('🔍 DOM Today Elements Check (NO FORCE FIX):', {
         todayDataElements: todayElements.length,
         todayClassElements: todayClassElements.length,
         timezoneValidation: {
@@ -912,14 +912,27 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
           day: el.getAttribute('data-day'),
           index: el.getAttribute('data-index'),
           classes: el.className,
-          hasToday: el.classList.contains('today')
+          hasToday: el.classList.contains('today'),
+          computedStyle: getComputedStyle(el).backgroundColor,
+          hasInlineStyle: !!(el as HTMLElement).style.backgroundColor
         })),
         allTodayClass: Array.from(todayClassElements).map(el => ({
           day: el.getAttribute('data-day'),
           index: el.getAttribute('data-index'),
-          classes: el.className
+          classes: el.className,
+          computedStyle: getComputedStyle(el).backgroundColor,
+          hasInlineStyle: !!(el as HTMLElement).style.backgroundColor
         }))
       })
+      
+      // 🚨 检查是否有多个today元素 - 这是bug的根源
+      if (todayClassElements.length > 1) {
+        console.error('🚨 BUG发现: 找到多个today元素!', Array.from(todayClassElements).map(el => ({
+          day: el.getAttribute('data-day'),
+          index: el.getAttribute('data-index'),
+          element: el
+        })))
+      }
       
       // 🚨 如果发现时区不匹配，发出警告
       if (todayElements.length === 0 || todayClassElements.length === 0) {
@@ -2296,7 +2309,7 @@ useEffect(() => {
                   
                   // 🔍 详细调试信息 - 只记录特定日期和今天
                   if (displayDay === 12 || displayDay === 13 || displayDay === 14 || isToday) {
-                    console.log(`📅 Calendar Cell Debug [${i}] (UTC-TO-LOCAL):`, {
+                    console.log(`📅 Calendar Cell Debug [${i}] (CLEAN-FIX):`, {
                       index: i,
                       displayDay,
                       cellDate: cellDate.toString(),
@@ -2306,7 +2319,9 @@ useEffect(() => {
                       isToday,
                       isTodayMethod: 'toDateString-comparison',
                       isCurrentMonth,
-                      calendarState: { calendarYear, calendarMonth }
+                      calendarState: { calendarYear, calendarMonth },
+                      willApplyInlineStyle: isToday,
+                      key: i // 检查是否有重复的key
                     })
                   }
                   
@@ -2317,13 +2332,14 @@ useEffect(() => {
                   const cssClasses = `calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`
                   
                   if (displayDay === 12 || displayDay === 13 || displayDay === 14 || isToday) {
-                    console.log(`🎨 CSS Classes Debug [${displayDay}日] (UTC-TO-LOCAL):`, {
+                    console.log(`🎨 CSS Classes Debug [${displayDay}日] (CLEAN-FIX):`, {
                       isToday,
                       cssClasses,
                       hasToday: cssClasses.includes('today'),
                       hasTextWhite: cssClasses.includes('text-white'),
                       domIdentifier: `calendar-cell-${i}-day-${displayDay}`, // DOM识别符
-                      timezoneMethod: 'utc-to-local + toDateString'
+                      timezoneMethod: 'clean-inline-styles',
+                      willReceiveInlineStyles: isToday
                     })
                   }
                   
@@ -2336,6 +2352,21 @@ useEffect(() => {
                       data-day={displayDay}
                       data-index={i}
                       data-is-today={isToday}
+                      data-date-string={cellDate.toDateString()}
+                      style={isToday ? {
+                        backgroundColor: '#10b981 !important',
+                        color: 'white !important',
+                        fontWeight: 'bold',
+                        border: '2px solid #059669',
+                        transform: 'scale(1.05)',
+                        zIndex: 10,
+                        boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)'
+                      } : {
+                        backgroundColor: '', // 明确清除非today元素的背景色
+                        transform: '',
+                        border: '',
+                        boxShadow: ''
+                      }}
                     >
                       <span className={`text-xs font-${isToday ? 'bold' : 'semibold'} ${!isCurrentMonth ? 'theme-text-muted' : 'theme-text-primary'}`}>
                         {displayDay}

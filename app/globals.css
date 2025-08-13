@@ -137,17 +137,34 @@ body {
     font-weight: bold !important;
     border: 2px solid #059669 !important;
     box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3) !important;
+    transform: scale(1.05) !important;
+    z-index: 10 !important;
   }
   
   .calendar-cell.today:hover {
     background-color: #059669 !important;
-    transform: scale(1.05);
-    transition: all 0.2s ease;
+    transform: scale(1.1) !important;
+    transition: all 0.2s ease !important;
   }
   
-  /* Ensure today styling overrides any theme */
-  [data-theme="dark"] .calendar-cell.today {
+  /* Ensure today styling overrides any theme and any other classes */
+  [data-theme="dark"] .calendar-cell.today,
+  .calendar-cell.today.text-white,
+  .today.calendar-cell {
     background-color: #10b981 !important;
     color: white !important;
+    font-weight: bold !important;
+    border: 2px solid #059669 !important;
+    box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3) !important;
+    transform: scale(1.05) !important;
+    z-index: 10 !important;
+  }
+  
+  /* Force override any hover states */
+  .calendar-cell.today:hover,
+  .calendar-cell:hover.today {
+    background-color: #059669 !important;
+    color: white !important;
+    transform: scale(1.1) !important;
   }
 }
