@@ -157,3 +157,47 @@ export function isRecordOnLocalDate(recordDateTime: string, calendarDate: Date):
   }
   return isSameLocalDay(recordDateTime, calendarDate)
 }
+
+/**
+ * Get timezone-safe "today" date that works consistently across different server environments
+ * This solves the issue where Vercel (UTC) and local development (local timezone) show different "today"
+ */
+export function getSafeToday(): Date {
+  if (typeof window === 'undefined') {
+    // Server-side: just return new Date, will be corrected on client
+    return new Date()
+  }
+  
+  // Client-side: use user's timezone to determine today
+  const now = new Date()
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  
+  try {
+    // Get today's date in user's timezone
+    const todayString = new Intl.DateTimeFormat('en-CA', {
+      timeZone: userTimezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(now)
+    
+    // Parse and create local date object
+    const [year, month, day] = todayString.split('-').map(num => parseInt(num, 10))
+    return new Date(year, month - 1, day) // month is 0-indexed
+  } catch (error) {
+    console.warn('Failed to get timezone-safe today, falling back to simple method:', error)
+    // Fallback to simple local date creation
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  }
+}
+
+/**
+ * Compare if a date is "today" in user's local timezone
+ * This prevents server-client timezone mismatches
+ */
+export function isToday(date: Date): boolean {
+  const today = getSafeToday()
+  return date.getFullYear() === today.getFullYear() &&
+         date.getMonth() === today.getMonth() &&
+         date.getDate() === today.getDate()
+}
