@@ -2270,25 +2270,31 @@ useEffect(() => {
 
               {/* Calendar Days */}
               {(() => {
-                // 🌍 采用period-calendar的简单today判断方法 + UTC转本地时间
-                // 获取UTC当前时间，然后转换为本地时间
-                const utcNow = new Date()
-                const localNow = new Date(utcNow.getTime() - (utcNow.getTimezoneOffset() * 60000))
-                const today = new Date(localNow.getFullYear(), localNow.getMonth(), localNow.getDate())
+                // � 最简单直接的today获取方法，不做任何UTC转换
+                const now = new Date()
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
                 
                 // 调试信息
                 if (typeof window !== 'undefined') {
                   const storedYear = localStorage.getItem('healthcalendar_selected_year')
                   const storedMonth = localStorage.getItem('healthcalendar_selected_month')
                   
-                  console.log('🌍 UTC to Local Today Debug:', {
-                    utcNow: utcNow.toString(),
-                    localNow: localNow.toString(),
+                  console.log('� Simple Today Debug (SIMPLE-LOCAL):', {
+                    now: now.toString(),
+                    nowComponents: {
+                      year: now.getFullYear(),
+                      month: now.getMonth(),
+                      date: now.getDate()
+                    },
                     today: today.toString(),
-                    todayDateString: today.toDateString(),
-                    utcOffset: utcNow.getTimezoneOffset(),
+                    todayComponents: {
+                      year: today.getFullYear(),
+                      month: today.getMonth(),
+                      date: today.getDate()
+                    },
                     userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     calendarState: { calendarYear, calendarMonth },
+                    isShowingCurrentMonth: calendarYear === today.getFullYear() && calendarMonth === today.getMonth(),
                     localStorage: { storedYear, storedMonth }
                   })
                 }
@@ -2302,26 +2308,37 @@ useEffect(() => {
                   const dayNumber = i - startOfWeek + 1
                   const cellDate = new Date(calendarYear, calendarMonth, dayNumber)
                   
-                  // 🔧 使用period-calendar的简单today判断方法：toDateString()比较
-                  const isToday = cellDate.toDateString() === today.toDateString()
+                  // 🔧 修复跨年份today判断：严格比较年月日，不仅仅是toDateString
+                  const isToday = 
+                    cellDate.getFullYear() === today.getFullYear() &&
+                    cellDate.getMonth() === today.getMonth() &&
+                    cellDate.getDate() === today.getDate()
                   const isCurrentMonth = cellDate.getMonth() === calendarMonth
                   const displayDay = cellDate.getDate()
                   
                   // 🔍 详细调试信息 - 只记录特定日期和今天
                   if (displayDay === 12 || displayDay === 13 || displayDay === 14 || isToday) {
-                    console.log(`📅 Calendar Cell Debug [${i}] (CLEAN-FIX):`, {
+                    console.log(`📅 Calendar Cell Debug [${i}] (SIMPLE-LOCAL):`, {
                       index: i,
                       displayDay,
                       cellDate: cellDate.toString(),
-                      cellDateString: cellDate.toDateString(),
+                      cellDateComponents: {
+                        year: cellDate.getFullYear(),
+                        month: cellDate.getMonth(),
+                        date: cellDate.getDate()
+                      },
                       today: today.toString(),
-                      todayDateString: today.toDateString(),
+                      todayComponents: {
+                        year: today.getFullYear(),
+                        month: today.getMonth(),
+                        date: today.getDate()
+                      },
                       isToday,
-                      isTodayMethod: 'toDateString-comparison',
+                      isTodayMethod: 'simple-new-Date-comparison',
                       isCurrentMonth,
                       calendarState: { calendarYear, calendarMonth },
                       willApplyInlineStyle: isToday,
-                      key: i // 检查是否有重复的key
+                      key: i
                     })
                   }
                   
@@ -2332,13 +2349,13 @@ useEffect(() => {
                   const cssClasses = `calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`
                   
                   if (displayDay === 12 || displayDay === 13 || displayDay === 14 || isToday) {
-                    console.log(`🎨 CSS Classes Debug [${displayDay}日] (CLEAN-FIX):`, {
+                    console.log(`🎨 CSS Classes Debug [${displayDay}日] (YEAR-MONTH-DAY-FIX):`, {
                       isToday,
                       cssClasses,
                       hasToday: cssClasses.includes('today'),
                       hasTextWhite: cssClasses.includes('text-white'),
                       domIdentifier: `calendar-cell-${i}-day-${displayDay}`, // DOM识别符
-                      timezoneMethod: 'clean-inline-styles',
+                      timezoneMethod: 'strict-year-month-date-comparison',
                       willReceiveInlineStyles: isToday
                     })
                   }
