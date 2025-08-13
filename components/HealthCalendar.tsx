@@ -788,10 +788,18 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
   const { toast } = useToast()
 
   // 日历状态
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
-  const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth())
+  const [currentDate, setCurrentDate] = useState<Date | null>(null)
+  const [calendarYear, setCalendarYear] = useState<number | null>(null)
+  const [calendarMonth, setCalendarMonth] = useState<number | null>(null)
   const [showPeriodRecords, setShowPeriodRecords] = useState(true)
+
+  // 在客户端挂载后设置正确的本地时间
+  useEffect(() => {
+    const now = new Date()
+    setCurrentDate(now)
+    setCalendarYear(now.getFullYear())
+    setCalendarMonth(now.getMonth())
+  }, [])
 
   // OneDrive同步状态 - 使用错误边界保护
   // const [oneDriveState, oneDriveActions] = (() => {
@@ -955,8 +963,12 @@ const HealthCalendar: React.FC<HealthCalendarProps> = () => {
 
   // 监听月份和年份变化，保存到localStorage
   useEffect(() => {
-    localStorage.setItem('healthcalendar_selected_year', calendarYear.toString());
-    localStorage.setItem('healthcalendar_selected_month', calendarMonth.toString());
+    if (calendarYear !== null) {
+      localStorage.setItem('healthcalendar_selected_year', calendarYear.toString());
+    }
+    if (calendarMonth !== null) {
+      localStorage.setItem('healthcalendar_selected_month', calendarMonth.toString());
+    }
   }, [calendarYear, calendarMonth])
 
   const initializeUsers = async () => {
@@ -1228,6 +1240,8 @@ const loadAllRecords = async () => {
 
   // 处理上一个月
   const handlePreviousMonth = () => {
+    if (calendarYear === null || calendarMonth === null) return;
+    
     let newYear = calendarYear;
     let newMonth = calendarMonth;
     
@@ -1248,6 +1262,8 @@ const loadAllRecords = async () => {
 
   // 处理下一个月
   const handleNextMonth = () => {
+    if (calendarYear === null || calendarMonth === null) return;
+    
     let newYear = calendarYear;
     let newMonth = calendarMonth;
     
@@ -2232,7 +2248,9 @@ useEffect(() => {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-2">
                 <div>
-                  <h2 className="text-xl font-bold theme-text-primary">{calendarYear}年 {getMonthName(calendarMonth)}</h2>
+                  <h2 className="text-xl font-bold theme-text-primary">
+                    {calendarYear !== null ? `${calendarYear}年` : ''} {calendarMonth !== null ? getMonthName(calendarMonth) : ''}
+                  </h2>
                   <p className="text-xs theme-text-secondary mt-0.5">健康记录概览</p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -2294,26 +2312,35 @@ useEffect(() => {
                     },
                     userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     calendarState: { calendarYear, calendarMonth },
-                    isShowingCurrentMonth: calendarYear === today.getFullYear() && calendarMonth === today.getMonth(),
+                    isShowingCurrentMonth: calendarYear !== null && calendarMonth !== null && calendarYear === today.getFullYear() && calendarMonth === today.getMonth(),
                     localStorage: { storedYear, storedMonth }
                   })
                 }
                 
+                // 如果日历状态还未初始化，显示加载状态
+                if (calendarYear === null || calendarMonth === null) {
+                  return Array.from({ length: 35 }, (_, i) => (
+                    <div key={i} className="calendar-cell h-12 flex items-center justify-center">
+                      <div className="animate-pulse bg-gray-200 rounded w-8 h-6"></div>
+                    </div>
+                  ))
+                }
+                
                 return Array.from({ length: 35 }, (_, i) => {
                   // 获取当前显示月份的第一天是星期几
-                  const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1)
+                  const firstDayOfMonth = new Date(calendarYear!, calendarMonth!, 1)
                   const startOfWeek = firstDayOfMonth.getDay()
                   
                   // 修复日期计算逻辑
                   const dayNumber = i - startOfWeek + 1
-                  const cellDate = new Date(calendarYear, calendarMonth, dayNumber)
+                  const cellDate = new Date(calendarYear!, calendarMonth!, dayNumber)
                   
                   // 🔧 修复跨年份today判断：严格比较年月日，不仅仅是toDateString
                   const isToday = 
                     cellDate.getFullYear() === today.getFullYear() &&
                     cellDate.getMonth() === today.getMonth() &&
                     cellDate.getDate() === today.getDate()
-                  const isCurrentMonth = cellDate.getMonth() === calendarMonth
+                  const isCurrentMonth = cellDate.getMonth() === calendarMonth!
                   const displayDay = cellDate.getDate()
                   
                   // 🔍 详细调试信息 - 只记录特定日期和今天
