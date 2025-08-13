@@ -38,7 +38,7 @@ import { Attachment } from '../types/attachment'
 import { OneDriveSyncModal } from './OneDriveSyncModal'
 import { OneDriveSyncToggle } from './OneDriveSyncToggle'
 import { OneDriveDisconnectModal } from './OneDriveDisconnectModal'
-import { getLocalDateString, isRecordOnLocalDate, formatLocalDateTime, getSafeToday, isToday as isTodaySafe } from '../lib/dateUtils'
+import { getLocalDateString, isRecordOnLocalDate, formatLocalDateTime } from '../lib/dateUtils'
 import { useTheme } from '../hooks/useTheme'
 import { useConfirm } from '../hooks/useConfirm'
 import { useToast } from '../hooks/use-toast'
@@ -2257,16 +2257,23 @@ useEffect(() => {
 
               {/* Calendar Days */}
               {(() => {
-                // 🌍 使用时区安全的今天日期函数，解决服务器-客户端时区差异
-                const safeTodayLocal = getSafeToday()
+                // 🌍 采用period-calendar的简单today判断方法 + UTC转本地时间
+                // 获取UTC当前时间，然后转换为本地时间
+                const utcNow = new Date()
+                const localNow = new Date(utcNow.getTime() - (utcNow.getTimezoneOffset() * 60000))
+                const today = new Date(localNow.getFullYear(), localNow.getMonth(), localNow.getDate())
                 
-                // 调试信息 - 帮助诊断部署环境时区问题
+                // 调试信息
                 if (typeof window !== 'undefined') {
                   const storedYear = localStorage.getItem('healthcalendar_selected_year')
                   const storedMonth = localStorage.getItem('healthcalendar_selected_month')
                   
-                  console.log('🌍 Timezone-Safe Debug:', {
-                    safeTodayLocal: safeTodayLocal.toString(),
+                  console.log('🌍 UTC to Local Today Debug:', {
+                    utcNow: utcNow.toString(),
+                    localNow: localNow.toString(),
+                    today: today.toString(),
+                    todayDateString: today.toDateString(),
+                    utcOffset: utcNow.getTimezoneOffset(),
                     userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     calendarState: { calendarYear, calendarMonth },
                     localStorage: { storedYear, storedMonth }
@@ -2282,30 +2289,22 @@ useEffect(() => {
                   const dayNumber = i - startOfWeek + 1
                   const cellDate = new Date(calendarYear, calendarMonth, dayNumber)
                   
-                  // 🔧 使用时区安全的日期比较函数
-                  const isToday = isTodaySafe(cellDate)
+                  // 🔧 使用period-calendar的简单today判断方法：toDateString()比较
+                  const isToday = cellDate.toDateString() === today.toDateString()
                   const isCurrentMonth = cellDate.getMonth() === calendarMonth
                   const displayDay = cellDate.getDate()
                   
                   // 🔍 详细调试信息 - 只记录特定日期和今天
-                  if (displayDay === 12 || displayDay === 11 || isToday) {
-                    console.log(`📅 Calendar Cell Debug [${i}] (FIXED):`, {
+                  if (displayDay === 12 || displayDay === 13 || displayDay === 14 || isToday) {
+                    console.log(`📅 Calendar Cell Debug [${i}] (UTC-TO-LOCAL):`, {
                       index: i,
                       displayDay,
                       cellDate: cellDate.toString(),
-                      cellDateComponents: {
-                        year: cellDate.getFullYear(),
-                        month: cellDate.getMonth(),
-                        date: cellDate.getDate()
-                      },
-                      safeTodayLocal: safeTodayLocal.toString(),
-                      todayComponents: {
-                        year: safeTodayLocal.getFullYear(),
-                        month: safeTodayLocal.getMonth(),
-                        date: safeTodayLocal.getDate()
-                      },
+                      cellDateString: cellDate.toDateString(),
+                      today: today.toString(),
+                      todayDateString: today.toDateString(),
                       isToday,
-                      isTodayMethod: 'timezone-safe-function', // 标识使用了新方法
+                      isTodayMethod: 'toDateString-comparison',
                       isCurrentMonth,
                       calendarState: { calendarYear, calendarMonth }
                     })
@@ -2317,14 +2316,14 @@ useEffect(() => {
                   // 🎨 CSS类名调试
                   const cssClasses = `calendar-cell h-12 flex flex-col items-center justify-center rounded-xl cursor-pointer ${isToday ? 'today text-white' : ''}`
                   
-                  if (displayDay === 12 || displayDay === 11 || isToday) {
-                    console.log(`🎨 CSS Classes Debug [${displayDay}日] (TIMEZONE-SAFE):`, {
+                  if (displayDay === 12 || displayDay === 13 || displayDay === 14 || isToday) {
+                    console.log(`🎨 CSS Classes Debug [${displayDay}日] (UTC-TO-LOCAL):`, {
                       isToday,
                       cssClasses,
                       hasToday: cssClasses.includes('today'),
                       hasTextWhite: cssClasses.includes('text-white'),
                       domIdentifier: `calendar-cell-${i}-day-${displayDay}`, // DOM识别符
-                      timezoneMethod: 'safe-function'
+                      timezoneMethod: 'utc-to-local + toDateString'
                     })
                   }
                   
