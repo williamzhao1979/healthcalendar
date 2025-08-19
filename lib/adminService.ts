@@ -776,10 +776,10 @@ export class IndexedDBAdminService {
     //       console.error('获取数据库失败:', error)
     // }
 
-    console.log('Ensuring IndexedDB is initialized...')
+    console.debug('Ensuring IndexedDB is initialized...')
     const db = await this.getDB()
     const currentStores = Array.from(db.objectStoreNames)
-    console.log('Current stores:', currentStores)
+    console.debug('Current stores:', currentStores)
 
     if (!(currentStores.includes('users') && 
       currentStores.includes('stoolRecords') && currentStores.includes('myRecords') && 

@@ -357,7 +357,7 @@ const TagManager: React.FC<{
     if (customTag.trim() && customTag.length <= 10 && !selectedTags.includes(customTag.trim())) {
       onTagsChange([...selectedTags, customTag.trim()])
       setCustomTag('')
-      setShowCustomInput(false)
+      // setShowCustomInput(false)
     }
   }
 
@@ -382,19 +382,9 @@ const TagManager: React.FC<{
             {tag}
           </button>
         ))}
-        
-        {/* 自定义标签按钮 */}
-        <button
-          onClick={() => setShowCustomInput(true)}
-          className="px-2 py-1 bg-green-100 border border-green-300 rounded-full text-xs font-medium text-green-600 cursor-pointer transition-all hover:bg-green-200 hover:shadow-md hover:-translate-y-0.5 flex items-center space-x-1"
-        >
-          <Plus className="w-3 h-3" />
-          <span>自定义</span>
-        </button>
       </div>
 
       {/* 自定义标签输入 */}
-      {showCustomInput && (
         <div className="flex items-center space-x-2">
           <input
             type="text"
@@ -411,18 +401,7 @@ const TagManager: React.FC<{
           >
             添加
           </button>
-          <button
-            onClick={() => {
-              setShowCustomInput(false)
-              setCustomTag('')
-            }}
-            className="px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            取消
-          </button>
         </div>
-      )}
-
       {/* 已选择的标签显示 */}
       {selectedTags.length > 0 && (
         <div>
@@ -485,6 +464,41 @@ function MyRecordPageContent() {
   const [showFullImageModal, setShowFullImageModal] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string>('')
   const [compressImages, setCompressImages] = useState(true) // 默认开启图片压缩
+  
+  // 现代化弹窗状态
+  const [alertModal, setAlertModal] = useState<{
+    show: boolean
+    type: 'success' | 'error' | 'warning' | 'info'
+    title: string
+    message: string
+    onConfirm?: () => void
+  }>({
+    show: false,
+    type: 'info',
+    title: '',
+    message: '',
+    onConfirm: undefined
+  })
+  
+  const [confirmModal, setConfirmModal] = useState<{
+    show: boolean
+    title: string
+    message: string
+    onConfirm: () => void
+    onCancel?: () => void
+    confirmText?: string
+    cancelText?: string
+    type?: 'warning' | 'danger' | 'info'
+  }>({
+    show: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    onCancel: undefined,
+    confirmText: '确定',
+    cancelText: '取消',
+    type: 'info'
+  })
 
   // 初始化
   useEffect(() => {
@@ -645,9 +659,59 @@ function MyRecordPageContent() {
     setShowFullImageModal(true)
   }
 
+  // 现代化弹窗函数
+  const showAlert = (type: 'success' | 'error' | 'warning' | 'info', title: string, message: string, onConfirm?: () => void) => {
+    setAlertModal({
+      show: true,
+      type,
+      title,
+      message,
+      onConfirm
+    })
+  }
+
+  const showConfirm = (
+    title: string, 
+    message: string, 
+    onConfirm: () => void, 
+    options?: {
+      onCancel?: () => void
+      confirmText?: string
+      cancelText?: string
+      type?: 'warning' | 'danger' | 'info'
+    }
+  ) => {
+    setConfirmModal({
+      show: true,
+      title,
+      message,
+      onConfirm,
+      onCancel: options?.onCancel,
+      confirmText: options?.confirmText || '确定',
+      cancelText: options?.cancelText || '取消',
+      type: options?.type || 'info'
+    })
+  }
+
+  const closeAlert = () => {
+    if (alertModal.onConfirm) {
+      alertModal.onConfirm()
+    }
+    setAlertModal(prev => ({ ...prev, show: false }))
+  }
+
+  const closeConfirm = (confirmed: boolean) => {
+    if (confirmed) {
+      confirmModal.onConfirm()
+    } else if (confirmModal.onCancel) {
+      confirmModal.onCancel()
+    }
+    setConfirmModal(prev => ({ ...prev, show: false }))
+  }
+
   const handleSave = async () => {
     if (!currentUser || !content.trim()) {
-      alert('请填写记录内容')
+      showAlert('warning', '提示', '请填写记录内容')
       return
     }
 
@@ -663,23 +727,24 @@ function MyRecordPageContent() {
       if (isEditing && editingId) {
         // await myRecordDB.updateRecord(editingId, recordData)
         await adminService.updateMyRecord(editingId, recordData)
-        // alert('记录已更新！')
+        showAlert('success', '成功', '记录已更新！', () => {
+          router.push('/health-calendar')
+        })
       } else {
         // await myRecordDB.saveRecord(recordData)
         await adminService.saveMyRecord(recordData)
-        // alert('记录已保存！')
+        showAlert('success', '成功', '记录已保存！', () => {
+          router.push('/health-calendar')
+        })
       }
 
       if (oneDriveState.isAuthenticated) {
         console.log('MyRecord页面 - 开始同步OneDrive我的记录')
         oneDriveActions.syncIDBOneDriveMyRecords()
       }
-
-      // 返回到健康日历页面
-      router.push('/health-calendar')
     } catch (error) {
       console.error('Failed to save record:', error)
-      alert('保存失败，请重试')
+      showAlert('error', '错误', '保存失败，请重试')
     }
   }
 
@@ -689,9 +754,18 @@ function MyRecordPageContent() {
 
   const handleClose = () => {
     if (content.trim() || selectedTags.length > 0 || attachments.length > 0) {
-      if (confirm('确定要关闭表单吗？未保存的数据将丢失。')) {
-        router.push('/health-calendar')
-      }
+      showConfirm(
+        '确认关闭',
+        '确定要关闭表单吗？未保存的数据将丢失。',
+        () => {
+          router.push('/health-calendar')
+        },
+        {
+          confirmText: '确定关闭',
+          cancelText: '继续编辑',
+          type: 'warning'
+        }
+      )
     } else {
       router.push('/health-calendar')
     }
@@ -838,7 +912,7 @@ function MyRecordPageContent() {
                   }
                 </div>
               </div>
-
+              
               {/* 使用新的 AttachmentUploader 组件 */}
               <AttachmentUploader
                 oneDriveConnected={oneDriveState.isAuthenticated}
@@ -852,6 +926,8 @@ function MyRecordPageContent() {
                 recordId={editingId || 'new'}
                 compressImages={compressImages}
               />
+              
+
 
               {/* Existing Attachments Display */}
               {attachments.length > 0 && (
@@ -922,15 +998,26 @@ function MyRecordPageContent() {
                           <button
                             onClick={async (e) => {
                               e.stopPropagation();
-                              if (confirm('确定要删除这个附件吗？')) {
-                                try {
-                                  await handleAttachmentDelete(attachment.fileName);
-                                  // Remove from local state
-                                  setAttachments(prev => prev.filter((_, i) => i !== index));
-                                } catch (error) {
-                                  console.error('Failed to delete attachment:', error);
+                              showConfirm(
+                                '删除附件',
+                                '确定要删除这个附件吗？',
+                                async () => {
+                                  try {
+                                    await handleAttachmentDelete(attachment.fileName);
+                                    // Remove from local state
+                                    setAttachments(prev => prev.filter((_, i) => i !== index));
+                                    showAlert('success', '成功', '附件已删除')
+                                  } catch (error) {
+                                    console.error('Failed to delete attachment:', error);
+                                    showAlert('error', '错误', '删除附件失败，请重试')
+                                  }
+                                },
+                                {
+                                  confirmText: '删除',
+                                  cancelText: '取消',
+                                  type: 'danger'
                                 }
-                              }
+                              )
                             }}
                             className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
                             title="删除附件"
@@ -947,31 +1034,33 @@ function MyRecordPageContent() {
                     })}
                   </div>
                   
-                  <AttachmentViewer
+                  {/* <AttachmentViewer
                     attachments={attachments}
-                  />
+                  /> */}
                 </div>
               )}
-            </div>
 
-            {/* 操作按钮 */}
+
+            </div>
+          </div>
+
+          {/* 操作按钮 */}
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={handleBack}
                 className="py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors text-sm flex items-center justify-center space-x-1"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="inline w-4 h-4 mr-1.5" />
                 <span>返回</span>
               </button>
               <button
                 onClick={handleSave}
                 className="py-2.5 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors text-sm flex items-center justify-center space-x-1"
               >
-                <Check className="w-4 h-4" />
+                <Check className="inline w-4 h-4 mr-1.5" />
                 <span>{isEditing ? '更新记录' : '保存记录'}</span>
               </button>
             </div>
-          </div>
         </main>
 
         {/* Full Image Modal */}
@@ -1025,6 +1114,127 @@ function MyRecordPageContent() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modern Alert Modal */}
+        {alertModal.show && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={closeAlert}
+            ></div>
+            
+            {/* Modal Content */}
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className={`p-6 text-center border-b ${
+                alertModal.type === 'success' ? 'border-green-100' :
+                alertModal.type === 'error' ? 'border-red-100' :
+                alertModal.type === 'warning' ? 'border-yellow-100' :
+                'border-blue-100'
+              }`}>
+                <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
+                  alertModal.type === 'success' ? 'bg-green-100' :
+                  alertModal.type === 'error' ? 'bg-red-100' :
+                  alertModal.type === 'warning' ? 'bg-yellow-100' :
+                  'bg-blue-100'
+                }`}>
+                  {alertModal.type === 'success' && <Check className={`w-8 h-8 text-green-600`} />}
+                  {alertModal.type === 'error' && <X className={`w-8 h-8 text-red-600`} />}
+                  {alertModal.type === 'warning' && <Trash2 className={`w-8 h-8 text-yellow-600`} />}
+                  {alertModal.type === 'info' && <Clock className={`w-8 h-8 text-blue-600`} />}
+                </div>
+                <h3 className={`text-lg font-semibold mb-2 ${
+                  alertModal.type === 'success' ? 'text-green-800' :
+                  alertModal.type === 'error' ? 'text-red-800' :
+                  alertModal.type === 'warning' ? 'text-yellow-800' :
+                  'text-blue-800'
+                }`}>
+                  {alertModal.title}
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {alertModal.message}
+                </p>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 pt-4">
+                <button
+                  onClick={closeAlert}
+                  className={`w-full py-3 px-4 rounded-xl font-semibold transition-colors ${
+                    alertModal.type === 'success' ? 'bg-green-500 hover:bg-green-600 text-white' :
+                    alertModal.type === 'error' ? 'bg-red-500 hover:bg-red-600 text-white' :
+                    alertModal.type === 'warning' ? 'bg-yellow-500 hover:bg-yellow-600 text-white' :
+                    'bg-blue-500 hover:bg-blue-600 text-white'
+                  }`}
+                >
+                  确定
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modern Confirm Modal */}
+        {confirmModal.show && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <div 
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => closeConfirm(false)}
+            ></div>
+            
+            {/* Modal Content */}
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className={`p-6 text-center border-b ${
+                confirmModal.type === 'danger' ? 'border-red-100' :
+                confirmModal.type === 'warning' ? 'border-yellow-100' :
+                'border-blue-100'
+              }`}>
+                <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${
+                  confirmModal.type === 'danger' ? 'bg-red-100' :
+                  confirmModal.type === 'warning' ? 'bg-yellow-100' :
+                  'bg-blue-100'
+                }`}>
+                  {confirmModal.type === 'danger' && <Trash2 className="w-8 h-8 text-red-600" />}
+                  {confirmModal.type === 'warning' && <Trash2 className="w-8 h-8 text-yellow-600" />}
+                  {confirmModal.type === 'info' && <Clock className="w-8 h-8 text-blue-600" />}
+                </div>
+                <h3 className={`text-lg font-semibold mb-2 ${
+                  confirmModal.type === 'danger' ? 'text-red-800' :
+                  confirmModal.type === 'warning' ? 'text-yellow-800' :
+                  'text-blue-800'
+                }`}>
+                  {confirmModal.title}
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {confirmModal.message}
+                </p>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 pt-4 grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => closeConfirm(false)}
+                  className="py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                >
+                  {confirmModal.cancelText}
+                </button>
+                <button
+                  onClick={() => closeConfirm(true)}
+                  className={`py-3 px-4 rounded-xl font-semibold transition-colors ${
+                    confirmModal.type === 'danger' ? 'bg-red-500 hover:bg-red-600 text-white' :
+                    confirmModal.type === 'warning' ? 'bg-yellow-500 hover:bg-yellow-600 text-white' :
+                    'bg-blue-500 hover:bg-blue-600 text-white'
+                  }`}
+                >
+                  {confirmModal.confirmText}
+                </button>
               </div>
             </div>
           </div>
