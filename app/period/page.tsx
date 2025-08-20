@@ -375,7 +375,7 @@ const TagManager: React.FC<{
     if (customTag.trim() && customTag.length <= 10 && !selectedTags.includes(customTag.trim())) {
       onTagsChange([...selectedTags, customTag.trim()])
       setCustomTag('')
-      setShowCustomInput(false)
+      // setShowCustomInput(false)
     }
   }
 
@@ -402,17 +402,16 @@ const TagManager: React.FC<{
         ))}
         
         {/* Custom tag button */}
-        <button
+        {/* <button
           onClick={() => setShowCustomInput(true)}
           className="px-2 py-1 bg-pink-100 border border-pink-300 rounded-full text-xs font-medium text-pink-600 cursor-pointer transition-all hover:bg-pink-200 hover:shadow-md hover:-translate-y-0.5 flex items-center space-x-1"
         >
           <Plus className="w-3 h-3" />
           <span>自定义</span>
-        </button>
+        </button> */}
       </div>
 
       {/* Custom tag input */}
-      {showCustomInput && (
         <div className="flex items-center space-x-2">
           <input
             type="text"
@@ -429,17 +428,7 @@ const TagManager: React.FC<{
           >
             添加
           </button>
-          <button
-            onClick={() => {
-              setShowCustomInput(false)
-              setCustomTag('')
-            }}
-            className="px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200 transition-colors"
-          >
-            取消
-          </button>
         </div>
-      )}
 
       {/* Selected tags display */}
       {selectedTags.length > 0 && (
@@ -1116,9 +1105,9 @@ function PeriodPageContent() {
                     })}
                   </div>
                   
-                  <AttachmentViewer
+                  {/* <AttachmentViewer
                     attachments={attachments}
-                  />
+                  /> */}
                 </div>
               )}
             </div>

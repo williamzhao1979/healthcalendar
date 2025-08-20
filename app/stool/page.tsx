@@ -582,7 +582,7 @@ function StoolPageContent() {
     if (customTag.trim() && !tags.includes(customTag.trim())) {
       setTags([...tags, customTag.trim()])
       setCustomTag('')
-      setShowCustomTagInput(false)
+      // setShowCustomTagInput(false)
     }
   }
 
@@ -922,17 +922,16 @@ function StoolPageContent() {
                   </button>
                 ))}
                 
-                <button
+                {/* <button
                   onClick={() => setShowCustomTagInput(!showCustomTagInput)}
                   className="px-2 py-1 bg-health-primary/10 border border-health-primary/30 rounded-full text-xs font-medium text-health-primary cursor-pointer transition-all hover:bg-health-primary/20 flex items-center space-x-1"
                 >
                   <Plus className="w-3 h-3" />
                   <span>自定义</span>
-                </button>
+                </button> */}
               </div>
 
               {/* Custom Tag Input */}
-              {showCustomTagInput && (
                 <div className="flex items-center space-x-2 mb-2">
                   <input
                     type="text"
@@ -949,17 +948,7 @@ function StoolPageContent() {
                   >
                     添加
                   </button>
-                  <button
-                    onClick={() => {
-                      setShowCustomTagInput(false)
-                      setCustomTag('')
-                    }}
-                    className="px-2.5 py-1.5 bg-gray-100 text-gray-600 text-xs rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    取消
-                  </button>
                 </div>
-              )}
 
               {/* Selected Tags Display */}
               {tags.length > 0 && (
@@ -1129,9 +1118,9 @@ function StoolPageContent() {
                     })}
                   </div>
                   
-                  <AttachmentViewer
+                  {/* <AttachmentViewer
                     attachments={attachments}
-                  />
+                  /> */}
                 </div>
               )}
             </div>

@@ -2209,8 +2209,8 @@ useEffect(() => {
                 <Utensils className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs theme-text-secondary">上次用餐</div>
-                <div className="text-sm font-bold theme-text-primary leading-tight">
+                <div className={`text-xs ${resolvedTheme === 'dark' ? 'text-blue-800' : 'theme-text-secondary'}`}>上次用餐</div>
+                <div className={`text-sm font-bold leading-tight ${resolvedTheme === 'dark' ? 'text-blue-900' : 'theme-text-primary'}`}>
                   {getTimeSinceLastMeal() || '无记录'}
                 </div>
               </div>
@@ -2220,8 +2220,8 @@ useEffect(() => {
                 <Sprout className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs theme-text-secondary">上次排便</div>
-                <div className="text-sm font-bold theme-text-primary leading-tight">
+                <div className={`text-xs ${resolvedTheme === 'dark' ? 'text-blue-800' : 'theme-text-secondary'}`}>上次排便</div>
+                <div className={`text-sm font-bold leading-tight ${resolvedTheme === 'dark' ? 'text-blue-900' : 'theme-text-primary'}`}>
                   {getTimeSinceLastStool() || '无记录'}
                 </div>
               </div>
@@ -2234,8 +2234,8 @@ useEffect(() => {
                 <Folder className="text-white text-xs" />
               </div>
               <div className="text-left">
-                <div className="text-xs theme-text-secondary">AI工具</div>
-                <div className="text-xs theme-text-tertiary">点击使用</div>
+                <div className={`text-xs ${resolvedTheme === 'dark' ? 'text-blue-800' : 'theme-text-secondary'}`}>AI工具</div>
+                <div className={`text-xs ${resolvedTheme === 'dark' ? 'text-blue-900' : 'theme-text-tertiary'}`}>点击使用</div>
               </div>
             </div>
           </div>
@@ -2253,13 +2253,11 @@ useEffect(() => {
                   </h2>
                   <p className="text-xs theme-text-secondary mt-0.5">健康记录概览</p>
                 </div>
-                <div className="flex items-center space-x-2">
+                {/* <div className="flex items-center space-x-2">
                   <button onClick={goToPrivacyCalendar} className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm health-icon privacy">
                     <Flower2 className="text-white text-sm" />
                   </button>
-                  
-
-                </div>
+                </div> */}
               </div>
               <div className="flex items-center space-x-1">
                 <button 
@@ -2443,12 +2441,6 @@ useEffect(() => {
                 <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full shadow-sm"></div>
                 <span className="text-xs font-medium theme-text-secondary">排便</span>
               </div>
-              {showPeriodRecords && (
-                <div className="flex items-center space-x-1.5">
-                  <div className="w-3 h-3 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full shadow-sm"></div>
-                  <span className="text-xs font-medium theme-text-secondary">生理</span>
-                </div>
-              )}
               <div className="flex items-center space-x-1.5">
                 <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full shadow-sm"></div>
                 <span className="text-xs font-medium theme-text-secondary">记录</span>
@@ -2470,6 +2462,28 @@ useEffect(() => {
                       <div className="w-8 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-pink-300 rounded-full peer peer-checked:after:translate-x-4 peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[1px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
                     </label>
                   </div>
+  {showPeriodRecords && (
+<button
+  onClick={goToPrivacyCalendar}
+  title="查看隐私日历"
+  className={`
+    flex items-center space-x-1.5 px-2 py-1 rounded-lg cursor-pointer
+    bg-gradient-to-r from-pink-400 to-purple-500
+    hover:opacity-80 active:opacity-90
+    shadow-sm hover:shadow-md transition
+  `}
+>
+  <Flower2 className="h-4 w-4 text-white" />
+</button>
+  )}
+
+              {/* {showPeriodRecords && (
+                <div className="flex items-center space-x-2">
+                  <button onClick={goToPrivacyCalendar} className="p-2 rounded-xl bg-white/30 hover:bg-white/40 transition-all backdrop-blur-sm health-icon privacy">
+                    <Flower2 className="text-white" />
+                  </button>
+                </div>
+              )} */}
             </div>
             
           </div>
